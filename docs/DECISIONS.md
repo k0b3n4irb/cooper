@@ -56,6 +56,49 @@ rationale and the docs that grounded it. Newest last.
   (grammars are static data). It was generated once; if the WLA dialect changes,
   regenerate from `phase_1.c`.
 
+---
+
+## 2026-06-26 — Component #2 (C language support / clangd)
+
+### D-007 — clangd is off-the-shelf, bundled via `extensionPack`
+- **Decision:** don't reimplement an LSP client. Cooper is an **extension pack**
+  that lists `llvm-vs-code-extensions.vscode-clangd` in `extensionPack`, so
+  installing Cooper installs clangd support. (`extensionPack`, not
+  `extensionDependencies`: Cooper doesn't call clangd's API, and the user may
+  remove it — it's a curated bundle, not a hard dependency.)
+- **Source:** clangd.llvm.org/installation (official VS Code extension id),
+  verified 2026-06-26.
+
+### D-008 — clangd config mirrors the SDK's own clang lint
+- **Decision:** the OpenSNES `.clangd` adds `-I <sdk>/lib/include -I . -std=gnu11`
+  plus the SDK's warning suppressions (`-Wno-pointer-to-int-cast`,
+  `-Wno-int-to-pointer-cast`, `-Wno-unused-parameter`). This **mirrors
+  `make/common.mk`'s `CLANG_LINT_FLAGS` + `-I lib/include`** so clangd sees what
+  the build's sibling clang check sees.
+- **No `-D__OPENSNES__`:** deliberately omitted, exactly as the SDK's host-clang
+  lint omits it. On a 64-bit host `long` is 8 bytes, so defining `__OPENSNES__`
+  (which routes `s32` through `long`) would make `sizeof(s32)` wrong. The host
+  `#else` branch of `lib/include/snes/types.h` keeps fixed-width sizes correct.
+- **`int`=2 caveat is documented, not hidden** (`docs/clangd.md`): clangd's host
+  target reports `int`/`unsigned int` as 4 bytes; on target they're 2.
+  **Authority = the `cc65816` build.** Fixed-width types (`u8`/`u16`/…) are safe
+  in clangd. (This is the D11 caveat from the architecture dossier, made concrete.)
+- **Source of truth for flags:** `opensnes/make/common.mk` (`CLANG_LINT_FLAGS`),
+  `opensnes/bin/cc65816` (`-D__OPENSNES__=1` for the *real* preprocess only).
+- **Verification:** `clang -fsyntax-only` with these flags parses **56/56**
+  example `main.c` clean (clang 22 = clangd's frontend), so the config is proven
+  across the whole corpus, not one file.
+
+### D-009 — auto-generator deferred to the next slice (first TS code)
+- **Decision:** this slice ships the **declarative** path (extension pack + a
+  documented, verified `.clangd` recipe). A `Cooper: Configure clangd` command
+  that detects the SDK path and writes the `.clangd` automatically is the next
+  component — it is the first piece of Cooper that needs runtime code, and will
+  stand up the TS + esbuild scaffold (per D-002). Kept separate to keep each
+  slice small and fully verifiable ("doucement").
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

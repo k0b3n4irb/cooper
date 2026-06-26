@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator. Component #1: WLA-DX 65816 assembly language support.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -17,7 +17,11 @@
     "vscode": "^1.75.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Extension Packs"
+  ],
+  "extensionPack": [
+    "llvm-vs-code-extensions.vscode-clangd"
   ],
   "keywords": [
     "snes",
