@@ -99,6 +99,35 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-26 — Component #3 (`Configure clangd` command + TS foundation)
+
+### D-010 — TS + esbuild scaffold landed (per D-002)
+- **Decision:** the first runtime-code component stands up TypeScript + esbuild
+  exactly as planned in D-002: `src/extension.ts`, `tsconfig.json` (module/
+  moduleResolution `Node16` — `node` is deprecated in TS 6), `esbuild.js`
+  (the official template), `dist/extension.js` bundle. `engines.vscode ^1.75.0`
+  keeps `onCommand` auto-activation (1.74+), so `activationEvents` is empty.
+
+### D-011 — testable split: pure logic vs vscode glue
+- **Decision:** all real logic (SDK detection, Makefile parsing, `.clangd`
+  rendering) lives in `src/clangdConfig.ts` with **no `vscode` import**, so it is
+  unit-testable under plain Node (`test/run.js` compiles it via esbuild, asserts
+  against the real SDK, and closes the loop by running `clang` with the *emitted*
+  flags). `src/extension.ts` is the thin command/dialog/settings layer.
+- **Rationale:** the Extension Development Host can't be driven headlessly here;
+  isolating the logic makes the valuable part fully verifiable offline.
+
+### D-012 — SDK detection order
+- **Decision:** `cooper.opensnesPath` setting → project `Makefile` `OPENSNES`
+  line → upward search for `lib/include/snes.h` → folder picker (persists the
+  pick to the workspace setting). The Makefile form handled is the canonical
+  `OPENSNES := $(shell cd ../../.. && pwd)` used by all 30 SDK example Makefiles.
+- **Sentinel corrected during verification:** the SDK root marker is
+  `lib/include/snes.h` (the umbrella header), **not** `lib/include/snes/snes.h`
+  (the `snes/` subdir holds only sub-headers). Caught by the node test.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

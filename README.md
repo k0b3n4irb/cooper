@@ -61,8 +61,17 @@ clangd configuration and the honest caveat that clangd's host target reports
 `int` as 4 bytes when the SNES target uses 2 — so the **`cc65816` build is the
 authority**, clangd is for completion/navigation.
 
+Run **Cooper: Configure clangd** from the Command Palette to generate the
+`.clangd` automatically — it finds the SDK via the `cooper.opensnesPath` setting,
+the project Makefile's `OPENSNES` line, or by searching parent folders (falling
+back to a folder picker).
+
 Setup and the full caveat: [`docs/clangd.md`](docs/clangd.md). The config was
 validated against the whole example corpus (56/56 `main.c` parse clean).
+
+> This component introduced Cooper's **TypeScript + esbuild** foundation. Pure
+> logic (SDK detection, `.clangd` rendering) lives in `src/clangdConfig.ts` with
+> no `vscode` import, unit-tested under Node (`npm test`).
 
 ## License
 

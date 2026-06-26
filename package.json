@@ -1,8 +1,8 @@
 {
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
-  "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator. Component #1: WLA-DX 65816 assembly language support.",
-  "version": "0.0.2",
+  "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
+  "version": "0.1.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -16,6 +16,8 @@
   "engines": {
     "vscode": "^1.75.0"
   },
+  "main": "./dist/extension.js",
+  "activationEvents": [],
   "categories": [
     "Programming Languages",
     "Extension Packs"
@@ -30,6 +32,16 @@
     "assembly",
     "opensnes"
   ],
+  "scripts": {
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "test": "node test/run.js",
+    "vscode:prepublish": "npm run package",
+    "package": "npm run check-types && node esbuild.js --production"
+  },
   "contributes": {
     "languages": [
       {
@@ -52,6 +64,31 @@
         "scopeName": "source.wla65816",
         "path": "./syntaxes/wla65816.tmLanguage.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "cooper.configureClangd",
+        "title": "Configure clangd (OpenSNES C support)",
+        "category": "Cooper"
+      }
+    ],
+    "configuration": {
+      "title": "Cooper",
+      "properties": {
+        "cooper.opensnesPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Absolute path to the OpenSNES SDK root (the folder containing `lib/include/snes.h`). Used by **Cooper: Configure clangd** to generate the `.clangd` file. If empty, Cooper infers it from the project Makefile's `OPENSNES` line, then by searching parent folders."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/vscode": "~1.75.0",
+    "esbuild": "^0.28.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^6.0.3"
   }
 }
