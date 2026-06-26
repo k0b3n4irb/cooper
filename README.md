@@ -1,0 +1,57 @@
+# Cooper — OpenSNES IDE
+
+> The one ring to bind them: a unified development environment for making SNES
+> games on the **OpenSNES** SDK + **luna** emulator.
+
+Cooper is a VS Code extension (pack, eventually) that ties together the whole
+OpenSNES vertical — SDK, compiler (`cc65816`: cproc→QBE→wla), and the luna
+cycle-accurate emulator — into one workflow: edit, build, run, debug, and
+author assets, without seams.
+
+The design is captured in [`docs/`](docs/):
+
+- [`docs/01-architecture.md`](docs/01-architecture.md) — the full architecture
+  (the "ring" = a shared contract, not a fourth app).
+- [`docs/02-debugger-dap-luna.md`](docs/02-debugger-dap-luna.md) — the DAP ↔ luna
+  debugger design.
+- [`docs/03-debug-info-format.md`](docs/03-debug-info-format.md) — the debug-info
+  format (extend the WLA `.sym`, don't invent).
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — stack & build decisions, dated.
+
+## Status
+
+Early. Built one component at a time, each grounded in up-to-date docs and
+verified before landing.
+
+| Component | Status |
+|---|---|
+| **#1 — WLA-DX 65816 syntax highlighting** | ✅ shipped (this commit) |
+| #2 — C language support (clangd, compile_commands) | planned |
+| #3 — Build & run/preview (tasks + luna) | planned |
+| #4 — Debugger (DAP ↔ luna) | planned |
+| #5 — Asset editors (palette → tiles → map) | planned |
+| #6 — AI SDK-aware (context → MCP → luna loop) | planned |
+
+## Component #1 — WLA-DX 65816 assembly highlighting
+
+Syntax highlighting for the WLA-DX assembly dialect used by OpenSNES hand-written
+ASM (`.asm`, `.inc`):
+
+- the full **WDC 65816 instruction set** (92 mnemonics),
+- **200 WLA-DX directives** (`.SECTION`/`.ENDS`, `.DB`/`.DW`, `.RAMSECTION`,
+  `.ACCU`/`.INDEX`, `.IFDEF`/`.ELSE`/`.ENDIF`, …), case-insensitive,
+- `$hex` / `%binary` / decimal literals, `;` line comments, `"`/`'` strings,
+  column-0 labels, indexed registers.
+
+The directive set is generated from the WLA-DX assembler's own parser
+(`compiler/wla-dx/phase_1.c`) — the source of truth — so it tracks the real
+dialect, not a generic 65816 grammar.
+
+### Try it locally
+
+Open this folder in VS Code and press <kbd>F5</kbd> (Extension Development Host),
+then open any `lib/source/*.asm` from the OpenSNES repo.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

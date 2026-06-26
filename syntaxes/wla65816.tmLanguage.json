@@ -1,0 +1,156 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "WLA-DX 65816 Assembly",
+  "scopeName": "source.wla65816",
+  "fileTypes": [
+    "asm",
+    "inc"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#labels"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#mnemonics"
+    },
+    {
+      "include": "#registers"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.wla65816",
+          "match": ";.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.wla65816",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.wla65816",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.wla65816",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.wla65816",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "match": "^\\s*([A-Za-z_.@][A-Za-z0-9_.@]*)(:)",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.label.wla65816"
+            },
+            "2": {
+              "name": "punctuation.separator.label.wla65816"
+            }
+          }
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.directive.wla65816",
+          "match": "(?i)\\.end[a-z0-9]+\\b"
+        },
+        {
+          "name": "keyword.control.directive.wla65816",
+          "match": "(?i)\\.(?:COMPUTEGBCOMPLEMENTCHECK|COMPUTECOMPLEMENTCHECK|DEFAULTRAMSECTIONSLOT|COMPUTESNESCHECKSUM|COMPUTESMDCHECKSUM|COMPUTESMSCHECKSUM|DEFAULTSECTIONSLOT|COMPUTEGBCHECKSUM|SNESNATIVEVECTOR|COMPUTECHECKSUM|DESTINATIONCODE|LICENSEECODENEW|LICENSEECODEOLD|RAMADDRESSRANGE|ROMADDRESSRANGE|STRINGMAPTABLE|CARTRIDGETYPE|DEVICESUPPORT|FORCECHECKSUM|REGIONSUPPORT|RESERVEDSPACE|SNESEMUVECTOR|TITLEDOMESTIC|TITLEOVERSEAS|CHECKSUMSIZE|LICENSEECODE|MODEMSUPPORT|NINTENDOLOGO|SERIALNUMBER|UNBACKGROUND|ARRAYDEFINE|BASEADDRESS|COUNTRYCODE|DEFAULTSLOT|EXTRAMEMORY|PRODUCTCODE|ROMBANKSIZE|ASCIITABLE|BACKGROUND|BANKSTOTAL|BREAKPOINT|INSTANCEOF|RAMSECTION|REGIONCODE|ROMBANKMAP|ROMGBCONLY|SEEDRANDOM|SNESHEADER|SYSTEMTYPE|COPYRIGHT|EMPTYFILL|MEMORYMAP|STRINGMAP|ARRAYDEF|ARRAYOUT|ASCTABLE|BANKSIZE|CONTINUE|FUNCTION|IFEXISTS|REDEFINE|ROMBANKS|SLOTSIZE|SRAMSIZE|UNDEFINE|ARRAYDB|ARRAYDD|ARRAYDL|ARRAYDW|ARRAYIN|COUNTRY|DSTRUCT|EXHIROM|EXLOROM|FARADDR|FASTROM|IFNDEFM|INCLUDE|OUTNAME|RAMSIZE|ROMSIZE|SDSCTAG|SECTION|SLOWROM|VERSION|ASCSTR|ASSERT|DEFINE|ENUMID|EXPORT|FCLOSE|FILTER|IFDEFM|IFGREQ|IFLEEQ|IFNDEF|INCBIN|INCDIR|PRINTT|PRINTV|REPEAT|ROMDMG|ROMGBC|ROMSGB|SMSTAG|STRUCT|SYMBOL|UNUSED|16BIT|24BIT|ALIGN|BANKS|BLOCK|BREAK|CADDR|DBCOS|DBRND|DBSIN|DWCOS|DWRND|DWSIN|FOPEN|FREAD|FSEEK|FSIZE|FTELL|HIROM|IFDEF|IFNEQ|INDEX|INPUT|LOROM|MACRO|NARGS|NOWDC|PRINT|REDEF|SHIFT|TABLE|UNDEF|WHILE|8BIT|ACCU|ADDR|BANK|BASE|BITS|BYTE|DATA|ELIF|ELSE|ENUM|FAIL|IFEQ|IFGR|IFLE|LONG|NAME|ORGA|REPT|SEED|SLOT|WORD|ASC|ASM|BYT|DBM|DDM|DEF|DLM|DSB|DSD|DSL|DSW|DWM|EQU|HEX|INC|IND|MAP|ORG|ROW|SMC|SYM|WDC|BR|DB|DD|DL|DS|DW|IF)\\b"
+        }
+      ]
+    },
+    "mnemonics": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(ADC|AND|ASL|BCC|BCS|BEQ|BIT|BMI|BNE|BPL|BRA|BRK|BRL|BVC|BVS|CLC|CLD|CLI|CLV|CMP|COP|CPX|CPY|DEC|DEX|DEY|EOR|INC|INX|INY|JML|JMP|JSL|JSR|LDA|LDX|LDY|LSR|MVN|MVP|NOP|ORA|PEA|PEI|PER|PHA|PHB|PHD|PHK|PHP|PHX|PHY|PLA|PLB|PLD|PLP|PLX|PLY|REP|ROL|ROR|RTI|RTL|RTS|SBC|SEC|SED|SEI|SEP|STA|STP|STX|STY|STZ|TAX|TAY|TCD|TCS|TDC|TRB|TSB|TSC|TSX|TXA|TXS|TXY|TYA|TYX|WAI|WDM|XBA|XCE)(\\.[bwl])?\\b",
+          "captures": {
+            "1": {
+              "name": "support.function.mnemonic.wla65816"
+            },
+            "2": {
+              "name": "keyword.operator.size.wla65816"
+            }
+          }
+        }
+      ]
+    },
+    "registers": {
+      "patterns": [
+        {
+          "match": "(,)\\s*(?i:x|y|s|b)\\b",
+          "captures": {
+            "1": {
+              "name": "punctuation.separator.wla65816"
+            },
+            "2": {
+              "name": "variable.language.register.wla65816"
+            }
+          }
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.wla65816",
+          "match": "\\$[0-9A-Fa-f]+\\b"
+        },
+        {
+          "name": "constant.numeric.binary.wla65816",
+          "match": "%[01]+\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.wla65816",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.immediate.wla65816",
+          "match": "#"
+        },
+        {
+          "name": "keyword.operator.wla65816",
+          "match": "[+\\-*/&|\\^~<>=]"
+        }
+      ]
+    }
+  }
+}

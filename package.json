@@ -1,0 +1,53 @@
+{
+  "name": "cooper",
+  "displayName": "Cooper — OpenSNES IDE",
+  "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator. Component #1: WLA-DX 65816 assembly language support.",
+  "version": "0.0.1",
+  "publisher": "opensnes",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/k0b3n4irb/cooper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/k0b3n4irb/cooper/issues"
+  },
+  "homepage": "https://github.com/k0b3n4irb/cooper#readme",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "snes",
+    "65816",
+    "wla-dx",
+    "assembly",
+    "opensnes"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "wla65816",
+        "aliases": [
+          "WLA-DX 65816 Assembly",
+          "wla-dx",
+          "wla65816"
+        ],
+        "extensions": [
+          ".asm",
+          ".inc"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "wla65816",
+        "scopeName": "source.wla65816",
+        "path": "./syntaxes/wla65816.tmLanguage.json"
+      }
+    ]
+  }
+}
