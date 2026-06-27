@@ -4,6 +4,28 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-06-27
+
+### Added — Data (memory-watch) breakpoints (P2.2b)
+
+The debugger's differentiator: **stop when a memory address is read/written**,
+over luna's `run_until_mem_write`/`run_until_mem_read`.
+
+- `dataBreakpointInfoRequest` + `setDataBreakpointsRequest`: set a watch on a
+  `.sym` symbol (e.g. `vblank_flag`) or a literal address (`$2100`). Registers
+  aren't watchable (return no `dataId`).
+- Continue honours a single watch exactly via `run_until_mem_*`; `'readWrite'`
+  watches writes. Capability `supportsDataBreakpoints`.
+- Verified end-to-end vs real luna: a write watch on `$2100` stops at PC `0x836B`
+  inside `InitHardware` — the exact instruction that writes INIDISP.
+
+### Notes / limits
+
+- luna watches **one address per run** (D-016): when a data breakpoint coexists
+  with other breakpoints, only the first is honoured per Continue (warned).
+  Mem-watch is **bank-exact** — set the address in the executing bank (`$80:..`
+  FastROM, `$00:..` LoROM). Decision D-021.
+
 ## [0.4.0] — 2026-06-27
 
 ### Added — Debugger memory view + expression evaluation (P2.2a)

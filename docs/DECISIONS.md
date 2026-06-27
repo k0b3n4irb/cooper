@@ -321,6 +321,31 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-27 — P2.2b (data / memory-watch breakpoints)
+
+### D-021 — Data breakpoints honour one watch per Continue; `readWrite`→write
+- **Decision:** DAP data breakpoints map to luna `run_until_mem_write|read`.
+  `dataBreakpointInfoRequest` resolves a `.sym` symbol or literal address to a
+  `dataId` (the `0x…` memoryReference); registers (the Registers scope) return
+  `dataId: null` (not memory-backed — and single-letter reg names would otherwise
+  parse as hex addresses). `accessTypes: ['read','write','readWrite']`.
+- **One condition per Continue (the D-016 gap, made explicit):** luna watches a
+  **single** address per run. So Continue honours, in order: a single data
+  breakpoint (`run_until_mem_*`, exact) → a single PC breakpoint (`run_until_pc`,
+  exact) → multiple PC breakpoints (chunked single-step scan, may overshoot). When
+  a data breakpoint coexists with other breakpoints, **only the first data
+  breakpoint is honoured that Continue**, and an `OutputEvent` warns. `'readWrite'`
+  watches **writes** (`run_until_mem_*` is one kind per call).
+- **Caveat (D-016):** mem-watch is **bank-exact, not mirror-folded** — set the
+  address in the bank the code executes from (`$80:..` FastROM, `$00:..` LoROM).
+- **Verified end-to-end vs real luna:** a write data breakpoint on `$2100`
+  (INIDISP) stops at PC `0x836B` inside `InitHardware` — the exact instruction
+  that writes it.
+- **Capability:** `supportsDataBreakpoints`. DAP field shapes from
+  `@vscode/debugprotocol` 1.68 `.d.ts`.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

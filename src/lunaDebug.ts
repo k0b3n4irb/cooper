@@ -80,6 +80,7 @@ export class LunaDebugSession extends LoggingDebugSession {
     private mcp = new LunaMcp();
     private sym: SymTable | null = null;
     private breakpoints: number[] = [];      // 24-bit PC addresses
+    private dataBreakpoints: { addr: number; access: DebugProtocol.DataBreakpointAccessType }[] = [];
     private configurationDone = false;
     private stopOnEntry = true;
     private maxSteps = 5_000_000;
@@ -97,6 +98,7 @@ export class LunaDebugSession extends LoggingDebugSession {
         response.body.supportsSteppingGranularity = true;
         response.body.supportsReadMemoryRequest = true;
         response.body.supportsEvaluateForHovers = true;
+        response.body.supportsDataBreakpoints = true;
         response.body.supportsRestartRequest = false;
         response.body.supportsStepBack = false;
         this.sendResponse(response);
@@ -171,6 +173,48 @@ export class LunaDebugSession extends LoggingDebugSession {
         this.sendResponse(response);
     }
 
+    /** Can a data (memory-watch) breakpoint be set on this name/expression?
+     *  Resolves a `.sym` symbol or literal address → a dataId (the address). */
+    protected dataBreakpointInfoRequest(
+        response: DebugProtocol.DataBreakpointInfoResponse,
+        args: DebugProtocol.DataBreakpointInfoArguments,
+    ): void {
+        // Registers are not memory-backed — no data breakpoint on a register.
+        const addr = (args.variablesReference === REGISTERS_REF || !this.sym)
+            ? undefined
+            : resolveExpr(this.sym, args.name);
+        if (addr === undefined) {
+            response.body = { dataId: null, description: `cannot watch '${args.name}'` };
+        } else {
+            response.body = {
+                dataId: memRef(addr),
+                description: `${args.name} @ ${memRef(addr)}`,
+                accessTypes: ['read', 'write', 'readWrite'],
+                canPersist: false,
+            };
+        }
+        this.sendResponse(response);
+    }
+
+    protected setDataBreakpointsRequest(
+        response: DebugProtocol.SetDataBreakpointsResponse,
+        args: DebugProtocol.SetDataBreakpointsArguments,
+    ): void {
+        this.dataBreakpoints = [];
+        const bps: DebugProtocol.Breakpoint[] = [];
+        for (const db of args.breakpoints) {
+            const addr = parseAddress(db.dataId);
+            if (addr !== undefined) {
+                this.dataBreakpoints.push({ addr, access: db.accessType ?? 'write' });
+                bps.push({ verified: true });
+            } else {
+                bps.push({ verified: false, message: `bad dataId '${db.dataId}'` });
+            }
+        }
+        response.body = { breakpoints: bps };
+        this.sendResponse(response);
+    }
+
     protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
         response.body = { threads: [new Thread(THREAD_ID, '65816 (main CPU)')] };
         this.sendResponse(response);
@@ -217,17 +261,38 @@ export class LunaDebugSession extends LoggingDebugSession {
         await this.runToBreakpoints(response);
     }
 
-    /** Run to the first breakpoint (exact for one bp; chunked scan for many). */
+    /**
+     * Run to the first breakpoint. luna watches ONE condition per run (D-016), so:
+     *  - a single data (memory-watch) breakpoint → `run_until_mem_*` (exact);
+     *  - a single PC breakpoint → `run_until_pc` (exact);
+     *  - multiple PC breakpoints → chunked single-step scan (may overshoot);
+     *  - mixing kinds / >1 data bp → only the first data bp is honored (warned).
+     */
     private async runToBreakpoints(response: DebugProtocol.Response): Promise<void> {
         response.body = { ...(response.body ?? {}), allThreadsContinued: true };
         this.sendResponse(response);
 
-        let hit = false;
+        let reason = 'pause';
         try {
-            if (this.breakpoints.length === 1) {
-                hit = (await this.mcp.runUntilPc(this.breakpoints[0], this.maxSteps)).hit;
+            if (this.dataBreakpoints.length >= 1) {
+                if (this.dataBreakpoints.length > 1 || this.breakpoints.length > 0) {
+                    this.sendEvent(new OutputEvent('luna watches one address per run — only the first data breakpoint is honored this continue.\n', 'console'));
+                }
+                const d = this.dataBreakpoints[0];
+                const r = d.access === 'read'
+                    ? await this.mcp.runUntilMemRead(d.addr, this.maxSteps)
+                    : await this.mcp.runUntilMemWrite(d.addr, this.maxSteps);  // write | readWrite
+                if (r.hit) {
+                    reason = 'data breakpoint';
+                }
+            } else if (this.breakpoints.length === 1) {
+                if ((await this.mcp.runUntilPc(this.breakpoints[0], this.maxSteps)).hit) {
+                    reason = 'function breakpoint';
+                }
             } else if (this.breakpoints.length > 1) {
-                hit = await this.scanForBreakpoints();
+                if (await this.scanForBreakpoints()) {
+                    reason = 'function breakpoint';
+                }
             } else {
                 // No breakpoints: advance a bounded budget, then pause.
                 await this.mcp.step(Math.min(this.maxSteps, 200000));
@@ -237,7 +302,7 @@ export class LunaDebugSession extends LoggingDebugSession {
             this.sendEvent(new TerminatedEvent());
             return;
         }
-        this.sendEvent(new StoppedEvent(hit ? 'function breakpoint' : 'pause', THREAD_ID));
+        this.sendEvent(new StoppedEvent(reason, THREAD_ID));
     }
 
     /** Chunked single-step scan for >1 breakpoint (may overshoot — D-016 gap). */

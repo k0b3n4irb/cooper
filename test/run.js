@@ -324,6 +324,23 @@ try { fs.unlinkSync(tmpS); } catch {}
             check('readMemory(InitHardware,3) === [C2,10,E2]', JSON.stringify(got) === JSON.stringify([0xC2, 0x10, 0xE2]));
             check('readMemory reports address 0x008365', rm.body.address === '0x008365');
 
+            // data (memory-watch) breakpoint: stop when INIDISP $2100 is written
+            const dbiReg = await dapCall('dataBreakpointInfo', { name: 'A', variablesReference: 1000 });
+            check('dataBreakpointInfo on a register -> dataId null', dbiReg.body.dataId === null);
+            const dbi = await dapCall('dataBreakpointInfo', { name: '$2100' });
+            check('dataBreakpointInfo($2100) -> dataId 0x002100', dbi.body.dataId === '0x002100');
+            check('dataBreakpointInfo offers write access', dbi.body.accessTypes.includes('write'));
+
+            await dapCall('setFunctionBreakPoints', { breakpoints: [] }); // clear PC bps
+            const sdb = await dapCall('setDataBreakpoints', { breakpoints: [{ dataId: '0x002100', accessType: 'write' }] });
+            check('setDataBreakpoints verified', sdb.body.breakpoints[0].verified === true);
+
+            await dapCall('continue', { threadId: 1 });
+            await waitEvent(stopped('data breakpoint'));
+            check('stopped at data breakpoint (mem write $2100)', true);
+            const st2 = await dapCall('stackTrace', { threadId: 1 });
+            check('data bp stopped in InitHardware', /InitHardware/.test(st2.body.stackFrames[0].name));
+
             await dapCall('disconnect', {});
             check('disconnect ok', true);
         } catch (e) {

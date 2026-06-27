@@ -42,9 +42,11 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 - ✅ **P2.2a (0.4.0):** `readMemoryRequest` (CPU-bus hex viewer via `peek_memory`)
   + `evaluateRequest` (symbol/address → byte + memoryReference); register
   memoryReferences. D-020.
-- 🔜 **P2.2b:** data breakpoints → `run_until_mem_write|read` (bank-exact);
-  VRAM/ARAM memory via `peek_vram`/`peek_aram`; PPU/VRAM/OAM viewers (webview at a
-  stop); better multi-bp continue.
+- ✅ **P2.2b (0.5.0):** data (memory-watch) breakpoints → `run_until_mem_write|read`
+  (`dataBreakpointInfo` + `setDataBreakpoints`); bank-exact; one watch per
+  Continue. D-021.
+- 🔜 **P2.2c:** VRAM/ARAM memory via `peek_vram`/`peek_aram`; PPU/VRAM/OAM viewers
+  (webview at a stop); better multi-bp continue.
 - **Gap:** no MCP `peek_cgram`/`peek_oam` in the pinned binary (D-016) → CGRAM/OAM
   bulk views need a luna RFE.
 - **Deps RESOLVED (2026-06-27, D-016):** the pinned luna 1.1.0 already exposes
