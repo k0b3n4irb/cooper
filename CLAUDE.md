@@ -126,6 +126,7 @@ build; hardware truth comes from luna); **off-the-shelf everywhere except** C4
 
 - `.claude/rules/` — normative rules: `workflow.md`, `architecture.md`,
   `extension-dev.md`, `commits.md`. Read them.
-- `.claude/notes/` — context: project overview, status, routing.
+- `.claude/notes/` — context: `roadmap.md` (the plan: done + phased remaining),
+  `status.md` (the "now"), `project-overview.md`, routing `README.md`.
 - `.claude/skills/` — `/new-component`, `/ground-in-docs`, `/regen-wla-grammar`.
 - `.claude/agents/` — `doc-researcher`, `sdk-source-cartographer`.

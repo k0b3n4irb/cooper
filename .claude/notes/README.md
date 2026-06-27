@@ -15,7 +15,10 @@ Rules enforce behavior; notes record context; docs are the durable design.
 
 - `project-overview.md` — the clear, complete description of Cooper: vision,
   the ownership superpower, the ring, capabilities, competitive position.
-- `status.md` — what's shipped, what's next, where the decisions live.
+- `roadmap.md` — the authoritative plan: what's done + the phased remaining work
+  (P0–P8), dependencies, and open decisions.
+- `status.md` — the "now" snapshot (last shipped + current focus); points to the
+  roadmap for the full plan.
 
 When you learn something durable about the project, put it in the right bucket:
 a *rule* if it should change behavior, a *note* if it's context, `docs/DECISIONS.md`
