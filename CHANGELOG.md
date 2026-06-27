@@ -4,6 +4,28 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-06-27
+
+### Added — Debugger memory view + expression evaluation (P2.2a)
+
+- **`Read Memory` (hex viewer)** — `readMemoryRequest` reads CPU-bus memory
+  (WRAM / ROM / MMIO) via luna `peek_memory`. Open it from a register's
+  "View Binary Data" or any evaluated address.
+- **Watch / hover / REPL evaluation** — `evaluateRequest` resolves a `.sym`
+  symbol (e.g. `vblank_flag`) or a literal address (`$7E0030`, `0x008365`,
+  `7E:0030`) to its first byte and a clickable `memoryReference`.
+- **Registers carry `memoryReference`s** (PC at PB:PC; 16-bit regs at bank 0) so
+  the hex viewer can open at a register's value.
+- Capabilities: `supportsReadMemoryRequest`, `supportsEvaluateForHovers`.
+- Verified end-to-end vs the real luna 1.1.0 binary: `evaluate("InitHardware")`
+  → `0x008365`/`$C2`; `readMemory(0x008365, 3)` → the real opcodes `C2 10 E2`.
+
+### Notes / limits
+
+- Memory reads cover the **CPU bus** only. VRAM / ARAM (`peek_vram`/`peek_aram`)
+  need a separate memory-reference scheme (P2.2b); CGRAM / OAM have no MCP peek
+  in the pinned binary (D-016). Decision D-020.
+
 ## [0.3.0] — 2026-06-27
 
 ### Added — Component #4: ASM/symbol-level debugger (P2.1, the jewel — MVP)

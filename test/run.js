@@ -189,6 +189,14 @@ check('exact-hit delta is 0', S.addrToSymbol(sym, initAddr).delta === 0);
 // Today's .sym is labels-only (no addr-to-line until G0 build flags).
 check('hasLineInfo is false (labels-only today)', sym.hasLineInfo === false);
 check('sections parsed (ROM + RAM)', sym.sections.some((s) => s.kind === 'rom') && sym.sections.some((s) => s.kind === 'ram'));
+
+// address parsing + expression resolution (for evaluate / memory view)
+check('parseAddress($008365)', S.parseAddress('$008365') === 0x008365);
+check('parseAddress(0x7E0030)', S.parseAddress('0x7E0030') === 0x7E0030);
+check('parseAddress(7E:0030)', S.parseAddress('7E:0030') === 0x7E0030);
+check('parseAddress(garbage) undefined', S.parseAddress('zzz') === undefined);
+check('resolveExpr(symbol) wins', S.resolveExpr(sym, 'InitHardware') === 0x008365);
+check('resolveExpr(literal) falls through', S.resolveExpr(sym, '$7E0030') === 0x7E0030);
 try { fs.unlinkSync(tmpS); } catch {}
 
 // ===========================================================================
@@ -254,6 +262,8 @@ try { fs.unlinkSync(tmpS); } catch {}
     check('formatRegisters PC = $00:8365', regs.find((r) => r.name === 'PC').value === '$00:8365');
     check('formatRegisters A = $1234', regs.find((r) => r.name === 'A').value === '$1234');
     check('formatRegisters P decodes flags', regs.find((r) => r.name === 'P').value === '$30 (nvMXdizc)');
+    check('formatRegisters PC carries memoryReference', regs.find((r) => r.name === 'PC').memoryReference === '0x008365');
+    check('formatRegisters P has no memoryReference', regs.find((r) => r.name === 'P').memoryReference === undefined);
 
     const lunaBin2 = B.resolveLunaPath({ sdkPath: OPENSNES });
     if (!lunaBin2 || !fs.existsSync(lunaBin2)) {
@@ -302,6 +312,17 @@ try { fs.unlinkSync(tmpS); } catch {}
             await dapCall('scopes', { frameId: 0 });
             const vars = await dapCall('variables', { variablesReference: 1000 });
             check('Registers PC === $00:8365 (breakpoint hit)', vars.body.variables.find((v) => v.name === 'PC').value === '$00:8365');
+
+            // evaluate a symbol -> its first byte + a memoryReference (InitHardware = $C2)
+            const ev = await dapCall('evaluate', { expression: 'InitHardware', context: 'watch' });
+            check('evaluate(InitHardware) memoryReference 0x008365', ev.body.memoryReference === '0x008365');
+            check('evaluate(InitHardware) shows first byte $C2', /\$C2$/.test(ev.body.result));
+
+            // readMemory at that reference -> base64 of the real opcodes C2 10 E2
+            const rm = await dapCall('readMemory', { memoryReference: '0x008365', count: 3 });
+            const got = [...Buffer.from(rm.body.data, 'base64')];
+            check('readMemory(InitHardware,3) === [C2,10,E2]', JSON.stringify(got) === JSON.stringify([0xC2, 0x10, 0xE2]));
+            check('readMemory reports address 0x008365', rm.body.address === '0x008365');
 
             await dapCall('disconnect', {});
             check('disconnect ok', true);

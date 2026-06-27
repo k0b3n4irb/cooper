@@ -188,9 +188,10 @@ export class LunaMcp {
         return this.callTool('run_until_mem_read', { addr, max_steps: maxSteps }) as Promise<MemBreakResult>;
     }
 
-    /** Read `count` bytes from the CPU bus at `bank:offset`. */
-    peekMemory(bank: number, offset: number, count: number): Promise<unknown> {
-        return this.callTool('peek_memory', { bank, offset, count });
+    /** Read `count` bytes from the CPU bus at `bank:offset` (returns the byte array). */
+    async peekMemory(bank: number, offset: number, count: number): Promise<number[]> {
+        const r = await this.callTool('peek_memory', { bank, offset, count }) as { bytes?: number[] };
+        return r?.bytes ?? [];
     }
 
     /** Terminate the luna process. */

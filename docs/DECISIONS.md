@@ -295,6 +295,32 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-27 — P2.2a (debugger memory view + evaluate)
+
+### D-020 — Memory model: CPU-bus reads via `peek_memory`; `0x`-prefixed refs
+- **Decision:** `readMemoryRequest` and `evaluateRequest` read the **CPU bus**
+  (`peek_memory` → `{bytes:[…]}`), covering **WRAM / ROM / MMIO** — the address
+  space the 65816 sees. DAP `memoryReference`s are emitted as **`0x` + 6 hex
+  digits** (24-bit, e.g. `0x008365`) and parsed back with `parseAddress`
+  (accepts `0x…`, `$…`, `BB:OOOO`). `peek_memory`'s window is one bank
+  (offset/count are 16-bit) so reads are **clamped to the bank** and the shortfall
+  reported as `unreadableBytes`.
+- **`evaluateRequest`** resolves a `.sym` symbol first, else a literal address
+  (`resolveExpr`), reads the first byte, and returns `result` + a
+  `memoryReference` so the hex viewer opens there. Register variables also carry
+  a `memoryReference` (PC at PB:PC; 16-bit regs at bank 0).
+- **VRAM / ARAM deferred:** they are **not** in the CPU address space, so they
+  need a distinct memory-reference scheme routing to `peek_vram` / `peek_aram`
+  (P2.2b). **CGRAM / OAM have no MCP peek tool at all** in the pinned binary
+  (D-016) → a luna RFE.
+- **Grounded:** `peek_memory(0x00,0x8365,6)` on the real binary returns
+  `[C2,10,E2,20,A9,8F]` = `REP #$10 / SEP #$20 / LDA #$8F` (InitHardware's init).
+  DAP `ReadMemory`/`Evaluate` field shapes from the installed
+  `@vscode/debugprotocol` 1.68 `.d.ts`.
+- **Capabilities added:** `supportsReadMemoryRequest`, `supportsEvaluateForHovers`.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

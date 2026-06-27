@@ -18,7 +18,7 @@ import { DebugProtocol } from '@vscode/debugprotocol';
 import * as path from 'path';
 import * as fs from 'fs';
 import { LunaMcp, CpuState } from './lunaMcp';
-import { parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved } from './sym';
+import { parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved, resolveExpr, parseAddress } from './sym';
 
 const THREAD_ID = 1;
 const REGISTERS_REF = 1000;
@@ -41,6 +41,11 @@ function hex(n: number, width: number): string {
     return '$' + (n >>> 0).toString(16).toUpperCase().padStart(width, '0');
 }
 
+/** Canonical DAP memoryReference for a 24-bit address: `0x00ABCD`. */
+function memRef(addr: number): string {
+    return '0x' + (addr >>> 0).toString(16).toUpperCase().padStart(6, '0');
+}
+
 /** Decode the 65816 status byte P into `nvmxdizc` (set bits upper-case). */
 export function decodeP(p: number): string {
     const bits = ['c', 'z', 'i', 'd', 'x', 'm', 'v', 'n']; // bit0..bit7
@@ -51,17 +56,19 @@ export function decodeP(p: number): string {
     return s;
 }
 
-/** Pure: format a CPU state as DAP register variables (testable without a binary). */
+/** Pure: format a CPU state as DAP register variables (testable without a binary).
+ *  Address-like registers carry a `memoryReference` so the hex viewer can open
+ *  at their value (PC at PB:PC; 16-bit regs at bank 0). */
 export function formatRegisters(cpu: CpuState): DebugProtocol.Variable[] {
-    const v = (name: string, value: string): DebugProtocol.Variable =>
-        ({ name, value, variablesReference: 0 });
+    const v = (name: string, value: string, ref?: number): DebugProtocol.Variable =>
+        ({ name, value, variablesReference: 0, ...(ref !== undefined ? { memoryReference: memRef(ref) } : {}) });
     return [
-        v('PC', `${hex(cpu.pb, 2)}:${hex(cpu.pc, 4).slice(1)}`),
-        v('A', hex(cpu.a, 4)),
-        v('X', hex(cpu.x, 4)),
-        v('Y', hex(cpu.y, 4)),
-        v('SP', hex(cpu.sp, 4)),
-        v('DP', hex(cpu.dp, 4)),
+        v('PC', `${hex(cpu.pb, 2)}:${hex(cpu.pc, 4).slice(1)}`, ((cpu.pb << 16) | cpu.pc) >>> 0),
+        v('A', hex(cpu.a, 4), cpu.a & 0xFFFF),
+        v('X', hex(cpu.x, 4), cpu.x & 0xFFFF),
+        v('Y', hex(cpu.y, 4), cpu.y & 0xFFFF),
+        v('SP', hex(cpu.sp, 4), cpu.sp & 0xFFFF),
+        v('DP', hex(cpu.dp, 4), cpu.dp & 0xFFFF),
         v('DB', hex(cpu.db, 2)),
         v('PB', hex(cpu.pb, 2)),
         v('P', `${hex(cpu.p, 2)} (${decodeP(cpu.p)})`),
@@ -88,6 +95,8 @@ export class LunaDebugSession extends LoggingDebugSession {
         response.body.supportsConfigurationDoneRequest = true;
         response.body.supportsFunctionBreakpoints = true;
         response.body.supportsSteppingGranularity = true;
+        response.body.supportsReadMemoryRequest = true;
+        response.body.supportsEvaluateForHovers = true;
         response.body.supportsRestartRequest = false;
         response.body.supportsStepBack = false;
         this.sendResponse(response);
@@ -265,6 +274,62 @@ export class LunaDebugSession extends LoggingDebugSession {
             this.sendEvent(new OutputEvent(`step failed: ${(e as Error).message}\n`, 'stderr'));
         }
         this.sendEvent(new StoppedEvent('step', THREAD_ID));
+    }
+
+    /** Evaluate a symbol or address (Watch/hover/REPL): show its first byte and
+     *  hand back a `memoryReference` so the hex viewer can open there. */
+    protected async evaluateRequest(
+        response: DebugProtocol.EvaluateResponse,
+        args: DebugProtocol.EvaluateArguments,
+    ): Promise<void> {
+        const expr = (args.expression ?? '').trim();
+        const addr = this.sym ? resolveExpr(this.sym, expr) : undefined;
+        if (addr === undefined) {
+            this.sendErrorResponse(response, 3002, `cannot resolve '${expr}' to a symbol or address`);
+            return;
+        }
+        try {
+            const [byte] = await this.mcp.peekMemory(addr >>> 16, addr & 0xFFFF, 1);
+            response.body = {
+                result: `${memRef(addr)} = ${hex(byte ?? 0, 2)}`,
+                type: 'u8',
+                variablesReference: 0,
+                memoryReference: memRef(addr),
+            };
+        } catch (e) {
+            this.sendErrorResponse(response, 3003, `peek failed: ${(e as Error).message}`);
+            return;
+        }
+        this.sendResponse(response);
+    }
+
+    /** Read CPU-bus memory (WRAM/ROM/MMIO) for the hex viewer. VRAM/ARAM later. */
+    protected async readMemoryRequest(
+        response: DebugProtocol.ReadMemoryResponse,
+        args: DebugProtocol.ReadMemoryArguments,
+    ): Promise<void> {
+        const base = parseAddress(args.memoryReference);
+        if (base === undefined) {
+            this.sendErrorResponse(response, 3004, `bad memoryReference '${args.memoryReference}'`);
+            return;
+        }
+        const addr = (base + (args.offset ?? 0)) >>> 0;
+        const bank = addr >>> 16;
+        const off = addr & 0xFFFF;
+        // peek_memory's window is one bank (offset/count are 16-bit).
+        const count = Math.max(0, Math.min(args.count, 0x10000 - off));
+        try {
+            const bytes = await this.mcp.peekMemory(bank, off, count);
+            response.body = {
+                address: memRef(addr),
+                data: Buffer.from(bytes).toString('base64'),
+                unreadableBytes: args.count - bytes.length,
+            };
+        } catch (e) {
+            this.sendErrorResponse(response, 3005, `peek failed: ${(e as Error).message}`);
+            return;
+        }
+        this.sendResponse(response);
     }
 
     protected disconnectRequest(response: DebugProtocol.DisconnectResponse): void {

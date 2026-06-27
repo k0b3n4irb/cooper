@@ -178,6 +178,29 @@ export function symbolToAddr(t: SymTable, name: string): number | undefined {
     return t.byName.get(name);
 }
 
+/**
+ * Parse a literal address: `BB:OOOO`, `$xxxxxx`, `0xxxxxxx`, or bare hex (1–6
+ * digits). Returns a 24-bit address or undefined. (Bare values are hex — the
+ * convention for an asm debugger.)
+ */
+export function parseAddress(s: string): number | undefined {
+    const str = s.trim();
+    const ba = str.match(/^([0-9a-fA-F]{1,2}):([0-9a-fA-F]{1,4})$/);
+    if (ba) {
+        return ((parseInt(ba[1], 16) << 16) | parseInt(ba[2], 16)) >>> 0;
+    }
+    const hx = str.match(/^(?:\$|0x)?([0-9a-fA-F]{1,6})$/);
+    if (hx) {
+        return parseInt(hx[1], 16) >>> 0;
+    }
+    return undefined;
+}
+
+/** Resolve an expression to a 24-bit address: a `.sym` symbol first, else a literal. */
+export function resolveExpr(t: SymTable, expr: string): number | undefined {
+    return symbolToAddr(t, expr.trim()) ?? parseAddress(expr);
+}
+
 export interface ResolvedAddr {
     /** The nearest label at or before the address. */
     name: string;

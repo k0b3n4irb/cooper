@@ -38,10 +38,13 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
   (function) breakpoints via `run_until_pc` + the WLA `.sym`, symbolized 1-frame
   stack. `src/sym.ts` + `src/lunaMcp.ts` + `src/lunaDebug.ts`. D-016…D-019.
 
-### 🔜 P2.2 — Debugger viewers + memory/data breakpoints (C4, part 1b)
-- `readMemoryRequest` → `peek_memory`/`peek_vram`/`peek_aram` (named memory model).
-- Data breakpoints → `run_until_mem_write|read` (bank-exact; D-016 caveat).
-- PPU/VRAM/OAM viewers (webview at a stop). Better multi-bp continue.
+### P2.2 — Debugger viewers + memory/data breakpoints (C4, part 1b)
+- ✅ **P2.2a (0.4.0):** `readMemoryRequest` (CPU-bus hex viewer via `peek_memory`)
+  + `evaluateRequest` (symbol/address → byte + memoryReference); register
+  memoryReferences. D-020.
+- 🔜 **P2.2b:** data breakpoints → `run_until_mem_write|read` (bank-exact);
+  VRAM/ARAM memory via `peek_vram`/`peek_aram`; PPU/VRAM/OAM viewers (webview at a
+  stop); better multi-bp continue.
 - **Gap:** no MCP `peek_cgram`/`peek_oam` in the pinned binary (D-016) → CGRAM/OAM
   bulk views need a luna RFE.
 - **Deps RESOLVED (2026-06-27, D-016):** the pinned luna 1.1.0 already exposes
