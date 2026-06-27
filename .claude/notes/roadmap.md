@@ -14,6 +14,7 @@ Legend: ✅ shipped · 🔜 next · ⏳ planned · 🔒 blocked on a decision
 | ✅ #2 — C support / clangd (C1·C2·C3) | 0.0.2 | Extension pack bundling `vscode-clangd`; `.clangd` recipe mirroring the SDK lint; `int`=2 caveat. Verified 56/56 `main.c` parse clean. |
 | ✅ #3 — Configure-clangd + TS foundation | 0.1.0 | `Cooper: Configure clangd` command (SDK detection); TypeScript + esbuild scaffold; pure logic Node-tested. |
 | ✅ P0 — Build + preview (C5) | 0.2.0 | `cooper-make` build task (TaskProvider) + `cooper-cc` problem matcher; `Cooper: Preview frame` → `luna run --steps N --force-display --screenshot` → inline PNG. Verified against real luna 1.1.0 + `aim_target.sfc`. **Native-window run deferred** (pinned luna is headless-only). D-013…D-015. |
+| ✅ P2.1 — ASM/symbol debugger (C4, MVP) | 0.3.0 | In-process DAP adapter (`LunaDebugSession`, `@vscode/debugadapter`) over luna MCP + `.sym`. Symbol breakpoints (`run_until_pc`), continue/step, Registers scope, symbolized stack. Foundation: `sym.ts` parser + zero-dep `lunaMcp.ts` client. Verified headlessly end-to-end vs real luna (56 tests). D-016…D-019. |
 | ✅ Knowledge base | — | `CLAUDE.md` + `.claude/{rules,notes,skills,agents}`, grammar generator. |
 
 ## The phased plan (remaining)
@@ -32,14 +33,17 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 - API snippets, Doxygen-sourced hover, `compile_commands.json` generation option.
 - Low risk, quality-of-life. Can interleave with P0.
 
-### 🔜 P2 — Debugger, symbol/ASM level (C4) — the jewel, part 1 — **IN PROGRESS**
-- DAP adapter over luna: launch, step (`step{1}`), registers/PPU (`state`), memory
-  (`peek_memory`/`peek_vram`/`peek_aram`), frame snapshot (`screenshot`),
-  breakpoints by address/symbol via `run_until_pc` + the WLA `.sym`.
-- ✅ **P2.1a (foundation):** `src/sym.ts` (`.sym` parser) + `src/lunaMcp.ts`
-  (stdio MCP client, zero deps) — pure, Node-tested end-to-end (D-017…D-019).
-- 🔜 **P2.1b:** `LunaDebugSession` (`@vscode/debugadapter` + inline impl, D-018) +
-  `contributes.debuggers` + launch config → the VS Code debug UI.
+### ✅ P2.1 — Debugger, symbol/ASM level (C4) — the jewel, part 1 — **SHIPPED 0.3.0**
+- ✅ DAP adapter over luna: launch, `step{1}`, Registers scope (`state`), symbol
+  (function) breakpoints via `run_until_pc` + the WLA `.sym`, symbolized 1-frame
+  stack. `src/sym.ts` + `src/lunaMcp.ts` + `src/lunaDebug.ts`. D-016…D-019.
+
+### 🔜 P2.2 — Debugger viewers + memory/data breakpoints (C4, part 1b)
+- `readMemoryRequest` → `peek_memory`/`peek_vram`/`peek_aram` (named memory model).
+- Data breakpoints → `run_until_mem_write|read` (bank-exact; D-016 caveat).
+- PPU/VRAM/OAM viewers (webview at a stop). Better multi-bp continue.
+- **Gap:** no MCP `peek_cgram`/`peek_oam` in the pinned binary (D-016) → CGRAM/OAM
+  bulk views need a luna RFE.
 - **Deps RESOLVED (2026-06-27, D-016):** the pinned luna 1.1.0 already exposes
   `run_until_pc`/`run_until_mem_write`/`run_until_mem_read` + `poke_memory` (live
   `tools/list` = 17 tools; its `--help` is stale). Proven end-to-end. **No luna

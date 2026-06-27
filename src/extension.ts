@@ -5,6 +5,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource } from './clangdConfig';
 import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs } from './build';
+import { LunaDebugSession } from './lunaDebug';
 
 const execFileAsync = promisify(execFile);
 
@@ -16,6 +17,8 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.build', () => runBuild()),
         vscode.commands.registerCommand('cooper.preview', () => previewFrame(context)),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
+        vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
+        vscode.debug.registerDebugConfigurationProvider('luna', new LunaConfigProvider()),
     );
 }
 
@@ -147,6 +150,66 @@ async function previewFrame(context: vscode.ExtensionContext): Promise<void> {
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(png), vscode.ViewColumn.Beside);
         },
     );
+}
+
+// ---------------------------------------------------------------------------
+// Debugger (P2.1b) — inline DAP adapter over luna MCP + the WLA .sym.
+// ---------------------------------------------------------------------------
+
+class LunaDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
+    createDebugAdapterDescriptor(): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
+        // In-process: no separate adapter binary, no TCP port (D-018).
+        return new vscode.DebugAdapterInlineImplementation(new LunaDebugSession());
+    }
+}
+
+class LunaConfigProvider implements vscode.DebugConfigurationProvider {
+    resolveDebugConfiguration(
+        folder: vscode.WorkspaceFolder | undefined,
+        config: vscode.DebugConfiguration,
+    ): vscode.ProviderResult<vscode.DebugConfiguration> {
+        const projectDir = folder?.uri.fsPath
+            ?? (vscode.window.activeTextEditor && path.dirname(vscode.window.activeTextEditor.document.uri.fsPath));
+        if (!projectDir) {
+            void vscode.window.showErrorMessage('Cooper: open a project folder to debug.');
+            return undefined;
+        }
+
+        // A bare "F5 with no launch.json": seed a launch config from the project.
+        if (!config.type && !config.request && !config.name) {
+            config.type = 'luna';
+            config.request = 'launch';
+            config.name = 'Luna: Debug SNES ROM';
+        }
+
+        // Default the ROM to the project's build output if not given.
+        if (!config.program) {
+            const found = findRomForDir(projectDir);
+            if (found) {
+                config.program = found.rom;
+            }
+        }
+        if (!config.program) {
+            void vscode.window.showErrorMessage('Cooper: no ROM to debug — set "program" in launch.json or add a Makefile with a TARGET.');
+            return undefined;
+        }
+        if (!fs.existsSync(config.program)) {
+            void vscode.window.showErrorMessage(`Cooper: ROM not built: ${config.program}. Run "Cooper: Build (make)" first.`);
+            return undefined;
+        }
+
+        // Inject the luna binary path (setting → SDK pinned binary).
+        const cfg = vscode.workspace.getConfiguration('cooper');
+        const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
+        const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
+        if (!luna) {
+            void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath or cooper.opensnesPath.');
+            return undefined;
+        }
+        config.lunaPath = luna;
+        config.cwd = config.cwd ?? path.dirname(config.program);
+        return config;
+    }
 }
 
 // ---------------------------------------------------------------------------

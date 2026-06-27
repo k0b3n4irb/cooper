@@ -235,6 +235,83 @@ try { fs.unlinkSync(tmpS); } catch {}
         }
     }
     try { fs.unlinkSync(tmpM); } catch {}
+
+    // =======================================================================
+    // P2.1b — the DAP session, driven headlessly end-to-end (real binary).
+    // =======================================================================
+    console.log('\n=== DAP session: debug loop (registers, symbol breakpoint) ===');
+    const tmpD = path.join(os.tmpdir(), `cooper_lunadebug_${process.pid}.cjs`);
+    esbuild.buildSync({
+        entryPoints: [path.join(__dirname, '..', 'src', 'lunaDebug.ts')],
+        bundle: true, platform: 'node', format: 'cjs', outfile: tmpD,
+        external: ['vscode'],
+    });
+    const D = require(tmpD);
+
+    // pure unit tests (no binary):
+    check('decodeP(0x30) -> nvMXdizc', D.decodeP(0x30) === 'nvMXdizc');
+    const regs = D.formatRegisters({ a: 0x1234, x: 1, y: 2, sp: 0x01FF, pc: 0x8365, pb: 0, db: 0, dp: 0, p: 0x30, e: 1 });
+    check('formatRegisters PC = $00:8365', regs.find((r) => r.name === 'PC').value === '$00:8365');
+    check('formatRegisters A = $1234', regs.find((r) => r.name === 'A').value === '$1234');
+    check('formatRegisters P decodes flags', regs.find((r) => r.name === 'P').value === '$30 (nvMXdizc)');
+
+    const lunaBin2 = B.resolveLunaPath({ sdkPath: OPENSNES });
+    if (!lunaBin2 || !fs.existsSync(lunaBin2)) {
+        console.log('  SKIP  luna binary not available');
+    } else {
+        if (!fs.existsSync(ri.rom)) { cp.spawnSync('make', [], { cwd: aimDir }); }
+        const session = new D.LunaDebugSession();
+        const events = [];
+        session.sendEvent = (e) => events.push(e);
+        const dapCall = (method, args) => new Promise((resolve, reject) => {
+            const to = setTimeout(() => reject(new Error(method + ' response timeout')), 40000);
+            session.sendResponse = (r) => { clearTimeout(to); resolve(r); };
+            const response = { seq: 0, type: 'response', request_seq: 0, success: true, command: method, body: {} };
+            const ret = session[method + 'Request'](response, args ?? {});
+            if (ret && typeof ret.catch === 'function') { ret.catch(reject); }
+        });
+        const waitEvent = (pred, ms = 40000) => new Promise((resolve, reject) => {
+            const iv = setInterval(() => { const e = events.find(pred); if (e) { clearInterval(iv); clearTimeout(to); resolve(e); } }, 20);
+            const to = setTimeout(() => { clearInterval(iv); reject(new Error('event timeout')); }, ms);
+        });
+        const stopped = (reason) => (e) => e.event === 'stopped' && e.body && e.body.reason === reason;
+        try {
+            const init = await dapCall('initialize', {});
+            check('initialize: supportsFunctionBreakpoints', init.body.supportsFunctionBreakpoints === true);
+            check('initialize emits InitializedEvent', events.some((e) => e.event === 'initialized'));
+
+            await dapCall('launch', { program: ri.rom, lunaPath: lunaBin2, cwd: aimDir, stopOnEntry: true });
+            const fb = await dapCall('setFunctionBreakPoints', { breakpoints: [{ name: 'InitHardware' }] });
+            check('symbol breakpoint InitHardware verified', fb.body.breakpoints[0].verified === true);
+            const fbBad = await dapCall('setFunctionBreakPoints', { breakpoints: [{ name: 'NoSuchSymbol' }] });
+            check('unknown symbol breakpoint not verified', fbBad.body.breakpoints[0].verified === false);
+            // re-arm the real breakpoint (the bad call cleared it)
+            await dapCall('setFunctionBreakPoints', { breakpoints: [{ name: 'InitHardware' }] });
+
+            await dapCall('configurationDone', {});
+            await waitEvent(stopped('entry'));
+            check('stopped at entry', true);
+
+            await dapCall('continue', { threadId: 1 });
+            await waitEvent(stopped('function breakpoint'));
+            check('stopped at the symbol breakpoint', true);
+
+            const st = await dapCall('stackTrace', { threadId: 1 });
+            check('stack frame names InitHardware', /InitHardware/.test(st.body.stackFrames[0].name));
+
+            await dapCall('scopes', { frameId: 0 });
+            const vars = await dapCall('variables', { variablesReference: 1000 });
+            check('Registers PC === $00:8365 (breakpoint hit)', vars.body.variables.find((v) => v.name === 'PC').value === '$00:8365');
+
+            await dapCall('disconnect', {});
+            check('disconnect ok', true);
+        } catch (e) {
+            check('DAP session threw: ' + String((e && e.message) || e), false);
+            try { session.disconnectRequest({ body: {} }, {}); } catch {}
+        }
+    }
+    try { fs.unlinkSync(tmpD); } catch {}
+
     console.log(`\n${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
 })();

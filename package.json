@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -17,7 +17,9 @@
     "vscode": "^1.75.0"
   },
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onDebugResolve:luna"
+  ],
   "categories": [
     "Programming Languages",
     "Extension Packs"
@@ -94,6 +96,62 @@
         }
       }
     ],
+    "debuggers": [
+      {
+        "type": "luna",
+        "label": "Luna SNES Debug",
+        "languages": [
+          "c",
+          "wla65816"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Path to the .sfc/.smc ROM to debug (its sibling .sym provides symbols).",
+                "default": "${workspaceFolder}/game.sfc"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Stop at the reset vector when the ROM loads.",
+                "default": true
+              },
+              "maxSteps": {
+                "type": "number",
+                "description": "Instruction budget for a Continue before it pauses (no breakpoint hit).",
+                "default": 5000000
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "luna",
+            "request": "launch",
+            "name": "Luna: Debug SNES ROM",
+            "program": "${workspaceFolder}/game.sfc",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Cooper: Debug SNES ROM in luna",
+            "description": "Launch a .sfc ROM under the luna debugger",
+            "body": {
+              "type": "luna",
+              "request": "launch",
+              "name": "Luna: Debug SNES ROM",
+              "program": "^\"\\${workspaceFolder}/${1:game}.sfc\"",
+              "stopOnEntry": true
+            }
+          }
+        ]
+      }
+    ],
     "problemMatchers": [
       {
         "name": "cooper-cc",
@@ -145,5 +203,9 @@
     "esbuild": "^0.28.1",
     "npm-run-all": "^4.1.5",
     "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@vscode/debugadapter": "^1.68.0",
+    "@vscode/debugprotocol": "^1.68.0"
   }
 }

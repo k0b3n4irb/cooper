@@ -4,24 +4,37 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] — 2026-06-27
 
-### Added (P2.1a — ASM debugger foundation, not yet user-facing)
+### Added — Component #4: ASM/symbol-level debugger (P2.1, the jewel — MVP)
 
-- **`src/sym.ts`** — pure WLA `.sym` parser (no `vscode` import). Resolves
-  label↔address both ways: `symbolToAddr` (incl. C symbols like `main`,
-  `InitHardware`) and `addrToSymbol` (nearest-preceding, e.g. `InitHardware+6`).
-  Parses `[labels]`/`[sections]`/`[ramsections]` today and `[addr-to-line]` when
-  the G0 build flags land. Verified against the real `aim_target.sym`.
-- **`src/lunaMcp.ts`** — hand-rolled stdio JSON-RPC 2.0 client for `luna mcp`
-  (zero deps; D-017). Typed wrappers over the grounded catalogue: `loadRom`,
-  `state`/`cpu`, `step`, `runUntilPc`, `runUntilMemWrite/Read`, `peekMemory`,
-  `reset`. Verified **end-to-end against the real luna 1.1.0 binary**: a
-  `run_until_mem_write($2100)` watchpoint hits at PC `0x836B`, resolved to
-  `InitHardware` via the `.sym` (parser + client closing the loop together).
+A working SNES debugger over the luna emulator, in-process (no external adapter
+binary). Pick **"Luna: Debug SNES ROM"** / F5 on a built `.sfc`.
 
-_Foundation only — the `LunaDebugSession` / `contributes.debuggers` wiring (P2.1b)
-is the next slice. No change to the packaged extension yet._ Decisions D-016…D-019.
+- **`contributes.debuggers` `type: "luna"`** wired via a
+  `DebugAdapterInlineImplementation` + a `DebugConfigurationProvider` that
+  resolves the ROM (project Makefile `TARGET`) and the luna binary.
+- **`src/lunaDebug.ts` — `LunaDebugSession`** (`@vscode/debugadapter` 1.68):
+  launch + stop-on-entry, **symbol (function) breakpoints** (`InitHardware` →
+  `.sym` → `run_until_pc`), continue, single-instruction step, a **Registers**
+  scope (A/X/Y/SP/PC/PB/DB/DP, P decoded to `nvmxdizc`, E) from luna `state`, and
+  a one-frame call stack naming the current PC's symbol.
+- **Foundation (P2.1a):** `src/sym.ts` (WLA `.sym` parser, label↔address both
+  ways incl. C symbols) + `src/lunaMcp.ts` (hand-rolled stdio JSON-RPC client for
+  `luna mcp`, **zero deps** — D-017).
+- **Verified end-to-end headlessly against the real luna 1.1.0 binary:** the full
+  DAP loop (initialize → launch → symbol breakpoint → continue → stop in
+  `InitHardware` → registers show `PC=$00:8365`) plus a `run_until_mem_write`
+  watchpoint resolving its hit PC through the `.sym`.
+
+### Notes / limits (next slices)
+
+- Breakpoints are **by symbol name** (no source/instruction breakpoints yet — no
+  line↔PC until G0, no disassembler). Multiple breakpoints use a chunked-step
+  scan (may overshoot); a single breakpoint is exact. Memory view + data
+  breakpoints (`run_until_mem_*`) and PPU/VRAM viewers come next (P2.2).
+- Decisions D-016…D-019. New deps: `@vscode/debugadapter`,
+  `@vscode/debugprotocol` (bundled into `dist/`; the `.vsix` stays self-contained).
 
 ## [0.2.0] — 2026-06-27
 
