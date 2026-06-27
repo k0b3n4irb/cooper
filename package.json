@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -70,6 +70,44 @@
         "command": "cooper.configureClangd",
         "title": "Configure clangd (OpenSNES C support)",
         "category": "Cooper"
+      },
+      {
+        "command": "cooper.build",
+        "title": "Build (make)",
+        "category": "Cooper"
+      },
+      {
+        "command": "cooper.preview",
+        "title": "Preview frame (luna screenshot)",
+        "category": "Cooper"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "cooper-make",
+        "required": [],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "The make target to run (default: the project's default goal, which builds the ROM)."
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "cooper-cc",
+        "owner": "cpp",
+        "source": "cc65816",
+        "fileLocation": "autoDetect",
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
       }
     ],
     "configuration": {
@@ -80,6 +118,23 @@
           "default": "",
           "scope": "machine-overridable",
           "markdownDescription": "Absolute path to the OpenSNES SDK root (the folder containing `lib/include/snes.h`). Used by **Cooper: Configure clangd** to generate the `.clangd` file. If empty, Cooper infers it from the project Makefile's `OPENSNES` line, then by searching parent folders."
+        },
+        "cooper.lunaPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Absolute path to the `luna` emulator binary used by **Cooper: Preview frame**. If empty, Cooper uses the SDK's pinned binary at `<sdk>/tools/luna-test/bin/luna`."
+        },
+        "cooper.preview.steps": {
+          "type": "number",
+          "default": 200000,
+          "minimum": 1,
+          "markdownDescription": "CPU instructions luna executes before grabbing the preview screenshot. Lower values may render a black frame before the ROM has drawn anything; 200000 is past init for typical demos."
+        },
+        "cooper.preview.forceDisplay": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Pass `--force-display` so the preview bypasses INIDISP forced-blank — shows what the ROM uploaded to VRAM/CGRAM even if it left the screen blanked (e.g. a title waiting on Start)."
         }
       }
     }

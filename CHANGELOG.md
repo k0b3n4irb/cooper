@@ -4,6 +4,38 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-06-27
+
+### Added
+
+- **Component #4 (P0): Build + preview.**
+  - **`make` build task** contributed via a `TaskProvider` (`cooper-make` type):
+    a `build` task (default goal) and a `clean` task, discoverable in *Run Task*.
+    `Cooper: Build (make)` runs the build directly.
+  - **`cooper-cc` problem matcher** turns `cc65816`/clang `file:line:col:
+    severity: message` errors into Problems-panel entries (bound to the build
+    task). Verified by capturing a real `cc65816` error.
+  - **`Cooper: Preview frame`** renders the built ROM headlessly with
+    `luna run --steps N --force-display --screenshot` and opens the PNG in the
+    built-in image viewer. Verified end-to-end against the real luna 1.1.0 binary
+    and `aim_target.sfc` (non-black 256×224 frame).
+  - new settings: `cooper.lunaPath`, `cooper.preview.steps` (default 200000,
+    grounded empirically), `cooper.preview.forceDisplay` (default true).
+
+### Notes
+
+- The pinned luna binary (v1.1.0) is **headless-only** — it has no native-window
+  subcommand, so "Run in luna (native window)" is deferred until luna exposes a
+  GUI command. The preview is the architecturally-correct snapshot path. See
+  `docs/DECISIONS.md` D-013…D-015.
+
+### Fixed
+
+- `.vscodeignore` now excludes `.claude/`, `scripts/`, and `CLAUDE.md` from the
+  packaged `.vsix` (dev-only files).
+- Corrected the stale "missing `lib/include/snes/snes.h`" wording in the
+  Configure-clangd error path (the sentinel is `lib/include/snes.h`).
+
 ## [0.1.0] — 2026-06-26
 
 ### Added

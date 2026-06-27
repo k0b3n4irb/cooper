@@ -1,17 +1,157 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource } from './clangdConfig';
+import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs } from './build';
+
+const execFileAsync = promisify(execFile);
+
+const MAKE_TASK_TYPE = 'cooper-make';
 
 export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('cooper.configureClangd', () => configureClangd()),
+        vscode.commands.registerCommand('cooper.build', () => runBuild()),
+        vscode.commands.registerCommand('cooper.preview', () => previewFrame(context)),
+        vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
     );
 }
 
 export function deactivate(): void {
     // nothing to clean up
 }
+
+// ---------------------------------------------------------------------------
+// Build — a `make` task provider + a command that runs the build task.
+// ---------------------------------------------------------------------------
+
+function makeTask(target: string | undefined, scope: vscode.WorkspaceFolder | vscode.TaskScope): vscode.Task {
+    const name = target && target !== 'all' ? target : 'build';
+    const task = new vscode.Task(
+        { type: MAKE_TASK_TYPE, target },
+        scope,
+        name,
+        'cooper',
+        new vscode.ShellExecution('make', makeArgs(target)),
+        '$cooper-cc',
+    );
+    if (name === 'build') {
+        task.group = vscode.TaskGroup.Build;
+    } else if (name === 'clean') {
+        task.group = vscode.TaskGroup.Clean;
+    }
+    return task;
+}
+
+function makeTaskProvider(): vscode.TaskProvider {
+    return {
+        provideTasks: () => {
+            const tasks: vscode.Task[] = [];
+            for (const folder of vscode.workspace.workspaceFolders ?? []) {
+                if (fs.existsSync(path.join(folder.uri.fsPath, 'Makefile'))) {
+                    tasks.push(makeTask(undefined, folder), makeTask('clean', folder));
+                }
+            }
+            return tasks;
+        },
+        resolveTask: (task) => {
+            const scope = typeof task.scope === 'object' ? task.scope : vscode.TaskScope.Workspace;
+            return makeTask(task.definition.target as string | undefined, scope);
+        },
+    };
+}
+
+async function runBuild(): Promise<void> {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+        void vscode.window.showErrorMessage('Cooper: open a project folder first.');
+        return;
+    }
+    if (!fs.existsSync(path.join(folder.uri.fsPath, 'Makefile'))) {
+        void vscode.window.showErrorMessage('Cooper: no Makefile in the workspace root to build.');
+        return;
+    }
+    await vscode.tasks.executeTask(makeTask(undefined, folder));
+}
+
+// ---------------------------------------------------------------------------
+// Preview — render a headless luna screenshot of the built ROM and open it.
+// ---------------------------------------------------------------------------
+
+async function previewFrame(context: vscode.ExtensionContext): Promise<void> {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+        void vscode.window.showErrorMessage('Cooper: open a project folder first.');
+        return;
+    }
+    const projectDir = folder.uri.fsPath;
+
+    // Resolve the ROM from the active file's dir (handles examples in subfolders),
+    // falling back to the workspace root.
+    const activeDir = vscode.window.activeTextEditor
+        ? path.dirname(vscode.window.activeTextEditor.document.uri.fsPath)
+        : projectDir;
+    const target = findRomForDir(activeDir) ?? findRomForDir(projectDir);
+    if (!target) {
+        void vscode.window.showErrorMessage('Cooper: no Makefile with a TARGET found — cannot locate the ROM to preview.');
+        return;
+    }
+    if (!fs.existsSync(target.rom)) {
+        const pick = await vscode.window.showWarningMessage(
+            `Cooper: ${path.basename(target.rom)} not built yet. Build it first?`,
+            'Build (make)',
+        );
+        if (pick === 'Build (make)') {
+            await runBuild();
+        }
+        return;
+    }
+
+    // Resolve the luna binary (setting → SDK pinned binary).
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
+    const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
+    if (!luna) {
+        void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath, or cooper.opensnesPath so Cooper can use the SDK\'s pinned binary.');
+        return;
+    }
+
+    // Screenshot lands in the extension's storage dir (not the user's source tree).
+    const storageDir = context.globalStorageUri.fsPath;
+    try {
+        fs.mkdirSync(storageDir, { recursive: true });
+    } catch { /* best-effort; the write below surfaces a real failure */ }
+    const png = path.join(storageDir, 'preview.png');
+
+    const args = lunaPreviewArgs(target.rom, png, {
+        steps: cfg.get<number>('preview.steps'),
+        forceDisplay: cfg.get<boolean>('preview.forceDisplay'),
+    });
+
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Cooper: rendering ${path.basename(target.rom)} in luna…` },
+        async () => {
+            try {
+                await execFileAsync(luna, args, { cwd: target.dir });
+            } catch (err: unknown) {
+                const stderr = (err as { stderr?: string }).stderr;
+                void vscode.window.showErrorMessage(`Cooper: luna preview failed: ${stderr?.trim() || String(err)}`);
+                return;
+            }
+            if (!fs.existsSync(png)) {
+                void vscode.window.showErrorMessage('Cooper: luna ran but produced no screenshot.');
+                return;
+            }
+            await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(png), vscode.ViewColumn.Beside);
+        },
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Configure clangd (Component #3) — unchanged logic.
+// ---------------------------------------------------------------------------
 
 async function configureClangd(): Promise<void> {
     const folder = vscode.workspace.workspaceFolders?.[0];
@@ -43,7 +183,7 @@ async function configureClangd(): Promise<void> {
             return;
         }
         if (!isOpenSnesRoot(chosen)) {
-            void vscode.window.showErrorMessage(`Cooper: ${chosen} is not an OpenSNES SDK root (missing lib/include/snes/snes.h).`);
+            void vscode.window.showErrorMessage(`Cooper: ${chosen} is not an OpenSNES SDK root (missing lib/include/snes.h).`);
             return;
         }
         await vscode.workspace.getConfiguration('cooper').update('opensnesPath', chosen, vscode.ConfigurationTarget.Workspace);

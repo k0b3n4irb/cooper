@@ -128,6 +128,73 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+---
+
+## 2026-06-27 — Component #4 (P0 — Build + run/preview, C5)
+
+### D-013 — Build via a `TaskProvider`, not a shipped `tasks.json`
+- **Decision:** Cooper contributes a `cooper-make` task **programmatically**
+  (`contributes.taskDefinitions` + `vscode.tasks.registerTaskProvider`), with a
+  `build` task (`make`, default goal = build the ROM) and a `clean` task. The
+  build task binds the `$cooper-cc` problem matcher and `TaskGroup.Build`. The
+  `Cooper: Build (make)` command runs it via `vscode.tasks.executeTask`.
+- **Why not ship a `.vscode/tasks.json`:** `tasks.json` is **user/workspace-owned
+  override territory**; an extension contributes tasks via a provider so they
+  appear in *Run Task* without writing into the user's repo. Users can still
+  override pieces by keying their own `tasks.json` on `type: "cooper-make"`.
+- **Source:** VS Code Task Provider guide + `contributes.taskDefinitions`
+  (verified 2026-06-27). **Grounded build facts:** `OPENSNES/make/common.mk:191`
+  (`.PHONY: all clean`, default goal `all`, **no `run` target**); example
+  `Makefile` sets `TARGET := <name>.sfc`; the ROM lands **in the Makefile's own
+  dir** (`common.mk:353` link rule), alongside `<name>.sym`.
+
+### D-014 — Problem matcher = `$cooper-cc` (clang/cproc) only for P0
+- **Decision:** P0 contributes **one** matcher, `cooper-cc` (owner `cpp`,
+  `fileLocation: autoDetect`), pattern `^(.*):(\d+):(\d+):\s+(warning|error):\s+(.*)$`.
+  This catches **both** the clang lint *and* the `cc65816` (cproc) driver, which
+  share the gcc-style `file:line:col: severity: msg` first line.
+- **WLA matcher deferred (grounded, recorded for later):** `wla-65816` errors use
+  a *different, column-less* grammar — either `<file>:<line>: MSG` or an
+  `ERROR: <msg>` line followed by a separate `  at <file>:<line>`. A loose WLA
+  pattern **collides** with clang's line (lazy `.+?` absorbs `:col`, mis-filing
+  the diagnostic), so binding both to one task double-reports. WLA errors are rare
+  (hand-written `.asm` only) and still show as raw text in the terminal. Deferring
+  keeps P0 small and the matcher correct. Re-add as a separate, non-overlapping
+  matcher when an asm-build slice needs it.
+- **Source:** `doc-researcher` (problem-matcher schema, 2026-06-27);
+  `sdk-source-cartographer` (real error lines from `cc65816`/`clang`/`wla-65816`).
+
+### D-015 — Preview = `luna run --screenshot`, headless (no native window)
+- **Decision:** `Cooper: Preview frame` runs **`luna run --steps <N>
+  --force-display --screenshot <png> <rom>`** and opens the PNG with the built-in
+  image viewer (`vscode.commands.executeCommand('vscode.open', uri)`).
+- **The roadmap-breaking fact:** the **pinned luna binary (v1.1.0) has NO native
+  window** — *every* subcommand is headless (`luna run/state/frames/…`).
+  `luna run <rom>` does not open a GUI; it steps N CPU instructions and optionally
+  dumps a 256×224 PNG. So the roadmap's "Run in luna (native window)" is
+  **impossible on the pinned binary and is deferred** until luna exposes a GUI
+  subcommand (author-owned, future phase). This is *aligned* with the architecture
+  rule ("snapshots + viewers at a stop, not a real-time video stream").
+- **`luna run` over `luna state --until-frame`:** `run` is the purpose-built
+  screenshot renderer (lighter; its one job is render→PNG). `state` is the JSON
+  snapshot path (traces/asserts/`--until-frame`) — heavier, and frame-exactness is
+  not needed for a *preview*. `state` is the right backend later for the debugger,
+  not for this. **Alternative rejected:** `state --until-frame`.
+- **`--steps 200000` default, grounded empirically:** on the real
+  `aim_target.sfc`, `-n 64`/`50000` render a **black** frame (identical fbhash,
+  1405-byte PNG); content appears at **200000** and the fbhash **stabilises**
+  (`6d80c5a68234dfee`, unchanged 200k→1M). `--force-display` (default on) defeats
+  INIDISP forced-blank so a title still waiting on Start isn't black. Both
+  surfaced as settings (`cooper.preview.steps`, `cooper.preview.forceDisplay`).
+- **luna path:** `cooper.lunaPath` setting → else the pinned binary at
+  `<sdk>/tools/luna-test/bin/luna` (grounded; `luna --version` → `luna 1.1.0`,
+  aarch64, runs on host). The MCP `run_until_*` breakpoints are **not** in the
+  pinned binary's `mcp` catalogue — confirmed, do not rely on them yet.
+- **Source:** luna 1.1.0 `run --help` / `state --help` (read live from the pinned
+  binary, 2026-06-27); empirical render sweep on `aim_target.sfc`.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

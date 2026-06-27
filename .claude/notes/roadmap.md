@@ -13,6 +13,7 @@ Legend: ✅ shipped · 🔜 next · ⏳ planned · 🔒 blocked on a decision
 | ✅ #1 — WLA-DX 65816 highlighting (C1b) | 0.0.1 | TextMate grammar from the WLA parser (92 mnemonics + size suffixes, 192 directives + `.END*` catch-all). Verified on the 56-file ASM corpus. |
 | ✅ #2 — C support / clangd (C1·C2·C3) | 0.0.2 | Extension pack bundling `vscode-clangd`; `.clangd` recipe mirroring the SDK lint; `int`=2 caveat. Verified 56/56 `main.c` parse clean. |
 | ✅ #3 — Configure-clangd + TS foundation | 0.1.0 | `Cooper: Configure clangd` command (SDK detection); TypeScript + esbuild scaffold; pure logic Node-tested. |
+| ✅ P0 — Build + preview (C5) | 0.2.0 | `cooper-make` build task (TaskProvider) + `cooper-cc` problem matcher; `Cooper: Preview frame` → `luna run --steps N --force-display --screenshot` → inline PNG. Verified against real luna 1.1.0 + `aim_target.sfc`. **Native-window run deferred** (pinned luna is headless-only). D-013…D-015. |
 | ✅ Knowledge base | — | `CLAUDE.md` + `.claude/{rules,notes,skills,agents}`, grammar generator. |
 
 ## The phased plan (remaining)
@@ -20,14 +21,14 @@ Legend: ✅ shipped · 🔜 next · ⏳ planned · 🔒 blocked on a decision
 Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 `/new-component` discipline (research → ground → decide → verify → commit).
 
-### 🔜 P0 — Build + run/preview (C5)
-- `make` build task + **cc65816 problem matcher** (compiler errors → Problems panel).
-- `Cooper: Run in luna` → `luna run game.sfc` (native window).
-- `Cooper: Preview` → `luna run --steps N --screenshot` → inline PNG.
-- First real luna contact. Makes the edit→build→see loop usable.
-- **Deps:** TS foundation (done). **Decision:** none blocking.
+### ✅ P0 — Build + preview (C5) — shipped 0.2.0
+- ✅ `cooper-make` build task (TaskProvider) + `cooper-cc` problem matcher.
+- ✅ `Cooper: Preview frame` → `luna run --steps N --force-display --screenshot`
+  → inline PNG via the built-in image viewer.
+- ⏳ **Deferred:** `Cooper: Run in luna` (native window) — the pinned luna v1.1.0
+  is **headless-only**; revisit when luna ships a GUI subcommand (author-owned).
 
-### ⏳ P1 — Helper polish (C3)
+### 🔜 P1 — Helper polish (C3)
 - API snippets, Doxygen-sourced hover, `compile_commands.json` generation option.
 - Low risk, quality-of-life. Can interleave with P0.
 

@@ -65,5 +65,89 @@ if (!hasClang) {
 }
 
 try { fs.unlinkSync(tmp); } catch {}
+
+// ===========================================================================
+// Component #4 (P0) — build/preview pure logic + closing-the-loop with luna.
+// ===========================================================================
+const tmpB = path.join(os.tmpdir(), `cooper_build_${process.pid}.cjs`);
+esbuild.buildSync({
+    entryPoints: [path.join(__dirname, '..', 'src', 'build.ts')],
+    bundle: true, platform: 'node', format: 'cjs', outfile: tmpB,
+});
+const B = require(tmpB);
+
+const aimDir = path.join(OPENSNES, 'examples', 'basics', 'aim_target');
+
+console.log('\n=== build module: pure assertions ===');
+const aimMk = fs.readFileSync(path.join(aimDir, 'Makefile'), 'utf8');
+check('romTargetFromMakefile reads TARGET := aim_target.sfc',
+    B.romTargetFromMakefile(aimMk) === 'aim_target.sfc');
+check('romTargetFromMakefile null on unresolved $(VAR)',
+    B.romTargetFromMakefile('TARGET := $(NAME).sfc') === null);
+
+const ri = B.findRomForDir(aimDir);
+check('findRomForDir resolves the example ROM',
+    ri && ri.dir === aimDir && ri.rom === path.join(aimDir, 'aim_target.sfc'));
+check('findRomForDir walks up from a subdir',
+    (B.findRomForDir(path.join(aimDir, 'nope-subdir')) || {}).rom === path.join(aimDir, 'aim_target.sfc'));
+
+check('resolveLunaPath finds the SDK pinned binary',
+    B.resolveLunaPath({ sdkPath: OPENSNES }) === path.join(OPENSNES, 'tools', 'luna-test', 'bin', 'luna'));
+check('resolveLunaPath prefers a valid setting',
+    B.resolveLunaPath({ configured: path.join(OPENSNES, 'tools', 'luna-test', 'bin', 'luna') })
+        === path.join(OPENSNES, 'tools', 'luna-test', 'bin', 'luna'));
+
+const pArgs = B.lunaPreviewArgs('/x/rom.sfc', '/x/out.png', { steps: 200000 });
+check('lunaPreviewArgs builds the grounded run argv',
+    JSON.stringify(pArgs) === JSON.stringify(
+        ['run', '--steps', '200000', '--screenshot', '/x/out.png', '--force-display', '/x/rom.sfc']));
+check('lunaPreviewArgs honours forceDisplay:false',
+    !B.lunaPreviewArgs('r', 'p', { forceDisplay: false }).includes('--force-display'));
+check('makeArgs: default goal is empty argv', JSON.stringify(B.makeArgs()) === '[]');
+check('makeArgs: clean → ["clean"]', JSON.stringify(B.makeArgs('clean')) === '["clean"]');
+
+// --- close the loop: the cooper-cc matcher regex must capture a REAL cc65816 error ---
+console.log('\n=== problem matcher catches a real cc65816 error ===');
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const cc = (pkg.contributes.problemMatchers || []).find((m) => m.name === 'cooper-cc');
+check('package.json contributes the cooper-cc matcher', !!cc);
+const cc65816 = path.join(OPENSNES, 'bin', 'cc65816');
+if (cc && fs.existsSync(cc65816)) {
+    const brokenC = path.join(os.tmpdir(), `cooper_broken_${process.pid}.c`);
+    fs.writeFileSync(brokenC, 'int main(void) { return @; }\n');
+    const r = cp.spawnSync(cc65816, [brokenC, '-o', path.join(os.tmpdir(), `cooper_broken_${process.pid}.asm`)], { encoding: 'utf8' });
+    const out = `${r.stdout || ''}${r.stderr || ''}`;
+    const re = new RegExp(cc.pattern.regexp);
+    const line = out.split('\n').find((l) => re.test(l));
+    check('cc65816 emitted a gcc-style error line', !!line);
+    if (line) {
+        const m = line.match(re);
+        check('matcher captures file/line/col/severity', m[cc.pattern.line] && m[cc.pattern.column] && /error|warning/.test(m[cc.pattern.severity]));
+    }
+    try { fs.unlinkSync(brokenC); } catch {}
+} else {
+    console.log('  SKIP  cc65816 not available');
+}
+
+// --- close the loop: luna renders a NON-BLACK preview of the real ROM ---
+console.log('\n=== luna renders a non-black preview of the real ROM ===');
+const luna = B.resolveLunaPath({ sdkPath: OPENSNES });
+if (luna && fs.existsSync(luna)) {
+    if (!fs.existsSync(ri.rom)) {
+        console.log('  (building aim_target first)');
+        cp.spawnSync('make', [], { cwd: aimDir, encoding: 'utf8' });
+    }
+    const outPng = path.join(os.tmpdir(), `cooper_preview_${process.pid}.png`);
+    const r = cp.spawnSync(luna, B.lunaPreviewArgs(ri.rom, outPng, { steps: 200000 }), { cwd: aimDir, encoding: 'utf8' });
+    check('luna run exited 0', r.status === 0);
+    const size = fs.existsSync(outPng) ? fs.statSync(outPng).size : 0;
+    // A black 256x224 frame compresses to ~1.4 KB; a rendered frame is larger.
+    check(`luna produced a non-black preview PNG (${size} bytes > 2000)`, size > 2000);
+    try { fs.unlinkSync(outPng); } catch {}
+} else {
+    console.log('  SKIP  luna binary not available');
+}
+
+try { fs.unlinkSync(tmpB); } catch {}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

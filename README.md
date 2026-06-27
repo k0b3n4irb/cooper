@@ -27,7 +27,7 @@ verified before landing.
 |---|---|
 | **#1 — WLA-DX 65816 syntax highlighting** | ✅ shipped |
 | **#2 — C language support (clangd)** | ✅ shipped |
-| #3 — Build & run/preview (tasks + luna) | planned |
+| **#3 — Build & preview (make task + luna screenshot)** | ✅ shipped |
 | #4 — Debugger (DAP ↔ luna) | planned |
 | #5 — Asset editors (palette → tiles → map) | planned |
 | #6 — AI SDK-aware (context → MCP → luna loop) | planned |

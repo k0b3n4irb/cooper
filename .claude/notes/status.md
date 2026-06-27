@@ -5,14 +5,22 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
-**#3 — Configure-clangd + TS/esbuild foundation** (v0.1.0, commit `4651eb6`).
-Before it: #2 C support / clangd (0.0.2), #1 WLA-DX highlighting (0.0.1).
+**P0 — Build + preview (C5)** (v0.2.0): `cooper-make` build task (TaskProvider)
++ `cooper-cc` problem matcher, `Cooper: Preview frame` → `luna run --screenshot`
+→ inline PNG. First real luna contact. Before it: #3 Configure-clangd + TS
+foundation (0.1.0), #2 clangd (0.0.2), #1 WLA-DX highlighting (0.0.1).
+
+**Grounding that reshaped P0:** the pinned luna v1.1.0 is **headless-only** (no
+native-window subcommand), so "Run in luna (native window)" is **deferred** until
+luna exposes a GUI command. Preview default `--steps 200000` was picked
+empirically (lower = black frame on `aim_target.sfc`). See D-013…D-015.
 
 ## Current focus
 
-**P0 — Build + run/preview (C5):** `make` build task + cc65816 problem matcher,
-`Run in luna` (native window), inline `--screenshot` preview. First real luna
-contact. No blocking decision.
+**Next: P1 (helper polish, C3) or P2 (debugger, C4).** Q5 (debugger-first vs
+assets-first) is the ordering call. P1 is low-risk quality-of-life; P2 is the
+jewel but gated on confirming `run_until_pc`/mem-watch in the pinned binary
+(they're **not** in the pinned `luna mcp` catalogue — source-only for now).
 
 ## Foundations in place
 
