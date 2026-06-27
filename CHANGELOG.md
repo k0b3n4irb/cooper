@@ -4,6 +4,25 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added (P2.1a — ASM debugger foundation, not yet user-facing)
+
+- **`src/sym.ts`** — pure WLA `.sym` parser (no `vscode` import). Resolves
+  label↔address both ways: `symbolToAddr` (incl. C symbols like `main`,
+  `InitHardware`) and `addrToSymbol` (nearest-preceding, e.g. `InitHardware+6`).
+  Parses `[labels]`/`[sections]`/`[ramsections]` today and `[addr-to-line]` when
+  the G0 build flags land. Verified against the real `aim_target.sym`.
+- **`src/lunaMcp.ts`** — hand-rolled stdio JSON-RPC 2.0 client for `luna mcp`
+  (zero deps; D-017). Typed wrappers over the grounded catalogue: `loadRom`,
+  `state`/`cpu`, `step`, `runUntilPc`, `runUntilMemWrite/Read`, `peekMemory`,
+  `reset`. Verified **end-to-end against the real luna 1.1.0 binary**: a
+  `run_until_mem_write($2100)` watchpoint hits at PC `0x836B`, resolved to
+  `InitHardware` via the `.sym` (parser + client closing the loop together).
+
+_Foundation only — the `LunaDebugSession` / `contributes.debuggers` wiring (P2.1b)
+is the next slice. No change to the packaged extension yet._ Decisions D-016…D-019.
+
 ## [0.2.0] — 2026-06-27
 
 ### Added

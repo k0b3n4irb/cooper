@@ -32,10 +32,14 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 - API snippets, Doxygen-sourced hover, `compile_commands.json` generation option.
 - Low risk, quality-of-life. Can interleave with P0.
 
-### 🔜 P2 — Debugger, symbol/ASM level (C4) — the jewel, part 1 — **DE-RISKED 🟢**
+### 🔜 P2 — Debugger, symbol/ASM level (C4) — the jewel, part 1 — **IN PROGRESS**
 - DAP adapter over luna: launch, step (`step{1}`), registers/PPU (`state`), memory
   (`peek_memory`/`peek_vram`/`peek_aram`), frame snapshot (`screenshot`),
   breakpoints by address/symbol via `run_until_pc` + the WLA `.sym`.
+- ✅ **P2.1a (foundation):** `src/sym.ts` (`.sym` parser) + `src/lunaMcp.ts`
+  (stdio MCP client, zero deps) — pure, Node-tested end-to-end (D-017…D-019).
+- 🔜 **P2.1b:** `LunaDebugSession` (`@vscode/debugadapter` + inline impl, D-018) +
+  `contributes.debuggers` + launch config → the VS Code debug UI.
 - **Deps RESOLVED (2026-06-27, D-016):** the pinned luna 1.1.0 already exposes
   `run_until_pc`/`run_until_mem_write`/`run_until_mem_read` + `poke_memory` (live
   `tools/list` = 17 tools; its `--help` is stale). Proven end-to-end. **No luna

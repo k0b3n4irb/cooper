@@ -149,5 +149,92 @@ if (luna && fs.existsSync(luna)) {
 }
 
 try { fs.unlinkSync(tmpB); } catch {}
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+
+// ===========================================================================
+// P2.1a — the WLA .sym parser (symbol layer for the ASM debugger).
+// ===========================================================================
+const tmpS = path.join(os.tmpdir(), `cooper_sym_${process.pid}.cjs`);
+esbuild.buildSync({
+    entryPoints: [path.join(__dirname, '..', 'src', 'sym.ts')],
+    bundle: true, platform: 'node', format: 'cjs', outfile: tmpS,
+});
+const S = require(tmpS);
+
+console.log('\n=== .sym parser: against the real aim_target.sym ===');
+const symPath = path.join(aimDir, 'aim_target.sym');
+if (!fs.existsSync(symPath)) {
+    console.log('  (building aim_target to produce the .sym)');
+    cp.spawnSync('make', [], { cwd: aimDir, encoding: 'utf8' });
+}
+const sym = S.parseSym(fs.readFileSync(symPath, 'utf8'));
+check('parses many labels (>500)', sym.labels.length > 500);
+check('[information] wlasymbol=true', sym.info.wlasymbol === 'true');
+
+// Forward: C symbols resolve to their addresses.
+const initAddr = S.symbolToAddr(sym, 'InitHardware');
+check('symbolToAddr(InitHardware) === 0x008365', initAddr === 0x008365);
+check('symbolToAddr(main) is defined', typeof S.symbolToAddr(sym, 'main') === 'number');
+
+// Names with @ / . survive (cproc/QBE block labels), split on first space only.
+const blockLabel = sym.labels.find((l) => l.name.includes('@'));
+check('block label with @ kept intact', !!blockLabel && /@/.test(blockLabel.name));
+
+// Reverse: the PC that wrote $2100 in the live run (0x836B) -> InitHardware+6.
+const res = S.addrToSymbol(sym, 0x00836B);
+check('addrToSymbol(0x836B) -> InitHardware', res && res.name === 'InitHardware');
+check('addrToSymbol(0x836B) delta === 6', res && res.delta === 6);
+check('formatResolved -> "InitHardware+6"', res && S.formatResolved(res) === 'InitHardware+6');
+check('exact-hit delta is 0', S.addrToSymbol(sym, initAddr).delta === 0);
+
+// Today's .sym is labels-only (no addr-to-line until G0 build flags).
+check('hasLineInfo is false (labels-only today)', sym.hasLineInfo === false);
+check('sections parsed (ROM + RAM)', sym.sections.some((s) => s.kind === 'rom') && sym.sections.some((s) => s.kind === 'ram'));
+try { fs.unlinkSync(tmpS); } catch {}
+
+// ===========================================================================
+// P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
+// ===========================================================================
+(async () => {
+    console.log('\n=== luna MCP client: end-to-end debug loop ===');
+    const tmpM = path.join(os.tmpdir(), `cooper_lunamcp_${process.pid}.cjs`);
+    esbuild.buildSync({
+        entryPoints: [path.join(__dirname, '..', 'src', 'lunaMcp.ts')],
+        bundle: true, platform: 'node', format: 'cjs', outfile: tmpM,
+    });
+    const { LunaMcp } = require(tmpM);
+    const lunaBin = B.resolveLunaPath({ sdkPath: OPENSNES });
+    if (!lunaBin || !fs.existsSync(lunaBin)) {
+        console.log('  SKIP  luna binary not available');
+    } else {
+        if (!fs.existsSync(ri.rom)) { cp.spawnSync('make', [], { cwd: aimDir }); }
+        const m = new LunaMcp({ timeoutMs: 30000 });
+        try {
+            await m.connect(lunaBin, aimDir);
+            check('connected; serverInfo.name present', !!m.serverInfo.name);
+            await m.loadRom(ri.rom);
+            const cpu0 = await m.cpu();
+            check('state.cpu has a numeric pc', typeof cpu0.pc === 'number');
+            // the de-risk hit: a write to INIDISP $2100 stops in InitHardware (0x836B)
+            const w = await m.runUntilMemWrite(0x002100, 300000);
+            check('run_until_mem_write($2100) hit', w.hit === true);
+            check('  reported pc === 0x836B', w.pc === 0x836B);
+            // resolve that PC through the .sym — closes parser + client together
+            const r = S.addrToSymbol(sym, w.pc);
+            check('  hit PC resolves to InitHardware via .sym', !!r && r.name === 'InitHardware');
+            // single-step, then run_until_pc to where we are returns immediately
+            await m.step(1);
+            const cpuB = await m.cpu();
+            check('step{1} keeps a numeric pc', typeof cpuB.pc === 'number');
+            const target = (cpuB.pb << 16) | cpuB.pc;
+            const hit = await m.runUntilPc(target, 50);
+            check('run_until_pc(current) hit', hit.hit === true);
+        } catch (e) {
+            check('MCP end-to-end threw: ' + String((e && e.message) || e), false);
+        } finally {
+            m.dispose();
+        }
+    }
+    try { fs.unlinkSync(tmpM); } catch {}
+    console.log(`\n${pass} passed, ${fail} failed`);
+    process.exit(fail ? 1 : 0);
+})();

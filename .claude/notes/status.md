@@ -24,10 +24,18 @@ backend today: its live MCP `tools/list` = **17 tools** (not the 8 its stale
 resolved to a `.sym` symbol). **No luna RFE gates P2.** Q1 → design choice (lean:
 TS DAP adapter over MCP first). See D-016 + `docs/02` §10.
 
-**Next: P1 (helper polish, C3) or P2.1 (ASM debugger).** Q5 ordering call. P2.1 is
-now unblocked code: launch `luna mcp`, bp-by-symbol via `.sym` + `run_until_pc`,
-`step{1}`, registers/memory via `state`/`peek_*`, snapshot via `screenshot`.
-Source-level stays gated on G0 (build flags `wla -i` + `wlalink -S -A`).
+**In progress: P2.1 — ASM/symbol-level debugger.**
+- ✅ **P2.1a (foundation, landed):** `src/sym.ts` (`.sym` parser, label↔addr both
+  ways, C symbols) + `src/lunaMcp.ts` (hand-rolled stdio MCP client, zero deps).
+  Both pure (no `vscode`), Node-tested end-to-end against the real binary + real
+  `.sym` (watchpoint $2100 → PC 0x836B → `InitHardware`). D-017…D-019.
+- 🔜 **P2.1b (next):** the `LunaDebugSession` (`@vscode/debugadapter` 1.68 +
+  `DebugAdapterInlineImplementation`, D-018) + `contributes.debuggers` `type:luna`
+  + a launch config, wiring the foundation into the VS Code debug UI. This is the
+  slice that bumps the version and ships a user-facing debugger.
+
+Source-level (P7) still gated on G0 (`wla -i` + `wlalink -S -A`). P1 (helper
+polish) can interleave if preferred.
 
 ## Foundations in place
 

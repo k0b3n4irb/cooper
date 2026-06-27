@@ -236,6 +236,65 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-27 — P2.1 (ASM/symbol-level debugger) — foundation slice (P2.1a)
+
+### D-017 — MCP client: hand-rolled JSON-RPC-over-stdio, zero deps
+- **Decision:** talk to `luna mcp` with a ~120-line hand-rolled stdio JSON-RPC 2.0
+  client (`src/lunaMcp.ts`, no `vscode` import), **not** the official
+  `@modelcontextprotocol/sdk`.
+- **Why:** the SDK (`1.29.0`) pulls **~18 hard runtime deps** (`express`, `hono`,
+  `jose`, `cors`, `pkce-challenge`, `eventsource`, …) — all HTTP/SSE-transport +
+  OAuth machinery we never touch over stdio. Cooper is a deliberately minimal-dep
+  extension talking to a **fixed, owned, stdio-only** 17-tool catalogue. Newline-
+  delimited JSON-RPC over `child_process` is ~120 lines we fully control. esbuild
+  would tree-shake most of the SDK out of the bundle, but it still bloats
+  `node_modules` + the audit surface for nothing.
+- **The one correctness detail to replicate (the SDK gets it free):** the
+  `initialize` (with `protocolVersion: "2024-11-05"`, `clientInfo`) → wait result
+  → `notifications/initialized` handshake **before** any `tools/call`. Framing is
+  **newline-delimited** JSON (not LSP `Content-Length`) — confirmed live against
+  the pinned binary's rmcp server.
+- **Alternative rejected:** `@modelcontextprotocol/sdk` — revisit only if we ever
+  need HTTP/SSE transport, OAuth, or dynamic tool discovery.
+- **Source:** doc-researcher 2026-06-27 (SDK `package.json` deps/exports; MCP
+  build-client guide); live stdio probes in D-016.
+
+### D-018 — DAP adapter: `@vscode/debugadapter` + inline implementation (P2.1b)
+- **Decision (records the choice; lands in the next slice P2.1b):** implement the
+  debug adapter as a `LoggingDebugSession` from **`@vscode/debugadapter` 1.68.0**
+  (+ `@vscode/debugprotocol` 1.68.0 types), wired into VS Code via
+  **`vscode.DebugAdapterInlineImplementation(new LunaDebugSession())`** from a
+  `DebugAdapterDescriptorFactory` — the official mock-debug pattern. In-process,
+  no separate adapter binary, no TCP port.
+- **Manifest:** `contributes.debuggers` `type: "luna"`, `configurationAttributes.launch`
+  `required: ["program"]` (the `.sfc`). **Activation events are NOT auto-generated
+  for debuggers** (only `onCommand` is, since 1.74) → declare `onDebugResolve:luna`.
+- **Capabilities → luna mapping** (set in `initializeRequest`):
+  `supportsConfigurationDoneRequest`; `supportsInstructionBreakpoints` +
+  `supportsDisassembleRequest` + `supportsSteppingGranularity` → `run_until_pc` +
+  `step{1}`; `supportsDataBreakpoints` → `run_until_mem_write|read`;
+  `supportsReadMemoryRequest` → `peek_memory`/`peek_vram`/`peek_aram`;
+  `supportsRestartRequest` → `reset` + `load_rom`. Registers shown via a
+  `"Registers"` scope (no flag). `supportsStepBack: false` (luna has no reverse-exec).
+- **Alternative rejected:** hand-rolling the DAP wire protocol — `@vscode/debugadapter`
+  is the off-the-shelf framework the architecture rule says to reuse (don't rebuild
+  the DAP framework; build only the SNES-specific mapping).
+- **Source:** doc-researcher 2026-06-27 (VS Code debugger-extension guide,
+  `@vscode/debugadapter` 1.68.0, DAP spec, mock-debug sample).
+
+### D-019 — Slice the debugger; foundation (parser + client) first, Node-tested
+- **Decision:** P2.1 ships in verifiable slices. **P2.1a = the pure, Node-testable
+  foundation:** `src/sym.ts` (the `.sym` parser) + `src/lunaMcp.ts` (the MCP
+  client), tested **against the real `.sym` and the real luna binary** (the
+  Extension Development Host can't be driven headlessly here, so the DAP glue
+  isn't offline-testable — but its substrate is). **P2.1b = the `LunaDebugSession`**
+  wiring the two into the VS Code debug UI.
+- **Why:** "doucement" — each slice small enough to verify end-to-end and commit
+  coherently. The de-risk (D-016) already proved the backend; this turns it into
+  tested code.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.
