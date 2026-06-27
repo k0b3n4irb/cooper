@@ -98,11 +98,19 @@ build; hardware truth comes from luna); **off-the-shelf everywhere except** C4
   (`opensnes/compiler/wla-dx/phase_1.c`) + a `.END*` catch-all for
   dynamically-built closers; WLA is **case-insensitive**. Regenerate via
   `/regen-wla-grammar` (`scripts/gen-wla-grammar.py`).
-- **luna**: `luna mcp` is a persistent stdio MCP server. The **pinned v1.1.0
-  binary** catalogue is read-only: `load_rom, reset, step, state, screenshot,
-  drain_audio, peek_memory, peek_aram`. The luna **source** also exposes
-  `run_until_pc`, `run_until_mem_write`, `run_until_mem_read` (runtime
-  breakpoints) — **confirm against the pinned binary before relying on them.**
+- **luna**: `luna mcp` is a persistent stdio MCP server holding **live emulator
+  state across calls**. **Ground its catalogue with a live JSON-RPC `tools/list`,
+  NOT `luna mcp --help`** — the pinned v1.1.0 binary's `--help` is stale (lists 8
+  read-only tools); the **live catalogue is 17 tools** (verified 2026-06-27):
+  reads (`peek_memory`, `peek_vram`, `peek_aram`, `search_memory`, `state`,
+  `screenshot`, `drain_audio`), writes (`poke_memory`, `set_cpu_register`,
+  `set_joypad`), run/breakpoint (`step`, `step_until_frame`, **`run_until_pc`**,
+  **`run_until_mem_write`**, **`run_until_mem_read`**), lifecycle (`load_rom`,
+  `reset`). The runtime **breakpoint primitives ARE in the pinned binary** — P2
+  (symbol/ASM debugger) is buildable against it today, no luna RFE. luna source
+  is v1.3.0; `peek_cgram` exists in `luna-api` but is **not** MCP-registered, and
+  there is no `peek_oam`. Mem-watch is **bank-exact, not mirror-folded**. See
+  `docs/02-debugger-dap-luna.md` §10.
 - All OpenSNES example Makefiles use `OPENSNES := $(shell cd ../../.. && pwd)`.
 - The OpenSNES SDK lives at `../opensnes` relative to this repo; luna source at
   `../luna`; the pinned luna binary at `../opensnes/tools/luna-test/bin/luna`.

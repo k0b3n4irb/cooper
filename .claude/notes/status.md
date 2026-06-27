@@ -17,10 +17,17 @@ empirically (lower = black frame on `aim_target.sfc`). See D-013…D-015.
 
 ## Current focus
 
-**Next: P1 (helper polish, C3) or P2 (debugger, C4).** Q5 (debugger-first vs
-assets-first) is the ordering call. P1 is low-risk quality-of-life; P2 is the
-jewel but gated on confirming `run_until_pc`/mem-watch in the pinned binary
-(they're **not** in the pinned `luna mcp` catalogue — source-only for now).
+**P2 de-risked 🟢 (2026-06-27).** The pinned luna 1.1.0 **is** a breakpoint
+backend today: its live MCP `tools/list` = **17 tools** (not the 8 its stale
+`--help` claims), including `run_until_pc`/`run_until_mem_write`/`run_until_mem_read`,
+`step`, `poke_memory`. Proven end-to-end (watchpoint → `{hit,pc,value}`, PC
+resolved to a `.sym` symbol). **No luna RFE gates P2.** Q1 → design choice (lean:
+TS DAP adapter over MCP first). See D-016 + `docs/02` §10.
+
+**Next: P1 (helper polish, C3) or P2.1 (ASM debugger).** Q5 ordering call. P2.1 is
+now unblocked code: launch `luna mcp`, bp-by-symbol via `.sym` + `run_until_pc`,
+`step{1}`, registers/memory via `state`/`peek_*`, snapshot via `screenshot`.
+Source-level stays gated on G0 (build flags `wla -i` + `wlalink -S -A`).
 
 ## Foundations in place
 

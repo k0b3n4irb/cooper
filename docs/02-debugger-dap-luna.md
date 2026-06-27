@@ -306,3 +306,83 @@ inspect) ; le passer en interactif complet = ajouter à luna une surface bp/watc
 2. **RFE luna en parallèle** : bp / watch / continue / events / poke (+ GUI-attach), via le même canal
    que la RFE `vram_layout`.
 3. **luna = moteur unique** — run, test, preview, validation, debug. C'est toute la stack.
+
+---
+
+## 10. DE-RISK P2 — vérité terrain via `tools/list` LIVE (2026-06-27) — §9 CORRIGÉ
+
+> **§9 (2026-06-25) s'est fié à `luna mcp --help`** (8 outils annoncés) et a conclu **D4
+> (breakpoints runtime) = ❌ ABSENT**, **poke = ❌ read-only**. C'était **faux** : le
+> `--help` est périmé. En parlant **JSON-RPC `tools/list`** au binaire épinglé vivant, le
+> catalogue réel = **17 outils**, dont les primitives de breakpoint. **Le verdict de §9.2
+> est renversé.** Leçon load-bearing : `--help` ≠ `tools/list` — toujours interroger le
+> serveur MCP en direct.
+
+### 10.1 Catalogue MCP réel — binaire épinglé 1.1.0, **17 outils**
+- **Lecture** : `peek_memory` (bus CPU, ≤64 K/banque), `peek_vram`, `peek_aram`,
+  `search_memory` ($7E/$7F), `state`, `screenshot`, `drain_audio`.
+- **Écriture** : `poke_memory`, `set_cpu_register` (a/x/y/sp/dp/pc/pb/db/p), `set_joypad`.
+- **Run / breakpoint** : `step{count}` (granularité **1 instruction**), `step_until_frame`,
+  **`run_until_pc{pc,max_steps}`**, **`run_until_mem_write{addr,max_steps}`**,
+  **`run_until_mem_read{addr,max_steps}`**.
+- **Cycle de vie** : `load_rom`, `reset`.
+- **Source** : `luna/crates/luna-api/src/lib.rs` (`run_until_pc:1637`, `mem_write:1673`,
+  `mem_read:1682`, `step:858`, `state:947`, `peek_*:1603/2148/2160`, `peek_cgram:2172`
+  **non-exposé MCP**) ; registre des outils `luna-mcp-server/src/lib.rs:276-591`. Source
+  workspace **v1.3.0** ; binaire pinné **1.1.0** — **les `run_until_*` y sont déjà**, seul
+  son `mcp --help` est resté à 8.
+
+### 10.2 Doutes §5 — re-verdict (corrige §9.2)
+| Doute | §9 (via `--help`) | **§10 (via `tools/list` live)** |
+|---|---|---|
+| **D1** session persistante stateful | ✅ | ✅ confirmé — `Emulator` dans `Arc<Mutex<…>>`, état **vit entre appels** (prouvé end-to-end) |
+| **D4** bp / watch runtime | ❌ ABSENT | ✅ **PRÉSENT** — `run_until_pc` + `run_until_mem_write` / `run_until_mem_read` |
+| poke (write mém/registre) | ❌ read-only | ✅ **PRÉSENT** — `poke_memory` + `set_cpu_register` |
+| **D3** event d'arrêt async | ❌ | 🟡 pas de *push* async, mais **« continue » = un `run_until_*` borné par `max_steps`** (modèle pull, fonctionne) |
+| **D7** snapshot état figé | — | ✅ `state` / `screenshot` / `peek_*` sur la session vivante |
+| **D8** multi-chips | — | 🟢 `state` expose `sa1`, `apu` (SPC700), `dsp1` → threads DAP plus tard |
+
+### 10.3 Preuve end-to-end (2 ROMs, 2 sondes indépendantes)
+- **aim_target.sfc** (LoROM) : `load_rom` → `run_until_mem_write(0x002100)` →
+  **`{hit:true, pc:0x836B, value:0x8F}`** ; `0x836B` ∈ **`InitHardware`** (`.sym` `00:8365`)
+  écrivant `$8F` dans INIDISP = forced-blank d'init. Hit **réel + résolu symboliquement**.
+- **Tetris 2** (FastROM) : `run_until_mem_write(0x802100)` → `{hit:true, pc:0x806064,
+  value:0x80}` ; `run_until_pc` → `{hit:true}`.
+- **`state` JSON** (champs réels) : `cpu{a,x,y,sp,pc,pb,db,dp,p,e,stopped,waiting}`,
+  `ppu{inidisp,bgmode,vram_addr_words,cgram,oam_*,m7*,windows,…}`, `cpu_regs{joy1,joy2,
+  nmitimen,…}`, `scheduler{ppu_line,frame_count}`, `apu`, `dma`, `sa1`, `dsp1`.
+
+### 10.4 Couche symbolique — `.sym` aujourd'hui (Agent B)
+`aim_target.sym` (wlalink, 5 sections) = **labels↔adresses bidirectionnel**, **symboles C
+inclus** (`main`, `gameLoopRun`, `InitHardware`) + labels de blocs `func@block.N` (index QBE,
+**pas** des lignes). **Pas de ligne↔PC aujourd'hui** → suffisant pour **P2 (bp par symbole,
+addr→symbole)**, insuffisant pour source-level. **G0 pour ajouter ligne↔PC** : assembler avec
+**`wla-65816 -i`** (`make/common.mk:120/307`) + linker avec **`wlalink -S -A`**
+(`make/common.mk:355`) → émet `[addr-to-line mapping v2]` (`wlalink/write.c:2705`). Parsing TS
+trivial (couper au **1er espace** ; ne **pas** découper les noms sur `:`/`@`/`.`).
+
+### 10.5 Les 4 manques (ergonomie — **non-bloquants** pour le MVP ASM)
+1. **Pas de multi-breakpoint « continue »** : 1 cible par appel `run_until_*` → l'adapter
+   gère sa propre table (step par paquets + check), ou 1 bp à la fois.
+2. **Pas d'event async / pause interruptible** : `max_steps` est **obligatoire** (pas de run
+   illimité) → « pause » = step chunké borné.
+3. **Pas de peek bulk CGRAM/OAM** : `peek_cgram` existe (luna-api) mais **non-enregistré**
+   MCP ; pas de `peek_oam` (OAM = excerpts dans `state`). N'impacte que les *viewers
+   mémoire*, pas le stepping.
+4. **`run_until_pc` ne rend que `hit:bool`** (pas de stop-reason riche).
+- **Caveat watch** : la surveillance mémoire est **bank-exact, non mirror-folded** —
+  surveiller la **banque exacte d'exécution** (`$80:2100` FastROM vs `$00:2100` LoROM) ;
+  l'adapter doit étendre les miroirs.
+
+### 10.6 Verdict & séquençage
+**P2 = GO 🟢.** Le debugger **symbol/ASM-level est constructible contre le binaire épinglé
+AUJOURD'HUI, sans aucune RFE luna.** Les RFEs §7 deviennent des **améliorations d'ergonomie**
+(multi-bp continue, event async, `peek_cgram`/`peek_oam`, stop-reason), pas des prérequis.
+- **Q1 débloqué** (capacité confirmée → pur choix de design). **Reco** : prototyper un
+  **adaptateur DAP en TS contre le MCP épinglé** (chemin le plus court ; le MCP suffit),
+  migrer vers `luna dap` natif plus tard.
+- **P2.0 (gate RFE) tombe** : on peut coder P2.1 directement (launch `luna mcp`, bp par
+  adresse/symbole via `.sym` + `run_until_pc`, step `step{1}`, registres/mémoire via
+  `state`/`peek_*`, snapshot via `screenshot`).
+- **Source-level (P2.4 / P7)** reste gated sur **G0** (flags build `-i`/`-A`) — localisé,
+  pas un mur.

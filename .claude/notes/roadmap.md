@@ -32,14 +32,20 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 - API snippets, Doxygen-sourced hover, `compile_commands.json` generation option.
 - Low risk, quality-of-life. Can interleave with P0.
 
-### ⏳ P2 — Debugger, symbol/ASM level (C4) — the jewel, part 1
-- DAP adapter over luna: launch, step, registers/PPU (`state`), memory
-  (`peek_*`, named WRAM/VRAM/CGRAM/OAM model), frame snapshot (`screenshot`),
-  breakpoints by address/symbol + embedded `WDM`/`SNES_BREAK`.
-- Load the WLA `.sym` for symbol resolution.
-- **Deps:** confirm `run_until_pc`/mem-watch in the pinned luna binary (see
-  `status.md` open item). **Decision 🔒 Q1:** DAP-native in luna vs TS adapter in
-  the IDE (leaning: prototype TS → migrate to DAP-native).
+### 🔜 P2 — Debugger, symbol/ASM level (C4) — the jewel, part 1 — **DE-RISKED 🟢**
+- DAP adapter over luna: launch, step (`step{1}`), registers/PPU (`state`), memory
+  (`peek_memory`/`peek_vram`/`peek_aram`), frame snapshot (`screenshot`),
+  breakpoints by address/symbol via `run_until_pc` + the WLA `.sym`.
+- **Deps RESOLVED (2026-06-27, D-016):** the pinned luna 1.1.0 already exposes
+  `run_until_pc`/`run_until_mem_write`/`run_until_mem_read` + `poke_memory` (live
+  `tools/list` = 17 tools; its `--help` is stale). Proven end-to-end. **No luna
+  RFE gates P2.1.**
+- **Decision Q1 (now a design choice, not a capability gate):** DAP-native in luna
+  vs TS adapter — **lean: TS DAP adapter over the pinned MCP first**, migrate to
+  native `luna dap` later. Lock when P2.1 starts.
+- **Known gaps (ergonomics, RFEs not blockers):** no multi-bp continue, no async
+  stop-event, no bulk CGRAM/OAM peek, `run_until_pc` returns only `hit`. Mem-watch
+  is bank-exact (not mirror-folded). Source-level (P7) still needs G0 build flags.
 
 ### ⏳ P3 — Debugger, runtime surface + DAP (C4) — part 2
 - luna roadmap: bp/watch posed live, continue/run-until-hit, async stop events,
@@ -75,7 +81,8 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 
 ## Cross-cutting decisions still open (from `docs/01` §15)
 
-- 🔒 **Q1** DAP-native in luna vs TS adapter (gates P2/P3).
+- **Q1** DAP-native in luna vs TS adapter — **no longer a blocker** (capability
+  confirmed, D-016); now a design choice. Lean: TS adapter over MCP first.
 - 🔒 **Q4** wrap SNESTilesKitten vs own webview (gates P5).
 - **Q5** debugger-first vs assets-first overall ordering (P2 vs P4).
 - ✅ **Q6** debug-info form — resolved: extend the WLA `.sym` (`docs/03`).

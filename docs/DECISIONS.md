@@ -195,6 +195,47 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-27 — P2 de-risk (debugger DAP ↔ luna)
+
+### D-016 — P2 is GO; the pinned luna is a breakpoint backend today; Q1 unblocked
+- **Decision:** the **symbol/ASM-level debugger (P2) is buildable against the
+  pinned luna 1.1.0 binary today, with no luna source change / no RFE gate.** The
+  former blocker ("confirm `run_until_*` exist in the pinned binary") is
+  **resolved: they do.**
+- **Grounded the right way:** the pinned binary's `luna mcp --help` is **stale**
+  (advertises 8 read-only tools); a live JSON-RPC **`tools/list` returns 17 tools**,
+  including `run_until_pc`, `run_until_mem_write`, `run_until_mem_read`, `step`
+  (1-instruction), `poke_memory`, `set_cpu_register`, plus `state`/`peek_*`. The
+  MCP session holds **live emulator state across calls** → a launch → break →
+  inspect → continue loop works. This **overturns `docs/02` §9.2** (which trusted
+  `--help`). Lesson: query the live MCP server, never `--help`.
+- **Proven end-to-end (2 ROMs):** `aim_target.sfc` → `run_until_mem_write($002100)`
+  → `{hit:true, pc:0x836B, value:0x8F}`, and `0x836B` resolves to `InitHardware`
+  via the `.sym`. `Tetris 2` (FastROM) → `run_until_mem_write($802100)` →
+  `{hit:true, pc:0x806064}`. `state` exposes full CPU/PPU/APU/SA1/DMA registers.
+- **Symbol layer (`.sym`) is sufficient for P2:** labels↔addresses both ways,
+  **C symbols included** (`main`, `gameLoopRun`); no line↔PC yet. Source-level
+  (P7) needs **G0** = assemble `wla -i` + link `wlalink -S -A` (emits
+  `[addr-to-line mapping v2]`) — localised, not a wall.
+- **Q1 (DAP-native vs TS adapter) — resolved as a design choice, not a capability
+  gate.** **Recommendation:** prototype a **TS DAP adapter over the pinned MCP**
+  (shortest path), migrate to a native `luna dap` later. *Not yet locked — revisit
+  when P2.1 starts; this entry only removes the blocker and records the lean.*
+- **The 4 ergonomics gaps (non-blocking for the ASM MVP), now RFEs not prereqs:**
+  (1) no multi-breakpoint "continue" — one target per `run_until_*` call;
+  (2) no async stop-event / interruptible run — `max_steps` is mandatory;
+  (3) no bulk CGRAM/OAM read tool (`peek_cgram` exists in luna-api but unexposed;
+  no `peek_oam`); (4) `run_until_pc` returns only `hit:bool`. **Caveat:** mem-watch
+  is **bank-exact, not mirror-folded** (watch `$80:2100` for FastROM, `$00:2100`
+  for LoROM).
+- **Source:** live `tools/list` on the pinned binary; luna source
+  `luna-api/src/lib.rs` (`run_until_pc:1637`, `mem_write:1673`, `mem_read:1682`),
+  `luna-mcp-server/src/lib.rs:276-591` (v1.3.0); `aim_target.sym`;
+  `make/common.mk:120/307/355`; `wlalink/write.c:2705`. Full write-up:
+  `docs/02-debugger-dap-luna.md` §10.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.
