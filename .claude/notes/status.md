@@ -5,6 +5,13 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**The Cooper sidebar** (v0.11.0). Activity-bar tree → everything clickable:
+PROJECT (ROM/SDK), BUILD & RUN, PPU VIEWERS, SYMBOLS (your functions from `.c` ∩
+`.sym`; click → set a breakpoint). Debug-from-tree handles subfolder projects.
+Pure model in `src/sidebar.ts`; both tiers verified. **GUI layer step 1** (chosen
+from 3 mockups: sidebar/dashboard/codelens — sidebar first). D-028. Next: webview
+dashboard (#2), CodeLens (#3).
+
 **Frictionless C onboarding** (v0.10.0). Open a C file in an OpenSNES project →
 Cooper auto-writes `.clangd` (no command). Resolves the project from the active
 file's nearest Makefile (subfolders), one picker for out-of-tree SDK, never
@@ -23,17 +30,21 @@ Before it: **P2.2b** data breakpoints (0.5.0); **P2.2a** memory view (0.4.0);
 
 ## Current focus
 
-**🔥 Frictionless C onboarding (user priority — "simple, fun IDE; if config is
-hard nobody uses it").** Real friction found in a live test project
-(`test_vscode/shmup_1942`): (1) clangd binary not installed → "I see nothing";
-(2) project in a **subfolder** → `Configure clangd` (workspace-root only) misses
-the Makefile; (3) **out-of-tree** project → the Makefile's `$(shell cd ../../..)`
-resolves the SDK wrong. Fix direction = **fewer steps, not more**: auto-write
-`.clangd` on project open (from the active file's nearest Makefile; picker
-fallback), and surface the one-click `clangd: Download language server`. The
-debugger (C4) is feature-complete; **don't add capability — reduce setup cost.**
+**🎨 The GUI layer (user priority — "a graphical IDE like GitLens, not 1000
+keyboard shortcuts; beautiful and easy").** Backend (debugger + viewers) is
+feature-complete; the work now is **making it feel like an IDE**, not more
+capability. Plan chosen from 3 SVG mockups (`/tmp/cooper_ui_{1,2,3}.png`):
+- ✅ **Sidebar (0.11.0)** — the clickable backbone. Done.
+- 🔜 **Webview dashboard / Home** (mockup #2) — big Build/Run/Debug buttons, live
+  preview thumbnail, palette/sprite/tile cards. The "beau" wow. Webview-heavy but
+  integration-testable.
+- 🔜 **CodeLens + inline actions** (mockup #3) — "▶ Debug here · 👁 watch" above
+  functions; editor-title Build/Run/Debug buttons. Finishing polish.
+- Also: one-click clangd download surfaced proactively; build-before-debug.
 
-Deferred: viewer selectors; better multi-bp continue; source-level (P7, G0 flags).
+North star: **open project → it just works, and looks good.** See
+[[cooper-simplicity-over-features]]. Deferred: viewer selectors; multi-bp
+continue; source-level (P7, G0 flags).
 
 ## Foundations in place
 

@@ -41,9 +41,17 @@ suite('Cooper — activation & commands', () => {
     test('contributes its commands', async () => {
         await vscode.extensions.getExtension(EXT_ID)!.activate();
         const cmds = await vscode.commands.getCommands(true);
-        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd']) {
+        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd', 'cooper.refresh', 'cooper.debug']) {
             assert.ok(cmds.includes(c), `missing command ${c}`);
         }
+    });
+
+    test('contributes the Cooper sidebar view', () => {
+        const pkg = vscode.extensions.getExtension(EXT_ID)!.packageJSON;
+        const containers = pkg.contributes.viewsContainers.activitybar as { id: string }[];
+        assert.ok(containers.some((c) => c.id === 'cooper'), 'no Cooper activity-bar container');
+        const views = pkg.contributes.views.cooper as { id: string }[];
+        assert.ok(views.some((v) => v.id === 'cooperTree'), 'no cooperTree view');
     });
 
     test('auto-writes .clangd when a C file opens', async () => {

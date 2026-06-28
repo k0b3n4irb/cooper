@@ -4,6 +4,21 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] — 2026-06-28
+
+### Added — The Cooper sidebar (graphical, clickable — no more palette hunting)
+
+- A **Cooper icon in the activity bar** opens a tree with everything one click away:
+  - **PROJECT** — the ROM (with ✓ built status) and the detected SDK.
+  - **BUILD & RUN** — Build, Run / Preview, Debug.
+  - **PPU VIEWERS** — Palette, Sprites (OAM), Tiles (VRAM).
+  - **SYMBOLS** — *your* functions (parsed from your `.c` and matched to the
+    `.sym`); **click one to set a breakpoint** on it.
+- **Debug** from the tree launches luna with the right ROM even for projects in a
+  **subfolder** (no launch.json needed). A refresh button keeps it current.
+- First step of the GUI layer (sidebar; a webview dashboard + CodeLens come next).
+  D-028.
+
 ## [0.10.0] — 2026-06-28
 
 ### Added — Zero-step C support: auto-`.clangd` on open

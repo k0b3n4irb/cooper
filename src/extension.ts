@@ -4,16 +4,19 @@ import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, findProjectDir } from './clangdConfig';
-import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs } from './build';
+import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs, romTargetFromMakefile } from './build';
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
+import { parseSym } from './sym';
+import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
 
 const execFileAsync = promisify(execFile);
 
 const MAKE_TASK_TYPE = 'cooper-make';
 
 export function activate(context: vscode.ExtensionContext): void {
+    const tree = new CooperTreeProvider();
     context.subscriptions.push(
         vscode.commands.registerCommand('cooper.configureClangd', () => configureClangd()),
         vscode.commands.registerCommand('cooper.build', () => runBuild()),
@@ -21,11 +24,18 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.showPalette', () => showPalette()),
         vscode.commands.registerCommand('cooper.showOam', () => showOam()),
         vscode.commands.registerCommand('cooper.showVram', () => showVram()),
+        vscode.commands.registerCommand('cooper.refresh', () => tree.refresh()),
+        vscode.commands.registerCommand('cooper.debug', () => startLunaDebug(tree.current())),
+        vscode.commands.registerCommand('cooper.breakOnSymbol', (name: string) => breakOnSymbol(name)),
+        vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
         vscode.debug.registerDebugConfigurationProvider('luna', new LunaConfigProvider()),
         vscode.workspace.onDidOpenTextDocument((doc) => void autoConfigureClangd(doc)),
+        vscode.window.onDidChangeActiveTextEditor(() => void tree.refresh()),
+        vscode.workspace.onDidSaveTextDocument(() => void tree.refresh()),
     );
+    void tree.refresh();
     // Auto-configure C support for any already-open OpenSNES C files.
     for (const editor of vscode.window.visibleTextEditors) {
         void autoConfigureClangd(editor.document);
@@ -34,6 +44,133 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
     // nothing to clean up
+}
+
+// ---------------------------------------------------------------------------
+// Cooper sidebar — a clickable tree of project / build / viewers / symbols.
+// ---------------------------------------------------------------------------
+
+const EMPTY_PROJECT: ProjectInfo = { projectDir: null, romName: null, romBuilt: false, sdkName: null, functions: [] };
+
+class CooperTreeProvider implements vscode.TreeDataProvider<TreeNode> {
+    private readonly emitter = new vscode.EventEmitter<void>();
+    readonly onDidChangeTreeData = this.emitter.event;
+    private roots: TreeNode[] = [];
+    private info: ProjectInfo = EMPTY_PROJECT;
+
+    current(): ProjectInfo {
+        return this.info;
+    }
+
+    async refresh(): Promise<void> {
+        this.info = await resolveProjectInfo();
+        this.roots = buildTreeModel(this.info);
+        this.emitter.fire();
+    }
+
+    getChildren(node?: TreeNode): TreeNode[] {
+        return node ? (node.children ?? []) : this.roots;
+    }
+
+    getTreeItem(node: TreeNode): vscode.TreeItem {
+        const item = new vscode.TreeItem(
+            node.label,
+            node.kind === 'category' ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None,
+        );
+        if (node.description) {
+            item.description = node.description;
+        }
+        if (node.icon) {
+            item.iconPath = new vscode.ThemeIcon(node.icon);
+        }
+        if (node.contextValue) {
+            item.contextValue = node.contextValue;
+        }
+        if (node.commandId) {
+            item.command = { command: node.commandId, title: node.label, arguments: node.args };
+        }
+        return item;
+    }
+}
+
+/** Locate the OpenSNES project: active file's nearest Makefile, else a workspace scan. */
+async function resolveProjectDir(): Promise<string | null> {
+    const active = vscode.window.activeTextEditor;
+    if (active && active.document.uri.scheme === 'file') {
+        const p = findProjectDir(path.dirname(active.document.uri.fsPath));
+        if (p) {
+            return p;
+        }
+    }
+    // Scan the workspace for a Makefile referencing OPENSNES (handles subfolders).
+    const mks = await vscode.workspace.findFiles('**/Makefile', '**/{node_modules,build,dist,.git}/**', 20);
+    for (const uri of mks) {
+        try {
+            if (/(^|\n)[ \t]*OPENSNES\b/.test(fs.readFileSync(uri.fsPath, 'utf8'))) {
+                return path.dirname(uri.fsPath);
+            }
+        } catch {
+            // ignore
+        }
+    }
+    return null;
+}
+
+async function resolveProjectInfo(): Promise<ProjectInfo> {
+    const projectDir = await resolveProjectDir();
+    if (!projectDir) {
+        return EMPTY_PROJECT;
+    }
+    let romName: string | null = null;
+    let romBuilt = false;
+    const mk = path.join(projectDir, 'Makefile');
+    if (fs.existsSync(mk)) {
+        romName = romTargetFromMakefile(fs.readFileSync(mk, 'utf8'));
+        if (romName) {
+            romBuilt = fs.existsSync(path.join(projectDir, romName));
+        }
+    }
+    const configured = vscode.workspace.getConfiguration('cooper').get<string>('opensnesPath')?.trim() || undefined;
+    const sdk = detectSdk({ configured, projectDir });
+
+    let functions: { name: string; addr: number }[] = [];
+    const symPath = romName ? path.join(projectDir, romName.replace(/\.(sfc|smc)$/i, '') + '.sym') : null;
+    if (symPath && fs.existsSync(symPath)) {
+        try {
+            const sym = parseSym(fs.readFileSync(symPath, 'utf8'));
+            const texts = fs.readdirSync(projectDir)
+                .filter((f) => f.endsWith('.c'))
+                .map((f) => { try { return fs.readFileSync(path.join(projectDir, f), 'utf8'); } catch { return ''; } });
+            functions = userFunctions(texts, sym);
+        } catch {
+            // leave functions empty
+        }
+    }
+    return { projectDir, romName, romBuilt, sdkName: sdk ? path.basename(sdk.path) : null, functions };
+}
+
+/** Start a luna debug session for the sidebar's resolved project (explicit ROM path). */
+function startLunaDebug(info: ProjectInfo): void {
+    if (!info.projectDir || !info.romName) {
+        void vscode.window.showErrorMessage('Cooper: no OpenSNES project/ROM to debug.');
+        return;
+    }
+    const romPath = path.join(info.projectDir, info.romName);
+    if (!fs.existsSync(romPath)) {
+        void vscode.window.showWarningMessage(`Cooper: ${info.romName} isn't built yet — run Build first.`);
+        return;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(info.projectDir))
+        ?? vscode.workspace.workspaceFolders?.[0];
+    void vscode.debug.startDebugging(folder, {
+        type: 'luna', request: 'launch', name: `Debug ${info.romName}`, program: romPath, stopOnEntry: true,
+    });
+}
+
+/** Set a function breakpoint on a symbol (clicking a symbol in the tree). */
+function breakOnSymbol(name: string): void {
+    vscode.debug.addBreakpoints([new vscode.FunctionBreakpoint(name)]);
+    void vscode.window.showInformationMessage(`Cooper: breakpoint set on ${name}() — start debugging to hit it.`);
 }
 
 // ---------------------------------------------------------------------------

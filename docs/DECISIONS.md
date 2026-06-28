@@ -488,6 +488,34 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-28 — The Cooper sidebar (GUI layer, step 1)
+
+### D-028 — A clickable sidebar (activity-bar view) — the "it's an IDE" layer
+- **Decision:** add a **Cooper activity-bar container + a `cooperTree` TreeView**
+  that surfaces everything as **clickable** — no palette hunting. Sections:
+  **PROJECT** (ROM + built status, SDK), **BUILD & RUN** (Build / Run-Preview /
+  Debug), **PPU VIEWERS** (Palette / OAM / VRAM), **SYMBOLS** (the user's own
+  functions). Answers the user's product critique ("I want a graphical IDE like
+  GitLens, not 1000 keyboard shortcuts" — chosen from 3 SVG mockups: sidebar /
+  webview-dashboard / codelens; **sidebar first** as the native, fast backbone).
+- **All backend reused** — the tree items just invoke the existing commands; zero
+  new backend. Two **new interactions**: a tree **Debug** that starts the luna
+  session with an explicit ROM path (so subfolder/out-of-tree projects work), and
+  **clicking a symbol sets a function breakpoint** (`vscode.FunctionBreakpoint`).
+- **SYMBOLS = the user's functions, not the SDK's:** C function definitions parsed
+  from the project's `.c` files, **intersected with the `.sym`** (so only names
+  that really made it into the ROM show, with their address). Pure
+  `extractCFunctions`/`userFunctions`/`buildTreeModel` in `src/sidebar.ts`.
+- **Project resolution is subfolder-aware** (active file's nearest Makefile, else
+  a workspace scan for a `Makefile` referencing `OPENSNES`) — same fix as D-027.
+- **Verified both tiers:** Node — model + symbol intersection (`main` from
+  aim_target); integration — the view container/view are contributed and the
+  commands register. Mockups in `/tmp/cooper_ui_{1,2,3}.png`.
+- **Next GUI steps (deferred):** the webview **dashboard/home** (mockup #2) and
+  **CodeLens** inline actions (#3) layer on top of this.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

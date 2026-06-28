@@ -207,6 +207,32 @@ check('resolveExpr(symbol) wins', S.resolveExpr(sym, 'InitHardware') === 0x00836
 check('resolveExpr(literal) falls through', S.resolveExpr(sym, '$7E0030') === 0x7E0030);
 try { fs.unlinkSync(tmpS); } catch {}
 
+// --- Cooper sidebar model (pure) ---
+console.log('\n=== Cooper sidebar tree model (pure) ===');
+const tmpSB = path.join(os.tmpdir(), `cooper_sidebar_${process.pid}.cjs`);
+esbuild.buildSync({
+    entryPoints: [path.join(__dirname, '..', 'src', 'sidebar.ts')],
+    bundle: true, platform: 'node', format: 'cjs', outfile: tmpSB,
+});
+const SB = require(tmpSB);
+check('extractCFunctions finds a definition',
+    SB.extractCFunctions('static void enemies_update(void) {\n}').includes('enemies_update'));
+check('extractCFunctions ignores a call/decl',
+    !SB.extractCFunctions('foo();\nint x = bar(1);').includes('foo'));
+// userFunctions = C defs that are real in the .sym — `main` exists in aim_target
+const aimMainC = fs.readFileSync(path.join(aimDir, 'main.c'), 'utf8');
+const ufns = SB.userFunctions([aimMainC], sym);
+check('userFunctions intersects C defs with the .sym (main present)',
+    ufns.some((f) => f.name === 'main' && typeof f.addr === 'number'));
+const model = SB.buildTreeModel({ projectDir: '/x', romName: 'game.sfc', romBuilt: true, sdkName: 'opensnes', functions: [{ name: 'foo', addr: 0x8000 }] });
+check('tree has 4 categories', model.length === 4 && model.every((n) => n.kind === 'category'));
+check('PROJECT shows the built ROM', model[0].children.find((c) => c.id === 'rom').description === '✓ built');
+check('Build action runs cooper.build', model[1].children.find((c) => c.id === 'build').commandId === 'cooper.build');
+check('Palette action runs cooper.showPalette', model[2].children.find((c) => c.id === 'palette').commandId === 'cooper.showPalette');
+check('symbol click sets a breakpoint', model[3].children[0].commandId === 'cooper.breakOnSymbol' && model[3].children[0].args[0] === 'foo');
+check('no project -> single info node', SB.buildTreeModel({ projectDir: null, romName: null, romBuilt: false, sdkName: null, functions: [] }).length === 1);
+try { fs.unlinkSync(tmpSB); } catch {}
+
 // --- PPU decode + palette viewer rendering (pure) ---
 console.log('\n=== PPU/palette decode (pure) ===');
 const tmpP = path.join(os.tmpdir(), `cooper_ppu_${process.pid}.cjs`);
