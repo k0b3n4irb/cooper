@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-06-28
+
+### Added — Debugger VRAM tile viewer (P2.2c)
+
+- **`Cooper: Show Tiles (VRAM)`** — a webview tile sheet of the live VRAM at the
+  current debug stop: the first 512 4bpp tiles (16/row), decoded from `peek_vram`
+  (new `cooperVram` custom request) and coloured with CGRAM sub-palette 0.
+- Pure planar tile decode + a **zero-dependency PNG encoder** (RGBA via the Node
+  `zlib` builtin) in `src/tiles.ts`; rendered as a PNG `<img>` (no webview JS).
+- Verified including **visually** — a PNG built from aim_target's live VRAM shows
+  recognisable font glyphs (D-025). Both test tiers green.
+
 ## [0.7.0] — 2026-06-28
 
 ### Added — Debugger OAM sprite viewer (P2.2c)

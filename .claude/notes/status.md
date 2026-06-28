@@ -5,24 +5,25 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
-**P2.2c — debugger palette viewer** (v0.6.0). `Cooper: Show Palette (CGRAM)` —
-webview of the live 256-colour palette at a debug stop, decoded from
-`state.ppu.cgram` (BGR555) via a custom DAP request `cooperPpu`. Pure decode in
-`src/ppu.ts`; webview verified in the **real Extension Host** (D-022 harness, now
-also exercising the palette command). 84 Node + 3 integration tests. D-023.
+**P2.2c — debugger PPU viewers** (palette 0.6.0 · OAM 0.7.0 · VRAM tiles 0.8.0).
+Three webviews of the live PPU at a debug stop: **CGRAM palette** (16×16 swatches),
+**OAM** (128-sprite table), **VRAM tiles** (512 4bpp tiles → PNG). Decoded in pure
+`src/ppu.ts`/`src/tiles.ts` (incl. a zero-dep PNG encoder); fed by custom DAP
+requests `cooperPpu`/`cooperVram`. Verified both tiers + visually (VRAM PNG shows
+real font glyphs). 101 Node + 3 integration tests. D-023…D-025.
 
-Before it: **P2.2b** data breakpoints (0.5.0, D-021); **P2.2a** memory view +
-evaluate (0.4.0, D-020); **P2.1** ASM/symbol debugger MVP (0.3.0, D-016…D-019);
-test harness (D-022); P0 preview (0.2.0); #3/#2/#1.
+Before it: **P2.2b** data breakpoints (0.5.0); **P2.2a** memory view (0.4.0);
+**P2.1** ASM/symbol debugger MVP (0.3.0); test harness (D-022); P0 (0.2.0); #3/#2/#1.
 
 ## Current focus
 
 **The debugger (C4) is a real tool**: symbol + data breakpoints, step, registers,
-memory view, symbolized stack, live palette viewer. Next options:
-- **P2.2c+ — more viewers** (same decode-pure + webview pattern, now both tiers
-  verifiable): **OAM** sprite list (`state.ppu.oam_full`), **VRAM tiles**
-  (`peek_vram` + bpp + sub-palette). And **VRAM/ARAM in the memory view**.
-- **P1 — helper polish (C3)** (snippets, Doxygen hover, `compile_commands.json`).
+memory view, symbolized stack, and live palette / OAM / VRAM-tile viewers. Options:
+- **Polish the viewers:** bpp/offset/sub-palette selectors for VRAM (QuickPick);
+  VRAM/ARAM in the hex memory view; render actual sprite pixels in the OAM view
+  (combine OAM + VRAM + palette).
+- **P1 — helper polish (C3)** (snippets, Doxygen hover, `compile_commands.json`) —
+  a change of register.
 - Deferred: better multi-breakpoint continue; source-level (P7) gated on G0
   (`wla -i` + `wlalink -S -A`).
 

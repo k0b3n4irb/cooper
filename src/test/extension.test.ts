@@ -108,6 +108,7 @@ suite('Cooper — luna debug adapter (real host)', () => {
             assert.strictEqual(ppu.oam?.length, 544, 'cooperPpu should return 544-byte OAM');
             await vscode.commands.executeCommand('cooper.showPalette'); // creates a webview; must not throw
             await vscode.commands.executeCommand('cooper.showOam');     // ditto
+            await vscode.commands.executeCommand('cooper.showVram');    // decodes VRAM -> PNG -> webview
         } finally {
             await vscode.debug.stopDebugging();
             tracker.dispose();

@@ -408,6 +408,27 @@ rationale and the docs that grounded it. Newest last.
 - **Grounded:** aim_target shows 2 on-screen sprites — player X=124 Y=107 (tile 0),
   target X=200 Y=59 (tile 1); `y === 240` is the SDK's "hidden" convention.
 
+### D-025 — VRAM tile viewer: planar decode + zero-dep PNG (v0.8.0)
+- **Decision:** `Cooper: Show Tiles (VRAM)` reads `peek_vram` (via a new custom
+  request `cooperVram {offset,count}` on the adapter) + the CGRAM (via `cooperPpu`),
+  decodes planar SNES tiles, colours them with a sub-palette, and shows a **PNG in
+  a webview `<img>`** (data URI, `image-rendering: pixelated`, upscaled ×4).
+- **Pure `src/tiles.ts`:** `decodeTile(bytes, base, bpp)` — planar layout
+  `base + (plane>>1)*16 + row*2 + (plane&1)`, pixel = Σ bit<<plane; `tilesToRgba`;
+  and a **minimal PNG encoder** (RGBA colour-type-6, manual CRC32, `zlib.deflateSync`
+  for IDAT — `zlib` is a Node builtin, kept external by esbuild `platform:'node'`,
+  **no new dependency**). Render to PNG (not a `<canvas>`+JS) keeps the webview
+  script-free and the output Node-testable.
+- **MVP fixed:** 4bpp, first `0x4000` bytes (512 tiles), 16 tiles/row, CGRAM
+  sub-palette 0. bpp/offset/palette selectors are a follow-up (QuickPick).
+- **Verified — including visually:** Node tier — value-exact `decodeTile` (4bpp
+  plane bits → 1/2/4/8; 2bpp → 3), valid PNG signature/IHDR, real `cooperVram` →
+  PNG; integration — `cooper.showVram` in the real host. And a generated PNG from
+  aim_target's live VRAM **renders recognisable font glyphs** (decode confirmed
+  visually, not just "valid PNG bytes").
+- **Grounded:** `peek_vram {offset,count}` → `{bytes}`; aim_target tile 1 is a
+  font glyph (column-3/4 bits).
+
 ---
 
 ### Known limitations (Component #1)

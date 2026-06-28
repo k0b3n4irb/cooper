@@ -232,6 +232,32 @@ check('oam html reports 128 sprites', oamHtml.includes('128 sprites'));
 check('oam html embeds cspSource', oamHtml.includes('vscode-csp:src'));
 try { fs.unlinkSync(tmpP); } catch {}
 
+// --- VRAM tile decode + PNG encode (pure) ---
+console.log('\n=== VRAM tile decode + PNG (pure) ===');
+const tmpT = path.join(os.tmpdir(), `cooper_tiles_${process.pid}.cjs`);
+esbuild.buildSync({
+    entryPoints: [path.join(__dirname, '..', 'src', 'tiles.ts')],
+    bundle: true, platform: 'node', format: 'cjs', outfile: tmpT,
+});
+const T = require(tmpT);
+// 4bpp: one bit set in each plane at a distinct column -> indices 1,2,4,8
+const t4 = new Array(32).fill(0);
+t4[0] = 0x80; t4[1] = 0x40; t4[16] = 0x20; t4[17] = 0x10;
+const px4 = T.decodeTile(t4, 0, 4);
+check('decodeTile 4bpp plane bits -> 1,2,4,8', px4[0] === 1 && px4[1] === 2 && px4[2] === 4 && px4[3] === 8);
+// 2bpp: both planes set col0 -> index 3
+const t2 = new Array(16).fill(0); t2[0] = 0x80; t2[1] = 0x80;
+check('decodeTile 2bpp both planes -> 3', T.decodeTile(t2, 0, 2)[0] === 3);
+check('decodeTileSheet count', T.decodeTileSheet(new Array(64).fill(0), 4, 2).length === 2);
+const pal16 = new Array(16).fill(0).map((_, i) => ({ r: i, g: i, b: i }));
+const rgba = T.tilesToRgba(T.decodeTileSheet(new Array(32 * 32).fill(0), 4, 32), pal16, 16);
+check('tilesToRgba 32 tiles, 16/row -> 128x16', rgba.width === 128 && rgba.height === 16);
+const png = T.encodePng(8, 8, new Uint8Array(8 * 8 * 4));
+check('encodePng has PNG signature', png[0] === 0x89 && png.slice(1, 4).toString('ascii') === 'PNG');
+check('encodePng IHDR width = 8', png.readUInt32BE(16) === 8);
+check('renderVramHtml embeds a PNG data URI', T.renderVramHtml('AAAA', 'vscode-csp:src', 'x').includes('data:image/png;base64,AAAA'));
+try { fs.unlinkSync(tmpT); } catch {}
+
 // ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
 // ===========================================================================
@@ -387,6 +413,19 @@ try { fs.unlinkSync(tmpP); } catch {}
             check('decoded palette has 256 RGB colours', decoded.length === 256 && typeof decoded[0].r === 'number');
             check('cooperPpu returns 544-byte OAM', Array.isArray(ppu.body.oam) && ppu.body.oam.length === 544);
             check('OAM decodes to 128 sprites', P.decodeOam(ppu.body.oam).length === 128);
+
+            // VRAM custom request -> decode -> PNG (closes the tile path on the real binary)
+            const vramResp = await new Promise((resolve, reject) => {
+                const to = setTimeout(() => reject(new Error('cooperVram timeout')), 40000);
+                session.sendResponse = (r) => { clearTimeout(to); resolve(r); };
+                const response = { seq: 0, type: 'response', request_seq: 0, success: true, command: 'cooperVram', body: {} };
+                const ret = session.customRequest('cooperVram', response, { offset: 0, count: 0x1000 });
+                if (ret && typeof ret.catch === 'function') { ret.catch(reject); }
+            });
+            check('cooperVram returns 0x1000 bytes', Array.isArray(vramResp.body.bytes) && vramResp.body.bytes.length === 0x1000);
+            const sheet = T.tilesToRgba(T.decodeTileSheet(vramResp.body.bytes, 4, 0x1000 / 32), P.decodeCgram(ppu.body.cgram).slice(0, 16), 16);
+            const pngBuf = T.encodePng(sheet.width, sheet.height, sheet.data);
+            check('VRAM sheet encodes a valid PNG', pngBuf[0] === 0x89 && pngBuf.slice(1, 4).toString('ascii') === 'PNG');
 
             await dapCall('disconnect', {});
             check('disconnect ok', true);

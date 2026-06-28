@@ -194,6 +194,12 @@ export class LunaMcp {
         return r?.bytes ?? [];
     }
 
+    /** Read `count` bytes from the 64 KB PPU VRAM at `offset` (returns the byte array). */
+    async peekVram(offset: number, count: number): Promise<number[]> {
+        const r = await this.callTool('peek_vram', { offset, count }) as { bytes?: number[] };
+        return r?.bytes ?? [];
+    }
+
     /** Terminate the luna process. */
     dispose(): void {
         if (this.proc) {

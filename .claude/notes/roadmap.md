@@ -50,10 +50,12 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
   Extension Host. D-023.
 - ✅ **OAM sprite viewer (0.7.0):** `Cooper: Show Sprites (OAM)` — 128-sprite table
   from `state.ppu.oam_full`. D-024.
-- 🔜 **VRAM tile viewer** (`peek_vram` + 2/4/8bpp decode); VRAM/ARAM in the memory
-  view; better multi-bp continue.
-- **Note:** CGRAM/OAM read via the `state` snapshot (no MCP `peek_cgram`/`peek_oam`
-  needed after all); VRAM via `peek_vram`.
+- ✅ **VRAM tile viewer (0.8.0):** `Cooper: Show Tiles (VRAM)` — 512 4bpp tiles from
+  `peek_vram` → PNG (zero-dep encoder); verified visually (font glyphs). D-025.
+- 🔜 **Viewer polish:** bpp/offset/sub-palette selectors (VRAM); VRAM/ARAM in the
+  hex memory view; rendered sprite pixels in OAM; better multi-bp continue.
+- **Note:** CGRAM/OAM via the `state` snapshot, VRAM via `peek_vram` — no luna RFE
+  was needed for any viewer.
 - **Deps RESOLVED (2026-06-27, D-016):** the pinned luna 1.1.0 already exposes
   `run_until_pc`/`run_until_mem_write`/`run_until_mem_read` + `poke_memory` (live
   `tools/list` = 17 tools; its `--help` is stale). Proven end-to-end. **No luna

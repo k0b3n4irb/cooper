@@ -417,6 +417,16 @@ export class LunaDebugSession extends LoggingDebugSession {
             }
             return;
         }
+        if (command === 'cooperVram') {
+            const a = (args ?? {}) as { offset?: number; count?: number };
+            try {
+                response.body = { bytes: await this.mcp.peekVram(a.offset ?? 0, a.count ?? 0x4000) };
+                this.sendResponse(response);
+            } catch (e) {
+                this.sendErrorResponse(response, 3007, `vram read failed: ${(e as Error).message}`);
+            }
+            return;
+        }
         super.customRequest(command, response, args);
     }
 

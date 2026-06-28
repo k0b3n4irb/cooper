@@ -7,6 +7,7 @@ import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource } from './clangdConf
 import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs } from './build';
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
+import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
 
 const execFileAsync = promisify(execFile);
 
@@ -19,6 +20,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.preview', () => previewFrame(context)),
         vscode.commands.registerCommand('cooper.showPalette', () => showPalette()),
         vscode.commands.registerCommand('cooper.showOam', () => showOam()),
+        vscode.commands.registerCommand('cooper.showVram', () => showVram()),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
         vscode.debug.registerDebugConfigurationProvider('luna', new LunaConfigProvider()),
@@ -206,6 +208,31 @@ async function showOam(): Promise<void> {
     }
     const sprites = decodeOam(ppu.oam ?? []);
     showViewer('cooperOam', 'OAM (sprites)', (w) => renderOamHtml(sprites, w.cspSource));
+}
+
+async function showVram(): Promise<void> {
+    const session = vscode.debug.activeDebugSession;
+    if (!session || session.type !== 'luna') {
+        void vscode.window.showErrorMessage('Cooper: start a Luna debug session (and pause) before opening a viewer.');
+        return;
+    }
+    const BPP = 4, TILES_PER_ROW = 16, VRAM_BYTES = 0x4000; // first 512 4bpp tiles
+    let cgram: number[] = [];
+    let vram: number[] = [];
+    try {
+        cgram = ((await session.customRequest('cooperPpu')) as { cgram?: number[] }).cgram ?? [];
+        vram = ((await session.customRequest('cooperVram', { offset: 0, count: VRAM_BYTES })) as { bytes?: number[] }).bytes ?? [];
+    } catch (e) {
+        void vscode.window.showErrorMessage(`Cooper: could not read VRAM: ${String(e)}`);
+        return;
+    }
+    const count = Math.floor(vram.length / bytesPerTile(BPP));
+    const tiles = decodeTileSheet(vram, BPP, count);
+    const palette = decodeCgram(cgram).slice(0, 16); // sub-palette 0
+    const { width, height, data } = tilesToRgba(tiles, palette, TILES_PER_ROW);
+    const png = encodePng(width, height, data).toString('base64');
+    showViewer('cooperVram', 'VRAM tiles',
+        (w) => renderVramHtml(png, w.cspSource, `${count} tiles · ${BPP}bpp · palette 0 · ${width}×${height}`, width * 4));
 }
 
 // ---------------------------------------------------------------------------
