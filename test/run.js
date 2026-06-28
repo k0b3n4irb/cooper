@@ -125,6 +125,36 @@ if (fs.existsSync(path.join(OPENSNES, 'make', 'common.mk'))) {
     check('make OPENSNES=<sdk> builds the ROM', rb.status === 0 && fs.existsSync(ri.rom));
 }
 
+// --- luna resolution robustness (the real bug: lunaPath was a DIRECTORY) ---
+console.log('\n=== luna resolution (file / directory / PATH) ===');
+const lunaDir = path.join(os.tmpdir(), `cooper_lunadir_${process.pid}`);
+fs.mkdirSync(lunaDir, { recursive: true });
+fs.writeFileSync(path.join(lunaDir, 'luna'), '#!/bin/sh\n');
+check('resolveLunaPath accepts a DIRECTORY containing luna (the user case)',
+    B.resolveLunaPath({ configured: lunaDir }) === path.join(lunaDir, 'luna'));
+check('resolveLunaPath accepts the binary file directly',
+    B.resolveLunaPath({ configured: path.join(lunaDir, 'luna') }) === path.join(lunaDir, 'luna'));
+const savedPath = process.env.PATH;
+process.env.PATH = lunaDir + path.delimiter + (savedPath || '');
+check('resolveLunaPath finds luna on PATH', B.resolveLunaPath({}) === path.join(lunaDir, 'luna'));
+process.env.PATH = '';
+check('resolveLunaPath returns null when nothing is found',
+    B.resolveLunaPath({ configured: '/no/such', sdkPath: '/no/such' }) === null);
+process.env.PATH = savedPath;
+fs.rmSync(lunaDir, { recursive: true, force: true });
+
+// --- a STANDALONE (out-of-tree) project builds via the OPENSNES override ---
+console.log('\n=== standalone project fixture (out-of-tree) builds ===');
+const fixDir = path.join(__dirname, 'fixtures', 'standalone');
+check('findProjectDir resolves the standalone fixture', C.findProjectDir(fixDir) === fixDir);
+if (fs.existsSync(path.join(OPENSNES, 'make', 'common.mk'))) {
+    cp.spawnSync('make', B.buildMakeArgs(OPENSNES, 'clean'), { cwd: fixDir });
+    const rs = cp.spawnSync('make', B.buildMakeArgs(OPENSNES), { cwd: fixDir, encoding: 'utf8' });
+    check('standalone project builds (OPENSNES override beats $(shell cd ../../..))',
+        rs.status === 0 && fs.existsSync(path.join(fixDir, 'hello_world.sfc')));
+    if (rs.status !== 0) { console.log(rs.stderr.split('\n').slice(0, 6).join('\n')); }
+}
+
 // --- close the loop: the cooper-cc matcher regex must capture a REAL cc65816 error ---
 console.log('\n=== problem matcher catches a real cc65816 error ===');
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));

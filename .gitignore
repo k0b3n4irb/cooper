@@ -4,3 +4,11 @@ dist/
 *.vsix
 .vscode-test/
 .DS_Store
+
+# standalone build fixture artifacts
+test/fixtures/**/*.sfc
+test/fixtures/**/*.sym
+test/fixtures/**/*.o
+test/fixtures/**/*.asm
+test/fixtures/**/linkfile
+test/fixtures/**/.clangd

@@ -55,19 +55,57 @@ export function findRomForDir(startDir: string, maxLevels = 8): RomInfo | null {
 }
 
 /**
- * Resolve the luna binary: explicit `cooper.lunaPath` setting → the SDK's pinned
- * binary at `<sdk>/tools/luna-test/bin/luna` (grounded; v1.1.0) → null.
+ * Resolve the luna *binary*. luna is released separately from the SDK, so accept
+ * a configured path that is the binary itself OR a directory containing it
+ * (`luna`, `bin/luna`, …) — a user release unzips to a folder. Order:
+ * `cooper.lunaPath` (file or dir) → the SDK's pinned binary
+ * `<sdk>/tools/luna-test/bin/luna` → `luna` on the PATH → null.
  */
 export function resolveLunaPath(opts: { configured?: string; sdkPath?: string }): string | null {
     const { configured, sdkPath } = opts;
-    if (configured && fs.existsSync(configured)) {
-        return configured;
+
+    const asBinary = (p: string): string | null => {
+        try {
+            const st = fs.statSync(p);
+            if (st.isFile()) {
+                return p;
+            }
+            if (st.isDirectory()) {
+                for (const cand of ['luna', path.join('bin', 'luna'), path.join('tools', 'luna-test', 'bin', 'luna')]) {
+                    const full = path.join(p, cand);
+                    try {
+                        if (fs.statSync(full).isFile()) {
+                            return full;
+                        }
+                    } catch { /* next candidate */ }
+                }
+            }
+        } catch { /* not found */ }
+        return null;
+    };
+
+    if (configured) {
+        const r = asBinary(configured);
+        if (r) {
+            return r;
+        }
     }
     if (sdkPath) {
-        const p = path.join(sdkPath, 'tools', 'luna-test', 'bin', 'luna');
-        if (fs.existsSync(p)) {
-            return p;
+        const r = asBinary(path.join(sdkPath, 'tools', 'luna-test', 'bin', 'luna'));
+        if (r) {
+            return r;
         }
+    }
+    for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
+        if (!dir) {
+            continue;
+        }
+        try {
+            const full = path.join(dir, 'luna');
+            if (fs.statSync(full).isFile()) {
+                return full;
+            }
+        } catch { /* next dir */ }
     }
     return null;
 }

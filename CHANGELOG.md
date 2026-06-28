@@ -4,6 +4,20 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.11.2] — 2026-06-28
+
+### Fixed — Run/Debug finds luna even from a separate user release
+
+- **`cooper.lunaPath` may now be the binary OR the folder that contains it** (a
+  luna user release unzips to a folder with `luna`/`luna-gui`). Cooper also falls
+  back to `luna` on your PATH. Fixes "luna not found" when the path was a directory.
+  D-030.
+
+### Internal
+
+- Test against a real **standalone (out-of-tree) project fixture**, not only the
+  SDK's in-tree examples — so build/luna issues surface in CI, not in your editor.
+
 ## [0.11.1] — 2026-06-28
 
 ### Fixed — Build works for standalone projects (not just SDK examples)

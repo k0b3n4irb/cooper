@@ -547,6 +547,34 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-28 — luna resolution + test against a real standalone project
+
+### D-030 — Robust luna resolution (file/dir/PATH); test on a standalone fixture
+- **The bug (user-found, RUN failed "luna not found"):** the user's
+  `cooper.lunaPath` was `~/bin/luna` — a **directory** (a luna user-release unzips
+  to a folder with `luna` + `luna-gui`), but the binary is `~/bin/luna/luna`.
+  `resolveLunaPath` did `fs.existsSync(configured)` → true for the directory →
+  Cooper tried to exec a folder.
+- **Why it slipped through:** luna is **released separately** from the SDK, so its
+  location is user-specific. Cooper's resolver was dev-centric
+  (`<sdk>/tools/luna-test/bin/luna`).
+- **Decision:** `resolveLunaPath` now accepts the configured path as a **binary OR
+  a directory** (looks for `luna`, `bin/luna`, `tools/luna-test/bin/luna` inside),
+  validates it's a **file**, and adds a **PATH** fallback. Order: configured →
+  SDK pinned → PATH. Setting doc updated ("binary or folder").
+- **Process fix (user demand — "reorient your tests on my project; I won't be your
+  QA"):** the test corpus used only the SDK's **in-tree** `examples/` (canonical
+  layout), so it never exposed standalone/out-of-tree/luna-dir bugs. Added an
+  in-repo **standalone fixture** `test/fixtures/standalone/` (a project NOT under
+  the SDK) and a test that **builds it with the `OPENSNES=` override** — the real
+  user scenario, reproducible. Going forward, verify against the standalone fixture,
+  not just in-tree examples. See [[cooper-test-on-standalone-projects]].
+- **Verified:** Node — `resolveLunaPath` (file / **directory** / PATH / null) +
+  the standalone fixture builds out-of-tree; the user's exact `luna run …` produced
+  a 22 KB screenshot of their shmup.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

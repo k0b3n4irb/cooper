@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -237,7 +237,7 @@
           "type": "string",
           "default": "",
           "scope": "machine-overridable",
-          "markdownDescription": "Absolute path to the `luna` emulator binary used by **Cooper: Preview frame**. If empty, Cooper uses the SDK's pinned binary at `<sdk>/tools/luna-test/bin/luna`."
+          "markdownDescription": "Path to the `luna` emulator — the **binary** or the **folder** that contains it (a user release unzips to a folder with `luna`/`luna-gui`). If empty, Cooper uses the SDK's pinned binary at `<sdk>/tools/luna-test/bin/luna`, then `luna` on your PATH."
         },
         "cooper.preview.steps": {
           "type": "number",
