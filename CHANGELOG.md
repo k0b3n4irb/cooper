@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] — 2026-06-28
+
+### Added — The Cooper dashboard ("Home")
+
+- A graphical **Cooper: Home** webview: big **Build / Run / Debug** buttons, a
+  **live preview thumbnail** (click Run to render a frame), and **Palette /
+  Sprites / Tiles** cards, plus an SDK / luna / ROM status line. Open it from the
+  **🏠 button** in the Cooper sidebar header (or `Cooper: Open Dashboard`).
+- Themed with VS Code colors so it matches your theme; interactive via a strict
+  CSP (nonce-gated script). Reuses the existing commands — no new backend. D-031.
+
 ## [0.11.2] — 2026-06-28
 
 ### Fixed — Run/Debug finds luna even from a separate user release

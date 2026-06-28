@@ -41,9 +41,15 @@ suite('Cooper — activation & commands', () => {
     test('contributes its commands', async () => {
         await vscode.extensions.getExtension(EXT_ID)!.activate();
         const cmds = await vscode.commands.getCommands(true);
-        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd', 'cooper.refresh', 'cooper.debug']) {
+        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd', 'cooper.refresh', 'cooper.debug', 'cooper.home']) {
             assert.ok(cmds.includes(c), `missing command ${c}`);
         }
+    });
+
+    test('opens the Cooper dashboard webview', async () => {
+        await vscode.extensions.getExtension(EXT_ID)!.activate();
+        // Must not throw — creates the webview, loads its CSP-gated script.
+        await vscode.commands.executeCommand('cooper.home');
     });
 
     test('contributes the Cooper sidebar view', () => {

@@ -274,6 +274,23 @@ check('symbol click sets a breakpoint', model[3].children[0].commandId === 'coop
 check('no project -> single info node', SB.buildTreeModel({ projectDir: null, romName: null, romBuilt: false, sdkName: null, functions: [] }).length === 1);
 try { fs.unlinkSync(tmpSB); } catch {}
 
+// --- Cooper Home dashboard HTML (pure) ---
+console.log('\n=== Cooper dashboard HTML (pure) ===');
+const tmpD2 = path.join(os.tmpdir(), `cooper_dash_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'dashboard.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpD2 });
+const D2 = require(tmpD2);
+const dash = D2.renderDashboardHtml({ hasProject: true, projectName: 'shmup_1942', romBuilt: true, sdkName: 'opensnes', lunaFound: true }, 'vscode-csp', 'NONCE0');
+check('dashboard has Build/Run/Debug + viewer cards (7 actions)', (dash.match(/data-cmd=/g) || []).length === 7);
+check('dashboard script gated by a nonce (CSP)', dash.includes("script-src 'nonce-NONCE0'") && dash.includes('nonce="NONCE0"'));
+check('dashboard allows data: images for the preview', dash.includes('img-src vscode-csp data:'));
+check('dashboard reflects status (luna ready, ROM built)', dash.includes('ready') && dash.includes('built'));
+check('dashboard has a preview image slot', dash.includes('id="preview"'));
+check('dashboard empty state when no project',
+    D2.renderDashboardHtml({ hasProject: false, projectName: '', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N').includes('Open an OpenSNES project'));
+check('dashboard escapes the project name (no HTML injection)',
+    D2.renderDashboardHtml({ hasProject: true, projectName: '<img>', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N').includes('&lt;img&gt;'));
+try { fs.unlinkSync(tmpD2); } catch {}
+
 // --- PPU decode + palette viewer rendering (pure) ---
 console.log('\n=== PPU/palette decode (pure) ===');
 const tmpP = path.join(os.tmpdir(), `cooper_ppu_${process.pid}.cjs`);

@@ -5,6 +5,14 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**The Cooper dashboard "Home"** (v0.12.0). Webview with big Build/Run/Debug
+buttons, a live preview thumbnail (luna screenshot pushed as base64), and
+Palette/Sprites/Tiles cards + status. Opens from the 🏠 sidebar-header button.
+Themed with VS Code vars; strict CSP (nonce). `renderDashboardHtml` pure-tested;
+opens in the real Extension Host. D-031. GUI layer step 2 (sidebar #1, dashboard
+#2; CodeLens #3 next). Also fixed: build OPENSNES override (0.11.1), luna
+file/dir/PATH resolution + standalone fixture (0.11.2).
+
 **The Cooper sidebar** (v0.11.0). Activity-bar tree → everything clickable:
 PROJECT (ROM/SDK), BUILD & RUN, PPU VIEWERS, SYMBOLS (your functions from `.c` ∩
 `.sym`; click → set a breakpoint). Debug-from-tree handles subfolder projects.

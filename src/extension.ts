@@ -10,6 +10,7 @@ import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu'
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
+import { renderDashboardHtml, DashboardState } from './dashboard';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,6 +26,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.showOam', () => showOam()),
         vscode.commands.registerCommand('cooper.showVram', () => showVram()),
         vscode.commands.registerCommand('cooper.refresh', () => tree.refresh()),
+        vscode.commands.registerCommand('cooper.home', () => showHome(context)),
         vscode.commands.registerCommand('cooper.debug', () => startLunaDebug(tree.current())),
         vscode.commands.registerCommand('cooper.breakOnSymbol', (name: string) => breakOnSymbol(name)),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
@@ -249,73 +251,120 @@ async function runBuild(target?: string): Promise<void> {
 // Preview — render a headless luna screenshot of the built ROM and open it.
 // ---------------------------------------------------------------------------
 
-async function previewFrame(context: vscode.ExtensionContext): Promise<void> {
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    if (!folder) {
-        void vscode.window.showErrorMessage('Cooper: open a project folder first.');
-        return;
+/** Render a luna screenshot of the project's ROM; returns the PNG path or null
+ *  (errors surfaced). Shared by the Preview command and the dashboard. */
+async function generatePreviewPng(context: vscode.ExtensionContext): Promise<string | null> {
+    const projectDir = await resolveProjectDir();
+    if (!projectDir) {
+        void vscode.window.showErrorMessage('Cooper: no OpenSNES project (a folder with a Makefile) found.');
+        return null;
     }
-    const projectDir = folder.uri.fsPath;
-
-    // Resolve the ROM from the active file's dir (handles examples in subfolders),
-    // falling back to the workspace root.
-    const activeDir = vscode.window.activeTextEditor
-        ? path.dirname(vscode.window.activeTextEditor.document.uri.fsPath)
-        : projectDir;
-    const target = findRomForDir(activeDir) ?? findRomForDir(projectDir);
-    if (!target) {
-        void vscode.window.showErrorMessage('Cooper: no Makefile with a TARGET found — cannot locate the ROM to preview.');
-        return;
+    const mk = path.join(projectDir, 'Makefile');
+    const romName = fs.existsSync(mk) ? romTargetFromMakefile(fs.readFileSync(mk, 'utf8')) : null;
+    if (!romName) {
+        void vscode.window.showErrorMessage('Cooper: no TARGET in the Makefile — cannot locate the ROM.');
+        return null;
     }
-    if (!fs.existsSync(target.rom)) {
-        const pick = await vscode.window.showWarningMessage(
-            `Cooper: ${path.basename(target.rom)} not built yet. Build it first?`,
-            'Build (make)',
-        );
-        if (pick === 'Build (make)') {
+    const romPath = path.join(projectDir, romName);
+    if (!fs.existsSync(romPath)) {
+        const pick = await vscode.window.showWarningMessage(`Cooper: ${romName} not built yet. Build it first?`, 'Build');
+        if (pick === 'Build') {
             await runBuild();
         }
-        return;
+        return null;
     }
-
-    // Resolve the luna binary (setting → SDK pinned binary).
     const cfg = vscode.workspace.getConfiguration('cooper');
     const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
     const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
     if (!luna) {
-        void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath, or cooper.opensnesPath so Cooper can use the SDK\'s pinned binary.');
-        return;
+        void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath (the binary or its folder), or cooper.opensnesPath.');
+        return null;
     }
-
-    // Screenshot lands in the extension's storage dir (not the user's source tree).
     const storageDir = context.globalStorageUri.fsPath;
-    try {
-        fs.mkdirSync(storageDir, { recursive: true });
-    } catch { /* best-effort; the write below surfaces a real failure */ }
+    try { fs.mkdirSync(storageDir, { recursive: true }); } catch { /* surfaced below */ }
     const png = path.join(storageDir, 'preview.png');
-
-    const args = lunaPreviewArgs(target.rom, png, {
+    const args = lunaPreviewArgs(romPath, png, {
         steps: cfg.get<number>('preview.steps'),
         forceDisplay: cfg.get<boolean>('preview.forceDisplay'),
     });
-
-    await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Cooper: rendering ${path.basename(target.rom)} in luna…` },
-        async () => {
+    return vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Cooper: rendering ${romName} in luna…` },
+        async (): Promise<string | null> => {
             try {
-                await execFileAsync(luna, args, { cwd: target.dir });
+                await execFileAsync(luna, args, { cwd: projectDir });
             } catch (err: unknown) {
-                const stderr = (err as { stderr?: string }).stderr;
-                void vscode.window.showErrorMessage(`Cooper: luna preview failed: ${stderr?.trim() || String(err)}`);
-                return;
+                void vscode.window.showErrorMessage(`Cooper: luna preview failed: ${(err as { stderr?: string }).stderr?.trim() || String(err)}`);
+                return null;
             }
-            if (!fs.existsSync(png)) {
-                void vscode.window.showErrorMessage('Cooper: luna ran but produced no screenshot.');
-                return;
-            }
-            await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(png), vscode.ViewColumn.Beside);
+            return fs.existsSync(png) ? png : null;
         },
     );
+}
+
+async function previewFrame(context: vscode.ExtensionContext): Promise<void> {
+    const png = await generatePreviewPng(context);
+    if (png) {
+        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(png), vscode.ViewColumn.Beside);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cooper Home — the dashboard webview (big buttons, live preview, viewer cards).
+// ---------------------------------------------------------------------------
+
+let homePanel: vscode.WebviewPanel | undefined;
+
+function nonce(): string {
+    let s = '';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 24; i++) {
+        s += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return s;
+}
+
+async function dashboardState(): Promise<DashboardState> {
+    const info = await resolveProjectInfo();
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const sdk = info.projectDir ? detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: info.projectDir }) : null;
+    const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
+    return {
+        hasProject: !!info.projectDir,
+        projectName: info.romName ? info.romName.replace(/\.(sfc|smc)$/i, '') : (info.projectDir ? path.basename(info.projectDir) : ''),
+        romBuilt: info.romBuilt,
+        sdkName: info.sdkName,
+        lunaFound: !!luna,
+    };
+}
+
+async function showHome(context: vscode.ExtensionContext): Promise<void> {
+    if (homePanel) {
+        homePanel.reveal();
+        homePanel.webview.html = renderDashboardHtml(await dashboardState(), homePanel.webview.cspSource, nonce());
+        return;
+    }
+    const panel = vscode.window.createWebviewPanel('cooperHome', 'Cooper: Home', vscode.ViewColumn.Active,
+        { enableScripts: true, retainContextWhenHidden: true });
+    homePanel = panel;
+    panel.onDidDispose(() => { homePanel = undefined; });
+    panel.webview.onDidReceiveMessage(async (m: { command?: string }) => {
+        switch (m.command) {
+            case 'build': await runBuild(); break;
+            case 'debug': startLunaDebug((await resolveProjectInfo())); break;
+            case 'palette': await showPalette(); break;
+            case 'oam': await showOam(); break;
+            case 'vram': await showVram(); break;
+            case 'run': {
+                const png = await generatePreviewPng(context);
+                if (png) {
+                    const data = fs.readFileSync(png).toString('base64');
+                    void panel.webview.postMessage({ type: 'preview', dataUri: `data:image/png;base64,${data}` });
+                }
+                break;
+            }
+        }
+    });
+    panel.webview.html = renderDashboardHtml(await dashboardState(), panel.webview.cspSource, nonce());
 }
 
 // ---------------------------------------------------------------------------
