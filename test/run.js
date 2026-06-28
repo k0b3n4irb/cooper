@@ -199,6 +199,25 @@ check('resolveExpr(symbol) wins', S.resolveExpr(sym, 'InitHardware') === 0x00836
 check('resolveExpr(literal) falls through', S.resolveExpr(sym, '$7E0030') === 0x7E0030);
 try { fs.unlinkSync(tmpS); } catch {}
 
+// --- PPU decode + palette viewer rendering (pure) ---
+console.log('\n=== PPU/palette decode (pure) ===');
+const tmpP = path.join(os.tmpdir(), `cooper_ppu_${process.pid}.cjs`);
+esbuild.buildSync({
+    entryPoints: [path.join(__dirname, '..', 'src', 'ppu.ts')],
+    bundle: true, platform: 'node', format: 'cjs', outfile: tmpP,
+});
+const P = require(tmpP);
+check('bgr555 white (0x7FFF) -> #ffffff', P.rgbHex(P.bgr555ToRgb(0x7FFF)) === '#ffffff');
+check('bgr555 black (0) -> #000000', P.rgbHex(P.bgr555ToRgb(0)) === '#000000');
+check('bgr555 red is the low 5 bits (0x001F)', P.rgbHex(P.bgr555ToRgb(0x001F)) === '#ff0000');
+check('bgr555 blue is the high 5 bits (0x7C00)', P.rgbHex(P.bgr555ToRgb(0x7C00)) === '#0000ff');
+check('decodeCgram maps 256 words', P.decodeCgram(new Array(256).fill(0)).length === 256);
+const palHtml = P.renderPaletteHtml(P.decodeCgram([0x7FFF, ...new Array(255).fill(0)]), 'vscode-csp:src');
+check('palette html has 256 swatches', (palHtml.match(/class="sw"/g) || []).length === 256);
+check('palette html embeds the cspSource', palHtml.includes('vscode-csp:src'));
+check('palette html shows the white swatch', palHtml.includes('background:#ffffff'));
+try { fs.unlinkSync(tmpP); } catch {}
+
 // ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
 // ===========================================================================
@@ -340,6 +359,18 @@ try { fs.unlinkSync(tmpS); } catch {}
             check('stopped at data breakpoint (mem write $2100)', true);
             const st2 = await dapCall('stackTrace', { threadId: 1 });
             check('data bp stopped in InitHardware', /InitHardware/.test(st2.body.stackFrames[0].name));
+
+            // custom request feeding the palette viewer: live CGRAM at the stop
+            const ppu = await new Promise((resolve, reject) => {
+                const to = setTimeout(() => reject(new Error('cooperPpu timeout')), 40000);
+                session.sendResponse = (r) => { clearTimeout(to); resolve(r); };
+                const response = { seq: 0, type: 'response', request_seq: 0, success: true, command: 'cooperPpu', body: {} };
+                const ret = session.customRequest('cooperPpu', response, {});
+                if (ret && typeof ret.catch === 'function') { ret.catch(reject); }
+            });
+            check('cooperPpu returns 256 CGRAM words', Array.isArray(ppu.body.cgram) && ppu.body.cgram.length === 256);
+            const decoded = P.decodeCgram(ppu.body.cgram);
+            check('decoded palette has 256 RGB colours', decoded.length === 256 && typeof decoded[0].r === 'number');
 
             await dapCall('disconnect', {});
             check('disconnect ok', true);

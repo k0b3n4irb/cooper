@@ -4,16 +4,26 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0] — 2026-06-28
+
+### Added — Debugger palette viewer (P2.2c)
+
+- **`Cooper: Show Palette (CGRAM)`** — a webview showing the **live 256-colour
+  palette at the current debug stop** (16×16 swatch grid), decoded from luna's
+  `state.ppu.cgram` (15-bit BGR555 → RGB). Data flows through a custom DAP request
+  (`cooperPpu`) on the active luna session, so it reflects exactly what the PPU
+  holds where you paused.
+- Works around the lack of an MCP `peek_cgram` tool by reading `state.ppu.cgram`
+  directly (D-023). Pure decode in `src/ppu.ts`; webview wiring verified in the
+  real Extension Host (integration tier).
 
 ### Tooling
 
 - **VS Code integration-test harness** (`@vscode/test-cli` + `@vscode/test-electron`,
   D-022): `npm run test:integration` runs `src/test/*.test.ts` inside a real
-  Extension Development Host — verifies command registration and the luna debug
-  adapter end-to-end through the real debug machinery (a DAP tracker observes a
-  `stopped(entry)` event). Complements the fast Node tier (`npm test`). No change
-  to the shipped extension.
+  Extension Development Host — verifies command registration, the luna debug
+  adapter end-to-end (a DAP tracker observes a `stopped(entry)` event), and the
+  palette webview command. Complements the fast Node tier (`npm test`).
 
 ## [0.5.0] — 2026-06-27
 

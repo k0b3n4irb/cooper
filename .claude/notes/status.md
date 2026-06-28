@@ -5,26 +5,26 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
-**P2.2b — data (memory-watch) breakpoints** (v0.5.0). `dataBreakpointInfo` +
-`setDataBreakpoints` → `run_until_mem_write|read`: stop when a `.sym` symbol or
-address is written/read. Verified vs real luna ($2100 write → PC 0x836B in
-InitHardware). 74 tests. D-021.
+**P2.2c — debugger palette viewer** (v0.6.0). `Cooper: Show Palette (CGRAM)` —
+webview of the live 256-colour palette at a debug stop, decoded from
+`state.ppu.cgram` (BGR555) via a custom DAP request `cooperPpu`. Pure decode in
+`src/ppu.ts`; webview verified in the **real Extension Host** (D-022 harness, now
+also exercising the palette command). 84 Node + 3 integration tests. D-023.
 
-Before it: **P2.2a** memory view + evaluate (0.4.0, D-020); **P2.1** ASM/symbol
-debugger MVP (0.3.0, `lunaDebug.ts`/`sym.ts`/`lunaMcp.ts`, D-016…D-019); P0
-preview (0.2.0); #3/#2/#1.
+Before it: **P2.2b** data breakpoints (0.5.0, D-021); **P2.2a** memory view +
+evaluate (0.4.0, D-020); **P2.1** ASM/symbol debugger MVP (0.3.0, D-016…D-019);
+test harness (D-022); P0 preview (0.2.0); #3/#2/#1.
 
 ## Current focus
 
-**The debugger (C4) is now a real tool**: symbol + data breakpoints, step,
-registers, memory view, symbolized stack — all verified headlessly vs real luna.
-Next options:
-- **P2.2c — VRAM/ARAM memory** (`peek_vram`/`peek_aram`, distinct ref scheme;
-  D-020) and **PPU/VRAM/OAM viewers** (webview at a stop) — the "waouh", but UI
-  (not headless-testable).
+**The debugger (C4) is a real tool**: symbol + data breakpoints, step, registers,
+memory view, symbolized stack, live palette viewer. Next options:
+- **P2.2c+ — more viewers** (same decode-pure + webview pattern, now both tiers
+  verifiable): **OAM** sprite list (`state.ppu.oam_full`), **VRAM tiles**
+  (`peek_vram` + bpp + sub-palette). And **VRAM/ARAM in the memory view**.
 - **P1 — helper polish (C3)** (snippets, Doxygen hover, `compile_commands.json`).
 - Deferred: better multi-breakpoint continue; source-level (P7) gated on G0
-  (`wla -i` + `wlalink -S -A`). Gap: no MCP `peek_cgram`/`peek_oam` (D-016) → RFE.
+  (`wla -i` + `wlalink -S -A`).
 
 ## Foundations in place
 

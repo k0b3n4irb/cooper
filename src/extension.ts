@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource } from './clangdConfig';
 import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs } from './build';
 import { LunaDebugSession } from './lunaDebug';
+import { decodeCgram, renderPaletteHtml } from './ppu';
 
 const execFileAsync = promisify(execFile);
 
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.configureClangd', () => configureClangd()),
         vscode.commands.registerCommand('cooper.build', () => runBuild()),
         vscode.commands.registerCommand('cooper.preview', () => previewFrame(context)),
+        vscode.commands.registerCommand('cooper.showPalette', () => showPalette()),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
         vscode.debug.registerDebugConfigurationProvider('luna', new LunaConfigProvider()),
@@ -150,6 +152,36 @@ async function previewFrame(context: vscode.ExtensionContext): Promise<void> {
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(png), vscode.ViewColumn.Beside);
         },
     );
+}
+
+// ---------------------------------------------------------------------------
+// Palette viewer (P2.2c) — a webview of the live CGRAM at a debug stop.
+// ---------------------------------------------------------------------------
+
+let palettePanel: vscode.WebviewPanel | undefined;
+
+async function showPalette(): Promise<void> {
+    const session = vscode.debug.activeDebugSession;
+    if (!session || session.type !== 'luna') {
+        void vscode.window.showErrorMessage('Cooper: start a Luna debug session (and pause) before showing the palette.');
+        return;
+    }
+    let ppu: { cgram?: number[] };
+    try {
+        ppu = await session.customRequest('cooperPpu') as { cgram?: number[] };
+    } catch (e) {
+        void vscode.window.showErrorMessage(`Cooper: could not read the PPU state: ${String(e)}`);
+        return;
+    }
+    const colors = decodeCgram(ppu.cgram ?? []);
+    if (!palettePanel) {
+        palettePanel = vscode.window.createWebviewPanel(
+            'cooperPalette', 'CGRAM Palette', vscode.ViewColumn.Beside, { enableScripts: false },
+        );
+        palettePanel.onDidDispose(() => { palettePanel = undefined; });
+    }
+    palettePanel.webview.html = renderPaletteHtml(colors, palettePanel.webview.cspSource);
+    palettePanel.reveal(vscode.ViewColumn.Beside);
 }
 
 // ---------------------------------------------------------------------------

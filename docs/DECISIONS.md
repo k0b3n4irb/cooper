@@ -376,6 +376,31 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-28 — P2.2c (debugger viewers) — palette viewer
+
+### D-023 — CGRAM palette viewer: webview fed by a custom DAP request off `state`
+- **Decision:** `Cooper: Show Palette (CGRAM)` renders the **live palette at the
+  current debug stop** as a webview (16×16 swatch grid). The data path is a
+  **custom DAP request** `cooperPpu` on `LunaDebugSession` → reads `state.ppu`
+  and returns `{ cgram, oam, bgmode, inidisp, backdrop }`; the command calls
+  `vscode.debug.activeDebugSession.customRequest('cooperPpu')` and renders.
+- **Works around the D-016 gap:** there is **no MCP `peek_cgram`/`peek_oam`**, but
+  the `state` snapshot **already includes** `ppu.cgram` (256 assembled **15-bit
+  BGR555 words**, not raw bytes — grounded: index 1 = `32767` = white) and
+  `ppu.oam_full` (544 bytes). So CGRAM/OAM are reachable without a new luna RFE.
+- **Decode (pure, `src/ppu.ts`):** BGR555 `0bBBBBBGGGGGRRRRR` → RGB-8, each 5-bit
+  channel expanded `(v<<3)|(v>>2)`. `renderPaletteHtml` emits a self-contained
+  doc with CSP `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'`,
+  `enableScripts: false` (no JS needed). One reused panel.
+- **Verified both tiers:** Node tier — decode (white/black/red-low/blue-high),
+  256-swatch HTML, and `cooperPpu` returning 256 words against the real binary;
+  **integration tier** — the custom request + `cooper.showPalette` webview command
+  through a real Extension Host debug session (D-022).
+- **Next viewers (same pattern):** OAM (sprite list from `oam_full`), VRAM tiles
+  (`peek_vram` + bpp + a chosen sub-palette) — both decode-pure + webview.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

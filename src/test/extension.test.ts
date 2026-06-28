@@ -98,6 +98,14 @@ suite('Cooper — luna debug adapter (real host)', () => {
                 messages.some((m) => m.type === 'event' && m.event === 'initialized'),
                 'no initialized event seen',
             );
+
+            // Palette viewer (P2.2c): the custom request feeds the live CGRAM, and
+            // the command renders a webview — both through the real host.
+            const active = vscode.debug.activeDebugSession;
+            assert.ok(active && active.type === 'luna', 'no active luna session');
+            const ppu = await active!.customRequest('cooperPpu') as { cgram?: number[] };
+            assert.strictEqual(ppu.cgram?.length, 256, 'cooperPpu should return 256 CGRAM words');
+            await vscode.commands.executeCommand('cooper.showPalette'); // creates a webview; must not throw
         } finally {
             await vscode.debug.stopDebugging();
             tracker.dispose();

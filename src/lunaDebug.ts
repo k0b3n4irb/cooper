@@ -397,6 +397,29 @@ export class LunaDebugSession extends LoggingDebugSession {
         this.sendResponse(response);
     }
 
+    /** Custom requests for Cooper viewers (e.g. the palette webview reads
+     *  `cooperPpu` → the live CGRAM/OAM at the current stop). */
+    protected async customRequest(command: string, response: DebugProtocol.Response, args: unknown): Promise<void> {
+        if (command === 'cooperPpu') {
+            try {
+                const s = await this.mcp.state();
+                const ppu = (s.ppu ?? {}) as Record<string, unknown>;
+                response.body = {
+                    cgram: ppu.cgram ?? [],
+                    oam: ppu.oam_full ?? [],
+                    bgmode: ppu.bgmode ?? 0,
+                    inidisp: ppu.inidisp ?? 0,
+                    backdrop: ppu.backdrop ?? 0,
+                };
+                this.sendResponse(response);
+            } catch (e) {
+                this.sendErrorResponse(response, 3006, `ppu read failed: ${(e as Error).message}`);
+            }
+            return;
+        }
+        super.customRequest(command, response, args);
+    }
+
     protected disconnectRequest(response: DebugProtocol.DisconnectResponse): void {
         this.mcp.dispose();
         this.sendResponse(response);

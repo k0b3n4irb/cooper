@@ -45,10 +45,13 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 - ✅ **P2.2b (0.5.0):** data (memory-watch) breakpoints → `run_until_mem_write|read`
   (`dataBreakpointInfo` + `setDataBreakpoints`); bank-exact; one watch per
   Continue. D-021.
-- 🔜 **P2.2c:** VRAM/ARAM memory via `peek_vram`/`peek_aram`; PPU/VRAM/OAM viewers
-  (webview at a stop); better multi-bp continue.
-- **Gap:** no MCP `peek_cgram`/`peek_oam` in the pinned binary (D-016) → CGRAM/OAM
-  bulk views need a luna RFE.
+- ✅ **P2.2c (0.6.0):** CGRAM palette viewer (webview at a stop, custom DAP request
+  `cooperPpu` off `state.ppu.cgram`; BGR555 decode). Webview verified in the real
+  Extension Host. D-023.
+- 🔜 **P2.2c+:** OAM sprite viewer (`state.ppu.oam_full`), VRAM tile viewer
+  (`peek_vram`); VRAM/ARAM in the memory view; better multi-bp continue.
+- **Note:** CGRAM/OAM read via the `state` snapshot (no MCP `peek_cgram`/`peek_oam`
+  needed after all); VRAM via `peek_vram`.
 - **Deps RESOLVED (2026-06-27, D-016):** the pinned luna 1.1.0 already exposes
   `run_until_pc`/`run_until_mem_write`/`run_until_mem_read` + `poke_memory` (live
   `tools/list` = 17 tools; its `--help` is stale). Proven end-to-end. **No luna
