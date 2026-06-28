@@ -12,3 +12,6 @@ test/fixtures/**/*.o
 test/fixtures/**/*.asm
 test/fixtures/**/linkfile
 test/fixtures/**/.clangd
+test/fixtures/**/*.inc
+test/fixtures/**/project_*
+test/fixtures/**/*.pic
