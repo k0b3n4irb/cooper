@@ -5,6 +5,10 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**P1/C3 — `Cooper: Generate compile_commands.json`** (v0.9.0). Engine-agnostic C
+config (clangd *or* MS C/C++) using the SDK lint flags. Verified incl. the emitted
+command parsing with clang + a real file written in the Extension Host. D-026.
+
 **P2.2c — debugger PPU viewers** (palette 0.6.0 · OAM 0.7.0 · VRAM tiles 0.8.0).
 Three webviews of the live PPU at a debug stop: **CGRAM palette** (16×16 swatches),
 **OAM** (128-sprite table), **VRAM tiles** (512 4bpp tiles → PNG). Decoded in pure

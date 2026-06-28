@@ -431,6 +431,28 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-28 — Helper polish (C3): compile_commands.json
+
+### D-026 — Engine-agnostic C config via `compile_commands.json`
+- **Decision:** `Cooper: Generate compile_commands.json` writes a JSON Compilation
+  Database at the project root, one entry per `.c` file, using the **same flags as
+  the `.clangd` config** (SDK include + `-std=gnu11` + the `-Wno-*` mirror, D-008).
+  This is the **engine-neutral** config: clangd auto-discovers it, and the MS
+  C/C++ extension reads it via `C_Cpp.default.compileCommands` — so a user can pick
+  *either* LSP and still get diagnostics that match the build's clang lint.
+- **Why:** answers "clangd feels heavy / can I use cpptools?" without forking the
+  config. clangd stays the recommended engine (same frontend as the build,
+  portable to VSCodium/OpenVSX — D-007), but Cooper no longer ties the user to it.
+- **Pure `renderCompileCommands`/`compileCommand` in `clangdConfig.ts`** (argv[0] =
+  `clang`, `directory` = the file's dir, absolute `-I` for SDK + file dir). The
+  command gathers files via `workspace.findFiles('**/*.c')` (excluding build dirs).
+- **Verified:** Node — structure + the **emitted command actually parses with
+  clang** (close-the-loop); integration — the command writes/reads a real
+  `compile_commands.json` in the Extension Host. The `int`=2 caveat is unchanged
+  (host target; authority = the `cc65816` build).
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

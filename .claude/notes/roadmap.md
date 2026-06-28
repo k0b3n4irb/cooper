@@ -30,8 +30,10 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
   is **headless-only**; revisit when luna ships a GUI subcommand (author-owned).
 
 ### 🔜 P1 — Helper polish (C3)
-- API snippets, Doxygen-sourced hover, `compile_commands.json` generation option.
-- Low risk, quality-of-life. Can interleave with P0.
+- ✅ **`compile_commands.json` generation (0.9.0):** engine-agnostic C config
+  (clangd or MS C/C++), SDK lint flags, close-the-loop verified. D-026.
+- 🔜 API snippets, Doxygen-sourced hover.
+- Low risk, quality-of-life. Can interleave.
 
 ### ✅ P2.1 — Debugger, symbol/ASM level (C4) — the jewel, part 1 — **SHIPPED 0.3.0**
 - ✅ DAP adapter over luna: launch, `step{1}`, Registers scope (`state`), symbol

@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — 2026-06-28
+
+### Added — `Cooper: Generate compile_commands.json` (P1 / C3)
+
+- Writes a JSON Compilation Database (one entry per `.c` file) using the same
+  flags as the `.clangd` config (SDK include + `-std=gnu11` + the `-Wno-*`
+  mirror). **Engine-agnostic**: clangd auto-discovers it; the MS C/C++ extension
+  reads it via `C_Cpp.default.compileCommands` — so you can use either LSP and get
+  diagnostics that match the build's clang lint (D-026).
+- Verified by running the emitted command through `clang` (close-the-loop) and by
+  generating a real file in the Extension Host integration tier.
+
 ## [0.8.0] — 2026-06-28
 
 ### Added — Debugger VRAM tile viewer (P2.2c)

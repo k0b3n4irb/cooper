@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -73,6 +73,11 @@
       {
         "command": "cooper.configureClangd",
         "title": "Configure clangd (OpenSNES C support)",
+        "category": "Cooper"
+      },
+      {
+        "command": "cooper.generateCompileCommands",
+        "title": "Generate compile_commands.json",
         "category": "Cooper"
       },
       {

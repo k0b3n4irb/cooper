@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource } from './clangdConfig';
+import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, renderCompileCommands } from './clangdConfig';
 import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs } from './build';
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
@@ -16,6 +16,7 @@ const MAKE_TASK_TYPE = 'cooper-make';
 export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('cooper.configureClangd', () => configureClangd()),
+        vscode.commands.registerCommand('cooper.generateCompileCommands', () => generateCompileCommands()),
         vscode.commands.registerCommand('cooper.build', () => runBuild()),
         vscode.commands.registerCommand('cooper.preview', () => previewFrame(context)),
         vscode.commands.registerCommand('cooper.showPalette', () => showPalette()),
@@ -298,6 +299,49 @@ class LunaConfigProvider implements vscode.DebugConfigurationProvider {
 // ---------------------------------------------------------------------------
 // Configure clangd (Component #3) — unchanged logic.
 // ---------------------------------------------------------------------------
+
+async function generateCompileCommands(): Promise<void> {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+        void vscode.window.showErrorMessage('Cooper: open a project folder first.');
+        return;
+    }
+    const projectDir = folder.uri.fsPath;
+    const configured = vscode.workspace.getConfiguration('cooper').get<string>('opensnesPath')?.trim() || undefined;
+    const detected = detectSdk({ configured, projectDir });
+    if (!detected) {
+        void vscode.window.showErrorMessage('Cooper: could not locate the OpenSNES SDK. Set cooper.opensnesPath or run "Cooper: Configure clangd" first.');
+        return;
+    }
+
+    const uris = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, '**/*.c'),
+        '**/{node_modules,build,dist,.git}/**',
+    );
+    if (uris.length === 0) {
+        void vscode.window.showWarningMessage('Cooper: no .c files found in this project.');
+        return;
+    }
+    const files = uris.map((u) => u.fsPath).sort();
+
+    const target = path.join(projectDir, 'compile_commands.json');
+    if (fs.existsSync(target)) {
+        const overwrite = await vscode.window.showWarningMessage(`Cooper: ${target} already exists. Overwrite it?`, 'Overwrite');
+        if (overwrite !== 'Overwrite') {
+            return;
+        }
+    }
+    try {
+        fs.writeFileSync(target, renderCompileCommands(detected.path, files));
+    } catch (err) {
+        void vscode.window.showErrorMessage(`Cooper: failed to write ${target}: ${String(err)}`);
+        return;
+    }
+    void vscode.window.showInformationMessage(
+        `Cooper: wrote compile_commands.json (${files.length} file${files.length > 1 ? 's' : ''}, SDK via ${detected.source}). ` +
+        'clangd uses it automatically; for the MS C/C++ extension set "C_Cpp.default.compileCommands" to this file.',
+    );
+}
 
 async function configureClangd(): Promise<void> {
     const folder = vscode.workspace.workspaceFolders?.[0];
