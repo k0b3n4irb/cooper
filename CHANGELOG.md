@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.11.1] — 2026-06-28
+
+### Fixed — Build works for standalone projects (not just SDK examples)
+
+- **Build no longer fails with `…/make/common.mk: No such file or directory`** for
+  a project outside the SDK tree. Cooper now runs **`make OPENSNES=<your SDK>`**
+  (from `cooper.opensnesPath`), overriding the Makefile's `$(shell cd ../../..)`
+  guess — so your game can live in its own repo with OpenSNES installed elsewhere.
+  The build also runs in the **project's directory** (subfolder-aware). D-029.
+
 ## [0.11.0] — 2026-06-28
 
 ### Added — The Cooper sidebar (graphical, clickable — no more palette hunting)

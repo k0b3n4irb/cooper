@@ -111,8 +111,19 @@ check('lunaPreviewArgs builds the grounded run argv',
         ['run', '--steps', '200000', '--screenshot', '/x/out.png', '--force-display', '/x/rom.sfc']));
 check('lunaPreviewArgs honours forceDisplay:false',
     !B.lunaPreviewArgs('r', 'p', { forceDisplay: false }).includes('--force-display'));
-check('makeArgs: default goal is empty argv', JSON.stringify(B.makeArgs()) === '[]');
-check('makeArgs: clean → ["clean"]', JSON.stringify(B.makeArgs('clean')) === '["clean"]');
+check('buildMakeArgs passes OPENSNES + default goal',
+    JSON.stringify(B.buildMakeArgs('/sdk')) === '["OPENSNES=/sdk"]');
+check('buildMakeArgs adds the target',
+    JSON.stringify(B.buildMakeArgs('/sdk', 'clean')) === '["OPENSNES=/sdk","clean"]');
+check('buildMakeArgs without an sdk is empty',
+    JSON.stringify(B.buildMakeArgs()) === '[]');
+// close the loop: `make OPENSNES=<sdk>` actually builds (the override beats the
+// Makefile's wrong $(shell cd ../../..) for out-of-tree projects)
+if (fs.existsSync(path.join(OPENSNES, 'make', 'common.mk'))) {
+    cp.spawnSync('make', B.buildMakeArgs(OPENSNES, 'clean'), { cwd: aimDir });
+    const rb = cp.spawnSync('make', B.buildMakeArgs(OPENSNES), { cwd: aimDir, encoding: 'utf8' });
+    check('make OPENSNES=<sdk> builds the ROM', rb.status === 0 && fs.existsSync(ri.rom));
+}
 
 // --- close the loop: the cooper-cc matcher regex must capture a REAL cc65816 error ---
 console.log('\n=== problem matcher catches a real cc65816 error ===');

@@ -99,7 +99,21 @@ export function lunaPreviewArgs(romPath: string, screenshotPath: string, opts: P
     return args;
 }
 
-/** Build the `make` argv for a target (empty = default goal, which builds the ROM). */
-export function makeArgs(target?: string): string[] {
-    return target && target !== 'all' ? [target] : [];
+/**
+ * Build the `make` argv. Passes `OPENSNES=<sdk>` so the build uses the SDK Cooper
+ * resolved (the setting), **overriding** the Makefile's own
+ * `OPENSNES := $(shell cd ../../.. && pwd)` — which only works when the project
+ * lives inside the SDK's `examples/` tree, and is wrong for a standalone project.
+ * (A command-line variable overrides a makefile `:=` assignment in GNU make.)
+ * Empty target = the default goal (builds the ROM).
+ */
+export function buildMakeArgs(sdkPath?: string, target?: string): string[] {
+    const args: string[] = [];
+    if (sdkPath) {
+        args.push(`OPENSNES=${sdkPath}`);
+    }
+    if (target && target !== 'all') {
+        args.push(target);
+    }
+    return args;
 }

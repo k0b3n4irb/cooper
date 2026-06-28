@@ -516,6 +516,37 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-28 — Build for standalone projects: pass `OPENSNES=` to make
+
+### D-029 — Cooper passes `OPENSNES=<sdk>` to `make`; build runs in the project dir
+- **The bug (user-found):** `make` failed with `/home/make/common.mk: No such
+  file or directory`. The SDK example Makefile computes
+  `OPENSNES := $(shell cd ../../.. && pwd)` — which only resolves correctly when
+  the project sits **inside** the SDK at `examples/<cat>/<name>/`. For a **standalone
+  developer project** (their own repo + assets, OpenSNES installed separately as a
+  "user release"), that relative climb points at garbage.
+- **The user's architectural point (correct):** there are **two distinct things** —
+  (1) the developer's project (only their code/assets), and (2) the OpenSNES release
+  referenced by a path (`cooper.opensnesPath`). The build must use **(2)**, not the
+  Makefile's self-computed guess.
+- **Decision:** Cooper runs **`make OPENSNES=<resolved sdk>`** — a command-line
+  variable **overrides** the makefile's `:=` assignment in GNU make (verified:
+  `make OPENSNES=/WRONG` looks for `/WRONG/make/common.mk`; `make OPENSNES=<sdk>`
+  builds). Cooper already knows the SDK (the setting / detection), so it injects it.
+  Also: the build now runs in the **resolved project dir** (subfolder-aware, like
+  D-027/D-028), not the workspace root. `buildMakeArgs(sdk, target)` (pure) emits
+  `["OPENSNES=<sdk>", target?]`.
+- **Verified:** Node — `buildMakeArgs` + a close-the-loop that `make
+  OPENSNES=<sdk>` actually builds `aim_target.sfc`.
+- **Bigger picture (for the OpenSNES release & scaffolding):** the example
+  Makefiles are SDK-internal; a clean **standalone-project template** should use
+  `OPENSNES ?= …` (overridable) and never the `$(shell cd ../../..)` climb. This is
+  the right home for the future **`Cooper: New Project`** scaffolding — generate a
+  project that takes the SDK from outside. For now, the `OPENSNES=` pass-through
+  makes existing Makefiles work from anywhere.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

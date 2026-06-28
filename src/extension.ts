@@ -4,7 +4,7 @@ import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, findProjectDir } from './clangdConfig';
-import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs, romTargetFromMakefile } from './build';
+import { findRomForDir, resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile } from './build';
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
@@ -177,14 +177,26 @@ function breakOnSymbol(name: string): void {
 // Build — a `make` task provider + a command that runs the build task.
 // ---------------------------------------------------------------------------
 
-function makeTask(target: string | undefined, scope: vscode.WorkspaceFolder | vscode.TaskScope): vscode.Task {
+function sdkPathFor(projectDir: string): string | undefined {
+    const configured = vscode.workspace.getConfiguration('cooper').get<string>('opensnesPath')?.trim() || undefined;
+    return detectSdk({ configured, projectDir })?.path;
+}
+
+/** A `make` task that runs in `cwd` and passes `OPENSNES=<sdk>` (overriding the
+ *  Makefile's wrong relative computation for standalone projects). */
+function makeTask(
+    target: string | undefined,
+    scope: vscode.WorkspaceFolder | vscode.TaskScope,
+    cwd: string | undefined,
+    sdkPath: string | undefined,
+): vscode.Task {
     const name = target && target !== 'all' ? target : 'build';
     const task = new vscode.Task(
         { type: MAKE_TASK_TYPE, target },
         scope,
         name,
         'cooper',
-        new vscode.ShellExecution('make', makeArgs(target)),
+        new vscode.ShellExecution('make', buildMakeArgs(sdkPath, target), cwd ? { cwd } : undefined),
         '$cooper-cc',
     );
     if (name === 'build') {
@@ -200,30 +212,37 @@ function makeTaskProvider(): vscode.TaskProvider {
         provideTasks: () => {
             const tasks: vscode.Task[] = [];
             for (const folder of vscode.workspace.workspaceFolders ?? []) {
-                if (fs.existsSync(path.join(folder.uri.fsPath, 'Makefile'))) {
-                    tasks.push(makeTask(undefined, folder), makeTask('clean', folder));
+                const dir = folder.uri.fsPath;
+                if (fs.existsSync(path.join(dir, 'Makefile'))) {
+                    const sdk = sdkPathFor(dir);
+                    tasks.push(makeTask(undefined, folder, dir, sdk), makeTask('clean', folder, dir, sdk));
                 }
             }
             return tasks;
         },
         resolveTask: (task) => {
             const scope = typeof task.scope === 'object' ? task.scope : vscode.TaskScope.Workspace;
-            return makeTask(task.definition.target as string | undefined, scope);
+            const dir = typeof task.scope === 'object' ? task.scope.uri.fsPath : undefined;
+            return makeTask(task.definition.target as string | undefined, scope, dir, dir ? sdkPathFor(dir) : undefined);
         },
     };
 }
 
-async function runBuild(): Promise<void> {
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    if (!folder) {
-        void vscode.window.showErrorMessage('Cooper: open a project folder first.');
+async function runBuild(target?: string): Promise<void> {
+    const projectDir = await resolveProjectDir();
+    if (!projectDir) {
+        void vscode.window.showErrorMessage('Cooper: no OpenSNES project (a folder with a Makefile) found in this workspace.');
         return;
     }
-    if (!fs.existsSync(path.join(folder.uri.fsPath, 'Makefile'))) {
-        void vscode.window.showErrorMessage('Cooper: no Makefile in the workspace root to build.');
+    const sdk = sdkPathFor(projectDir);
+    if (!sdk) {
+        void vscode.window.showErrorMessage('Cooper: set cooper.opensnesPath — the OpenSNES SDK could not be located, so the build can\'t override the Makefile\'s OPENSNES.');
         return;
     }
-    await vscode.tasks.executeTask(makeTask(undefined, folder));
+    const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectDir))
+        ?? vscode.workspace.workspaceFolders?.[0]
+        ?? vscode.TaskScope.Workspace;
+    await vscode.tasks.executeTask(makeTask(target, folder, projectDir, sdk));
 }
 
 // ---------------------------------------------------------------------------
