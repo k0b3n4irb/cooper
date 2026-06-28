@@ -48,8 +48,10 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 - ✅ **P2.2c (0.6.0):** CGRAM palette viewer (webview at a stop, custom DAP request
   `cooperPpu` off `state.ppu.cgram`; BGR555 decode). Webview verified in the real
   Extension Host. D-023.
-- 🔜 **P2.2c+:** OAM sprite viewer (`state.ppu.oam_full`), VRAM tile viewer
-  (`peek_vram`); VRAM/ARAM in the memory view; better multi-bp continue.
+- ✅ **OAM sprite viewer (0.7.0):** `Cooper: Show Sprites (OAM)` — 128-sprite table
+  from `state.ppu.oam_full`. D-024.
+- 🔜 **VRAM tile viewer** (`peek_vram` + 2/4/8bpp decode); VRAM/ARAM in the memory
+  view; better multi-bp continue.
 - **Note:** CGRAM/OAM read via the `state` snapshot (no MCP `peek_cgram`/`peek_oam`
   needed after all); VRAM via `peek_vram`.
 - **Deps RESOLVED (2026-06-27, D-016):** the pinned luna 1.1.0 already exposes

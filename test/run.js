@@ -216,6 +216,20 @@ const palHtml = P.renderPaletteHtml(P.decodeCgram([0x7FFF, ...new Array(255).fil
 check('palette html has 256 swatches', (palHtml.match(/class="sw"/g) || []).length === 256);
 check('palette html embeds the cspSource', palHtml.includes('vscode-csp:src'));
 check('palette html shows the white swatch', palHtml.includes('background:#ffffff'));
+
+// OAM decode (synthetic, value-exact) + render
+const oamArr = new Array(544).fill(0);
+oamArr[0] = 124; oamArr[1] = 107; oamArr[2] = 5; oamArr[3] = 0x0E; // sprite0: pal=7
+oamArr[5] = 240;                                                   // sprite1: hidden
+oamArr[512] = 0x02;                                                // sprite0 high bits: size=1
+const sprites = P.decodeOam(oamArr);
+check('decodeOam returns 128 sprites', sprites.length === 128);
+check('decodeOam sprite0 X/Y/tile', sprites[0].x === 124 && sprites[0].y === 107 && sprites[0].tile === 5);
+check('decodeOam sprite0 palette/size', sprites[0].palette === 7 && sprites[0].sizeLarge === true);
+check('decodeOam sprite0 onScreen, sprite1 hidden', sprites[0].onScreen === true && sprites[1].onScreen === false);
+const oamHtml = P.renderOamHtml(sprites, 'vscode-csp:src');
+check('oam html reports 128 sprites', oamHtml.includes('128 sprites'));
+check('oam html embeds cspSource', oamHtml.includes('vscode-csp:src'));
 try { fs.unlinkSync(tmpP); } catch {}
 
 // ===========================================================================
@@ -371,6 +385,8 @@ try { fs.unlinkSync(tmpP); } catch {}
             check('cooperPpu returns 256 CGRAM words', Array.isArray(ppu.body.cgram) && ppu.body.cgram.length === 256);
             const decoded = P.decodeCgram(ppu.body.cgram);
             check('decoded palette has 256 RGB colours', decoded.length === 256 && typeof decoded[0].r === 'number');
+            check('cooperPpu returns 544-byte OAM', Array.isArray(ppu.body.oam) && ppu.body.oam.length === 544);
+            check('OAM decodes to 128 sprites', P.decodeOam(ppu.body.oam).length === 128);
 
             await dapCall('disconnect', {});
             check('disconnect ok', true);

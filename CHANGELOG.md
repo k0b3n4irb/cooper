@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-06-28
+
+### Added — Debugger OAM sprite viewer (P2.2c)
+
+- **`Cooper: Show Sprites (OAM)`** — a webview table of the 128 OAM sprites at the
+  current debug stop (X, Y, tile, palette, priority, flips, size; on-screen rows
+  highlighted), decoded from `state.ppu.oam_full` via the `cooperPpu` custom
+  request. Grounded on aim_target (sprite 0 = the player at X=124 Y=107). Same
+  decode-pure + webview pattern as the palette viewer (D-024). Verified both tiers.
+
 ## [0.6.0] — 2026-06-28
 
 ### Added — Debugger palette viewer (P2.2c)

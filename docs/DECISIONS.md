@@ -399,6 +399,15 @@ rationale and the docs that grounded it. Newest last.
 - **Next viewers (same pattern):** OAM (sprite list from `oam_full`), VRAM tiles
   (`peek_vram` + bpp + a chosen sub-palette) — both decode-pure + webview.
 
+### D-024 — OAM sprite viewer (same pattern; v0.7.0)
+- **Decision:** `Cooper: Show Sprites (OAM)` decodes `state.ppu.oam_full` (544
+  bytes = 512 low table [4 B × 128: X, Y, tile, attr] + 32 high table [2 bits ×
+  128: bit0 = X high, bit1 = size]) into 128 sprites and renders a webview table.
+  Reuses the existing `cooperPpu` request (it already returns `oam`) — no adapter
+  change. `pure decodeOam` + `renderOamHtml` in `src/ppu.ts`.
+- **Grounded:** aim_target shows 2 on-screen sprites — player X=124 Y=107 (tile 0),
+  target X=200 Y=59 (tile 1); `y === 240` is the SDK's "hidden" convention.
+
 ---
 
 ### Known limitations (Component #1)

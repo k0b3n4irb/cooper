@@ -103,9 +103,11 @@ suite('Cooper — luna debug adapter (real host)', () => {
             // the command renders a webview — both through the real host.
             const active = vscode.debug.activeDebugSession;
             assert.ok(active && active.type === 'luna', 'no active luna session');
-            const ppu = await active!.customRequest('cooperPpu') as { cgram?: number[] };
+            const ppu = await active!.customRequest('cooperPpu') as { cgram?: number[]; oam?: number[] };
             assert.strictEqual(ppu.cgram?.length, 256, 'cooperPpu should return 256 CGRAM words');
+            assert.strictEqual(ppu.oam?.length, 544, 'cooperPpu should return 544-byte OAM');
             await vscode.commands.executeCommand('cooper.showPalette'); // creates a webview; must not throw
+            await vscode.commands.executeCommand('cooper.showOam');     // ditto
         } finally {
             await vscode.debug.stopDebugging();
             tracker.dispose();

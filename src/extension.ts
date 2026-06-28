@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource } from './clangdConfig';
 import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs } from './build';
 import { LunaDebugSession } from './lunaDebug';
-import { decodeCgram, renderPaletteHtml } from './ppu';
+import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 
 const execFileAsync = promisify(execFile);
 
@@ -18,6 +18,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.build', () => runBuild()),
         vscode.commands.registerCommand('cooper.preview', () => previewFrame(context)),
         vscode.commands.registerCommand('cooper.showPalette', () => showPalette()),
+        vscode.commands.registerCommand('cooper.showOam', () => showOam()),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
         vscode.debug.registerDebugConfigurationProvider('luna', new LunaConfigProvider()),
@@ -158,30 +159,53 @@ async function previewFrame(context: vscode.ExtensionContext): Promise<void> {
 // Palette viewer (P2.2c) — a webview of the live CGRAM at a debug stop.
 // ---------------------------------------------------------------------------
 
-let palettePanel: vscode.WebviewPanel | undefined;
+interface PpuSnapshot { cgram?: number[]; oam?: number[]; }
 
-async function showPalette(): Promise<void> {
+/** Read the live PPU snapshot from the active luna debug session, or surface an error. */
+async function activePpu(): Promise<PpuSnapshot | undefined> {
     const session = vscode.debug.activeDebugSession;
     if (!session || session.type !== 'luna') {
-        void vscode.window.showErrorMessage('Cooper: start a Luna debug session (and pause) before showing the palette.');
-        return;
+        void vscode.window.showErrorMessage('Cooper: start a Luna debug session (and pause) before opening a viewer.');
+        return undefined;
     }
-    let ppu: { cgram?: number[] };
     try {
-        ppu = await session.customRequest('cooperPpu') as { cgram?: number[] };
+        return await session.customRequest('cooperPpu') as PpuSnapshot;
     } catch (e) {
         void vscode.window.showErrorMessage(`Cooper: could not read the PPU state: ${String(e)}`);
+        return undefined;
+    }
+}
+
+const viewerPanels = new Map<string, vscode.WebviewPanel>();
+
+/** Reuse (or create) a named webview panel and set its HTML from `render`. */
+function showViewer(id: string, title: string, render: (webview: vscode.Webview) => string): void {
+    let panel = viewerPanels.get(id);
+    if (!panel) {
+        panel = vscode.window.createWebviewPanel(id, title, vscode.ViewColumn.Beside, { enableScripts: false });
+        panel.onDidDispose(() => viewerPanels.delete(id));
+        viewerPanels.set(id, panel);
+    }
+    panel.webview.html = render(panel.webview);
+    panel.reveal(vscode.ViewColumn.Beside);
+}
+
+async function showPalette(): Promise<void> {
+    const ppu = await activePpu();
+    if (!ppu) {
         return;
     }
     const colors = decodeCgram(ppu.cgram ?? []);
-    if (!palettePanel) {
-        palettePanel = vscode.window.createWebviewPanel(
-            'cooperPalette', 'CGRAM Palette', vscode.ViewColumn.Beside, { enableScripts: false },
-        );
-        palettePanel.onDidDispose(() => { palettePanel = undefined; });
+    showViewer('cooperPalette', 'CGRAM Palette', (w) => renderPaletteHtml(colors, w.cspSource));
+}
+
+async function showOam(): Promise<void> {
+    const ppu = await activePpu();
+    if (!ppu) {
+        return;
     }
-    palettePanel.webview.html = renderPaletteHtml(colors, palettePanel.webview.cspSource);
-    palettePanel.reveal(vscode.ViewColumn.Beside);
+    const sprites = decodeOam(ppu.oam ?? []);
+    showViewer('cooperOam', 'OAM (sprites)', (w) => renderOamHtml(sprites, w.cspSource));
 }
 
 // ---------------------------------------------------------------------------
