@@ -601,6 +601,25 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-28 — Self-healing debug config
+
+### D-032 — Debug re-resolves the ROM when `launch.json` is stale
+- **The bug (user-found):** clicking Debug/F5 did **nothing** — their `launch.json`
+  `program` still pointed at `${workspaceFolder}/shmup_1942/shmup_1942.sfc` (an old
+  subfolder layout) after they flattened the project to the root. The config
+  provider saw `program` set, `fs.existsSync` false → rejected → silent no-op.
+- **Decision:** `LunaConfigProvider.resolveDebugConfiguration` now uses a configured
+  `program` **only if it exists**; otherwise it **re-resolves the ROM** from the
+  project (subfolder-aware `resolveProjectDir` + Makefile `TARGET`). A stale or
+  missing `program` self-heals; the provider is now async. (Mirrors D-027/D-029:
+  don't trust a hardcoded path — resolve from the project.)
+- **Verified on the user's real setup:** their **luna 1.3.0** release (`~/bin/luna/`,
+  a directory — D-030) + their `shmup_1942.sfc`; a breakpoint on `enemies_update`
+  hits exactly at `0x84AB` with registers readable. The adapter (built against the
+  pinned 1.1.0) is compatible with their 1.3.0.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

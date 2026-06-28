@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.12.1] — 2026-06-28
+
+### Fixed — Debug starts even with a stale launch.json
+
+- **"Nothing happens on F5/Debug" when `launch.json` pointed at an old ROM path**
+  (e.g. after restructuring the project). The luna debug-config provider now uses
+  a configured `program` only if it **exists**, and otherwise **re-resolves the
+  ROM from the project** (subfolder-aware) — debugging self-heals. Verified
+  end-to-end against a user luna **1.3.0** release + their game (breakpoint hits
+  exactly). D-032.
+
 ## [0.12.0] — 2026-06-28
 
 ### Added — The Cooper dashboard ("Home")

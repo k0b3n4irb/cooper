@@ -4,7 +4,7 @@ import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, findProjectDir } from './clangdConfig';
-import { findRomForDir, resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile } from './build';
+import { resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile } from './build';
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
@@ -457,15 +457,29 @@ class LunaDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
 }
 
 class LunaConfigProvider implements vscode.DebugConfigurationProvider {
-    resolveDebugConfiguration(
+    async resolveDebugConfiguration(
         folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
-    ): vscode.ProviderResult<vscode.DebugConfiguration> {
-        const projectDir = folder?.uri.fsPath
-            ?? (vscode.window.activeTextEditor && path.dirname(vscode.window.activeTextEditor.document.uri.fsPath));
+    ): Promise<vscode.DebugConfiguration | undefined> {
+        // Use a configured `program` only if it actually exists — a launch.json can
+        // go stale when the project is restructured. Otherwise re-resolve the ROM
+        // from the project (subfolder-aware), so debugging self-heals.
+        let romPath: string | undefined = (config.program && fs.existsSync(config.program)) ? config.program : undefined;
+        let projectDir = romPath
+            ? path.dirname(romPath)
+            : (await resolveProjectDir()) ?? folder?.uri.fsPath
+              ?? (vscode.window.activeTextEditor && path.dirname(vscode.window.activeTextEditor.document.uri.fsPath)) ?? undefined;
+
         if (!projectDir) {
-            void vscode.window.showErrorMessage('Cooper: open a project folder to debug.');
+            void vscode.window.showErrorMessage('Cooper: open an OpenSNES project (a folder with a Makefile) to debug.');
             return undefined;
+        }
+        if (!romPath) {
+            const mk = path.join(projectDir, 'Makefile');
+            const romName = fs.existsSync(mk) ? romTargetFromMakefile(fs.readFileSync(mk, 'utf8')) : null;
+            if (romName) {
+                romPath = path.join(projectDir, romName);
+            }
         }
 
         // A bare "F5 with no launch.json": seed a launch config from the project.
@@ -475,32 +489,25 @@ class LunaConfigProvider implements vscode.DebugConfigurationProvider {
             config.name = 'Luna: Debug SNES ROM';
         }
 
-        // Default the ROM to the project's build output if not given.
-        if (!config.program) {
-            const found = findRomForDir(projectDir);
-            if (found) {
-                config.program = found.rom;
-            }
-        }
-        if (!config.program) {
-            void vscode.window.showErrorMessage('Cooper: no ROM to debug — set "program" in launch.json or add a Makefile with a TARGET.');
+        if (!romPath) {
+            void vscode.window.showErrorMessage('Cooper: no ROM to debug — add a Makefile with a TARGET, or set "program" in launch.json.');
             return undefined;
         }
-        if (!fs.existsSync(config.program)) {
-            void vscode.window.showErrorMessage(`Cooper: ROM not built: ${config.program}. Run "Cooper: Build (make)" first.`);
+        if (!fs.existsSync(romPath)) {
+            void vscode.window.showErrorMessage(`Cooper: ${path.basename(romPath)} isn't built yet — run Build first.`);
             return undefined;
         }
+        config.program = romPath;
 
-        // Inject the luna binary path (setting → SDK pinned binary).
         const cfg = vscode.workspace.getConfiguration('cooper');
         const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
         const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
         if (!luna) {
-            void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath or cooper.opensnesPath.');
+            void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath (the binary or its folder), or cooper.opensnesPath.');
             return undefined;
         }
         config.lunaPath = luna;
-        config.cwd = config.cwd ?? path.dirname(config.program);
+        config.cwd = config.cwd ?? projectDir;
         return config;
     }
 }
