@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Tooling
+
+- **VS Code integration-test harness** (`@vscode/test-cli` + `@vscode/test-electron`,
+  D-022): `npm run test:integration` runs `src/test/*.test.ts` inside a real
+  Extension Development Host — verifies command registration and the luna debug
+  adapter end-to-end through the real debug machinery (a DAP tracker observes a
+  `stopped(entry)` event). Complements the fast Node tier (`npm test`). No change
+  to the shipped extension.
+
 ## [0.5.0] — 2026-06-27
 
 ### Added — Data (memory-watch) breakpoints (P2.2b)

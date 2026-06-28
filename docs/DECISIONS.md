@@ -346,6 +346,36 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-28 — Integration-test harness (`@vscode/test-electron`)
+
+### D-022 — Add the VS Code Extension Host integration harness
+- **Decision:** add `@vscode/test-cli` + `@vscode/test-electron` so a second test
+  tier runs **inside a real VS Code Extension Development Host**, exercising the
+  `vscode`-importing glue the Node tier (`test/run.js`) cannot: command
+  registration, and the **luna debug adapter end-to-end through the real debug
+  machinery** (a `DebugAdapterTrackerFactory` captures DAP traffic; the test
+  asserts a `stopped(entry)` event after `vscode.debug.startDebugging`).
+- **Two tiers, on purpose:** `npm test` = fast Node tier (pure modules + the DAP
+  session driven directly), the everyday gate. `npm run test:integration` = the
+  heavy tier (downloads a full VS Code, ~260 MB, into `.vscode-test/`), run before
+  shipping glue changes. The Node tier stays the default because it's seconds, not
+  minutes, and needs no display.
+- **Layout:** integration tests in `src/test/*.test.ts`, compiled by a **separate
+  `tsconfig.test.json` → `out/` (CommonJS)** — loaded by the host, **not** bundled
+  by esbuild. The extension tsconfig **excludes `src/test`** (Mocha globals would
+  break its `types:["node"]` check). `.vscode-test.mjs` opens the **real
+  `aim_target` example** as the workspace so the debug-config provider resolves the
+  ROM + pinned luna from its Makefile. `out/`, `.vscode-test/`, and the harness
+  configs are git- and vsce-ignored.
+- **Verified runnable here:** VS Code **1.126.0** (linux-arm64) on the present
+  `DISPLAY=:0` — no `xvfb` needed; 3/3 pass incl. the live debug session. On a
+  headless CI box wrap with `xvfb-run -a` (the runner needs a display even for
+  non-UI tests). Not root → no `--no-sandbox`.
+- **Source:** doc-researcher 2026-06-28 (`@vscode/test-cli` 0.0.x, `test-electron`
+  3.x, the `defineConfig` shape, the CI `xvfb-run -a` pattern).
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

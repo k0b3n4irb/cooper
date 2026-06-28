@@ -9,9 +9,12 @@ docs/**
 test/**
 src/**
 node_modules/**
+out/**
 **/*.ts
 **/*.map
 esbuild.js
 tsconfig.json
+tsconfig.test.json
+.vscode-test.mjs
 **/.eslintrc*
 **/*.vsix

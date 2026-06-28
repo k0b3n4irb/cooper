@@ -28,11 +28,23 @@ the feature genuinely needs it.
   under plain Node.
 - **`src/extension.ts`** is the thin glue: command registration, dialogs,
   settings reads, file writes. It imports the pure modules.
-- **Tests** (`test/run.js`) compile the pure module via esbuild and assert
-  against **reality** (the real OpenSNES repo, real examples), including
-  closing-the-loop checks (e.g. run `clang` with the flags the code emits).
-  Rationale: the Extension Development Host can't be driven headlessly here, so
-  the valuable logic must be verifiable offline.
+- **Two test tiers:**
+  - **Node tier — `test/run.js` (default, `npm test`):** compiles pure modules
+    via esbuild and asserts against **reality** (the real OpenSNES repo/examples),
+    including closing-the-loop checks (run `clang` with the emitted flags; drive
+    the luna binary). `@vscode/debugadapter` is plain Node, so even the
+    `LunaDebugSession` is driven here without a `vscode` host. Fast (seconds), no
+    display — the everyday gate.
+  - **Integration tier — `src/test/*.test.ts` (`npm run test:integration`,
+    D-022):** runs inside a **real Extension Development Host** via
+    `@vscode/test-cli`/`test-electron`, for the `vscode`-importing glue the Node
+    tier can't reach (command registration, the debug adapter through the real
+    debug machinery). Heavy (downloads VS Code ~260 MB into `.vscode-test/`); run
+    before shipping glue/webview changes. Compiled by a separate
+    `tsconfig.test.json` → `out/` (CommonJS, host-loaded, **not** esbuild-bundled);
+    the extension tsconfig excludes `src/test`. On headless CI: `xvfb-run -a`.
+  Rationale: keep the valuable *logic* offline-verifiable (Node tier), and verify
+  the thin *glue* in a real host (integration tier).
 
 ## Packaging & versioning
 

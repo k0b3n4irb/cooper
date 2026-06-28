@@ -28,9 +28,13 @@ Next options:
 
 ## Foundations in place
 
-TS + esbuild build (`npm run compile`/`watch`/`package`), Node test harness
-(`npm test`), `vsce` packaging, WLA grammar generator. Single extension at root;
-promote to npm-workspaces when a 2nd package lands.
+TS + esbuild build (`npm run compile`/`watch`/`package`), `vsce` packaging, WLA
+grammar generator. Single extension at root; promote to npm-workspaces when a 2nd
+package lands. **Two test tiers** (D-022): `npm test` = fast Node tier (pure
+modules + the DAP session driven directly, no display); `npm run test:integration`
+= real Extension Development Host via `@vscode/test-electron` (verifies the
+`vscode` glue + debug adapter; downloads VS Code into `.vscode-test/`; `xvfb-run
+-a` on headless CI).
 
 ## Watch items
 
