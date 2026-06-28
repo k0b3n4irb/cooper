@@ -41,28 +41,8 @@ suite('Cooper — activation & commands', () => {
     test('contributes its commands', async () => {
         await vscode.extensions.getExtension(EXT_ID)!.activate();
         const cmds = await vscode.commands.getCommands(true);
-        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd', 'cooper.generateCompileCommands']) {
+        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd']) {
             assert.ok(cmds.includes(c), `missing command ${c}`);
-        }
-    });
-
-    test('generates a compile_commands.json for the workspace', async () => {
-        await vscode.extensions.getExtension(EXT_ID)!.activate();
-        const dir = vscode.workspace.workspaceFolders![0].uri.fsPath;
-        const ccPath = path.join(dir, 'compile_commands.json');
-        if (fs.existsSync(ccPath)) {
-            fs.unlinkSync(ccPath); // avoid the overwrite prompt (no user in headless)
-        }
-        try {
-            await vscode.commands.executeCommand('cooper.generateCompileCommands');
-            assert.ok(fs.existsSync(ccPath), 'compile_commands.json not written');
-            const entries = JSON.parse(fs.readFileSync(ccPath, 'utf8'));
-            assert.ok(Array.isArray(entries) && entries.length >= 1, 'no entries');
-            assert.ok(entries.every((e: { file: string; arguments: string[] }) => e.file.endsWith('.c') && e.arguments.includes('-std=gnu11')), 'bad entry shape');
-        } finally {
-            if (fs.existsSync(ccPath)) {
-                fs.unlinkSync(ccPath); // don't pollute the SDK example dir
-            }
         }
     });
 });

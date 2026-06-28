@@ -5,10 +5,6 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
-**P1/C3 — `Cooper: Generate compile_commands.json`** (v0.9.0). Engine-agnostic C
-config (clangd *or* MS C/C++) using the SDK lint flags. Verified incl. the emitted
-command parsing with clang + a real file written in the Extension Host. D-026.
-
 **P2.2c — debugger PPU viewers** (palette 0.6.0 · OAM 0.7.0 · VRAM tiles 0.8.0).
 Three webviews of the live PPU at a debug stop: **CGRAM palette** (16×16 swatches),
 **OAM** (128-sprite table), **VRAM tiles** (512 4bpp tiles → PNG). Decoded in pure
@@ -21,15 +17,17 @@ Before it: **P2.2b** data breakpoints (0.5.0); **P2.2a** memory view (0.4.0);
 
 ## Current focus
 
-**The debugger (C4) is a real tool**: symbol + data breakpoints, step, registers,
-memory view, symbolized stack, and live palette / OAM / VRAM-tile viewers. Options:
-- **Polish the viewers:** bpp/offset/sub-palette selectors for VRAM (QuickPick);
-  VRAM/ARAM in the hex memory view; render actual sprite pixels in the OAM view
-  (combine OAM + VRAM + palette).
-- **P1 — helper polish (C3)** (snippets, Doxygen hover, `compile_commands.json`) —
-  a change of register.
-- Deferred: better multi-breakpoint continue; source-level (P7) gated on G0
-  (`wla -i` + `wlalink -S -A`).
+**🔥 Frictionless C onboarding (user priority — "simple, fun IDE; if config is
+hard nobody uses it").** Real friction found in a live test project
+(`test_vscode/shmup_1942`): (1) clangd binary not installed → "I see nothing";
+(2) project in a **subfolder** → `Configure clangd` (workspace-root only) misses
+the Makefile; (3) **out-of-tree** project → the Makefile's `$(shell cd ../../..)`
+resolves the SDK wrong. Fix direction = **fewer steps, not more**: auto-write
+`.clangd` on project open (from the active file's nearest Makefile; picker
+fallback), and surface the one-click `clangd: Download language server`. The
+debugger (C4) is feature-complete; **don't add capability — reduce setup cost.**
+
+Deferred: viewer selectors; better multi-bp continue; source-level (P7, G0 flags).
 
 ## Foundations in place
 

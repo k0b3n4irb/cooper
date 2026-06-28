@@ -64,23 +64,6 @@ if (!hasClang) {
     if (r.status !== 0) console.log(r.stderr.split('\n').slice(0, 5).join('\n'));
 }
 
-// --- compile_commands.json: structure + the emitted command parses with clang ---
-console.log('\n=== compile_commands.json (engine-agnostic config) ===');
-const ccArr = JSON.parse(C.renderCompileCommands(OPENSNES, [main]));
-check('one entry per file', Array.isArray(ccArr) && ccArr.length === 1);
-check('entry.file is the source path', ccArr[0].file === main);
-check('entry.directory is the file dir', ccArr[0].directory === helloDir);
-check('arguments include the SDK include', ccArr[0].arguments.includes(`-I${path.join(OPENSNES, 'lib', 'include')}`));
-check('arguments include -std=gnu11', ccArr[0].arguments.includes('-std=gnu11'));
-check('argv[0] is clang', ccArr[0].arguments[0] === 'clang');
-if (hasClang) {
-    // close the loop: the emitted command (minus argv0/file) must parse the real file
-    const ccArgs = ccArr[0].arguments.slice(1, -1).concat(['-fsyntax-only', main]);
-    const rc = cp.spawnSync('clang', ccArgs, { cwd: ccArr[0].directory, encoding: 'utf8' });
-    check('emitted compile command parses with clang', rc.status === 0);
-    if (rc.status !== 0) console.log(rc.stderr.split('\n').slice(0, 5).join('\n'));
-}
-
 try { fs.unlinkSync(tmp); } catch {}
 
 // ===========================================================================

@@ -4,9 +4,19 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.1] — 2026-06-28
+
+### Removed
+
+- **`Cooper: Generate compile_commands.json`** — reverted. It was justified as an
+  "engine-agnostic" alternative to clangd, but it does **not** remove the need for
+  a language server (cpptools also requires an install), so it only added a second
+  config surface and confusion. C support stays a **single** path: `.clangd` via
+  `Cooper: Configure clangd`. (Reverses D-026.)
+
 ## [0.9.0] — 2026-06-28
 
-### Added — `Cooper: Generate compile_commands.json` (P1 / C3)
+### Added — `Cooper: Generate compile_commands.json` (P1 / C3) — _reverted in 0.9.1_
 
 - Writes a JSON Compilation Database (one entry per `.c` file) using the same
   flags as the `.clangd` config (SDK include + `-std=gnu11` + the `-Wno-*`

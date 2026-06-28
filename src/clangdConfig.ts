@@ -98,36 +98,6 @@ export function detectSdk(opts: { configured?: string; projectDir: string }): { 
     return null;
 }
 
-export interface CompileEntry {
-    directory: string;
-    file: string;
-    arguments: string[];
-}
-
-/**
- * One JSON Compilation Database entry for a C file, using the SAME flags as the
- * `.clangd` config (SDK lint mirror). `clang` is argv[0] so any LSP reads it as a
- * clang invocation; the file's own dir is added so local includes resolve.
- */
-export function compileCommand(sdkPath: string, file: string): CompileEntry {
-    const dir = path.dirname(file);
-    const inc = path.join(sdkPath, 'lib', 'include');
-    return {
-        directory: dir,
-        file,
-        arguments: ['clang', `-I${inc}`, `-I${dir}`, ...CLANGD_EXTRA_FLAGS, '-c', path.basename(file)],
-    };
-}
-
-/**
- * Render a `compile_commands.json` (JSON Compilation Database) for the given C
- * files. Read by clangd (auto-discovered) and the MS C/C++ extension alike, so
- * the editor's diagnostics match the build's clang lint regardless of engine.
- */
-export function renderCompileCommands(sdkPath: string, files: string[]): string {
-    return JSON.stringify(files.map((f) => compileCommand(sdkPath, f)), null, 2) + '\n';
-}
-
 /** Render the `.clangd` YAML for a given SDK path. */
 export function renderClangd(sdkPath: string): string {
     const inc = path.join(sdkPath, 'lib', 'include');

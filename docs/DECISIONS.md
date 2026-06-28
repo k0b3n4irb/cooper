@@ -433,7 +433,15 @@ rationale and the docs that grounded it. Newest last.
 
 ## 2026-06-28 — Helper polish (C3): compile_commands.json
 
-### D-026 — Engine-agnostic C config via `compile_commands.json`
+### D-026 — Engine-agnostic C config via `compile_commands.json` — ⛔ REVERTED (0.9.1)
+> **Reverted same day.** The premise ("lets you use cpptools instead of clangd")
+> doesn't reduce friction: cpptools also needs an install, so there is **no
+> zero-install path**. The command only added a second C-config surface alongside
+> `.clangd` → confusion for the "simple, fun IDE" goal. C support stays one path:
+> `.clangd`. Lesson: don't add a config format to dodge an install that's
+> unavoidable anyway. The real simplification is **auto-config + one-click clangd
+> download**, not more commands. (Kept below for the record.)
+
 - **Decision:** `Cooper: Generate compile_commands.json` writes a JSON Compilation
   Database at the project root, one entry per `.c` file, using the **same flags as
   the `.clangd` config** (SDK include + `-std=gnu11` + the `-Wno-*` mirror, D-008).
