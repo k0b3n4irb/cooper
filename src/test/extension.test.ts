@@ -45,6 +45,27 @@ suite('Cooper — activation & commands', () => {
             assert.ok(cmds.includes(c), `missing command ${c}`);
         }
     });
+
+    test('auto-writes .clangd when a C file opens', async () => {
+        await vscode.extensions.getExtension(EXT_ID)!.activate();
+        const dir = vscode.workspace.workspaceFolders![0].uri.fsPath;
+        const clangdPath = path.join(dir, '.clangd');
+        if (fs.existsSync(clangdPath)) {
+            fs.unlinkSync(clangdPath); // start clean
+        }
+        try {
+            // Opening the C file fires onDidOpenTextDocument -> auto-config writes .clangd.
+            await vscode.workspace.openTextDocument(path.join(dir, 'main.c'));
+            await wait(() => fs.existsSync(clangdPath), 8000, '.clangd to be auto-written');
+            const txt = fs.readFileSync(clangdPath, 'utf8');
+            assert.ok(txt.includes('lib/include'), '.clangd missing the SDK include path');
+            assert.ok(txt.includes('-std=gnu11'), '.clangd missing -std=gnu11');
+        } finally {
+            if (fs.existsSync(clangdPath)) {
+                fs.unlinkSync(clangdPath); // don't pollute the SDK example dir
+            }
+        }
+    });
 });
 
 suite('Cooper — luna debug adapter (real host)', () => {

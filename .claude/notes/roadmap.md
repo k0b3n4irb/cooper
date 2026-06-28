@@ -32,11 +32,11 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 ### 🔜 P1 — Helper polish (C3)
 - ⛔ ~~compile_commands.json command~~ — added 0.9.0, **reverted 0.9.1** (didn't
   earn its complexity; doesn't remove the language-server install). D-026.
-- 🔥 **Frictionless C onboarding** (the real win): auto-write `.clangd` on opening
-  an OpenSNES project (handle **subfolder** projects via the active file's nearest
-  Makefile; fall back to picker when the SDK is out-of-tree); guide the **one-click
-  clangd download** (vscode-clangd's `clangd: Download language server`).
-- 🔜 API snippets, Doxygen-sourced hover.
+- ✅ **Frictionless C onboarding (0.10.0):** auto-write `.clangd` on opening a C
+  file (subfolder-aware via the active file's nearest Makefile; picker for
+  out-of-tree SDK; never clobbers; opt-out). D-027.
+- 🔜 API snippets, Doxygen-sourced hover. Optionally: detect missing clangd and
+  surface `clangd: Download language server` proactively.
 
 ### ✅ P2.1 — Debugger, symbol/ASM level (C4) — the jewel, part 1 — **SHIPPED 0.3.0**
 - ✅ DAP adapter over luna: launch, `step{1}`, Registers scope (`state`), symbol

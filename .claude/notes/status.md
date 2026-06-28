@@ -5,6 +5,12 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Frictionless C onboarding** (v0.10.0). Open a C file in an OpenSNES project →
+Cooper auto-writes `.clangd` (no command). Resolves the project from the active
+file's nearest Makefile (subfolders), one picker for out-of-tree SDK, never
+clobbers, opt-out `cooper.autoConfigureClangd`. Both tiers verified (auto-write in
+the real host). D-027. Earlier: ⛔ compile_commands.json reverted (0.9.1, D-026).
+
 **P2.2c — debugger PPU viewers** (palette 0.6.0 · OAM 0.7.0 · VRAM tiles 0.8.0).
 Three webviews of the live PPU at a debug stop: **CGRAM palette** (16×16 swatches),
 **OAM** (128-sprite table), **VRAM tiles** (512 4bpp tiles → PNG). Decoded in pure

@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -18,7 +18,8 @@
   },
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onDebugResolve:luna"
+    "onDebugResolve:luna",
+    "onLanguage:c"
   ],
   "categories": [
     "Programming Languages",
@@ -192,7 +193,12 @@
           "type": "string",
           "default": "",
           "scope": "machine-overridable",
-          "markdownDescription": "Absolute path to the OpenSNES SDK root (the folder containing `lib/include/snes.h`). Used by **Cooper: Configure clangd** to generate the `.clangd` file. If empty, Cooper infers it from the project Makefile's `OPENSNES` line, then by searching parent folders."
+          "markdownDescription": "Absolute path to the OpenSNES SDK root (the folder containing `lib/include/snes.h`). Used to generate the `.clangd` file. If empty, Cooper infers it from the project Makefile's `OPENSNES` line, then by searching parent folders."
+        },
+        "cooper.autoConfigureClangd": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Automatically write a `.clangd` for C IntelliSense when you open a C file in an OpenSNES project (never overwrites an existing one). Turn off to configure manually with **Cooper: Configure clangd**."
         },
         "cooper.lunaPath": {
           "type": "string",

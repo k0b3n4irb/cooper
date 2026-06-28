@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource } from './clangdConfig';
+import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, findProjectDir } from './clangdConfig';
 import { findRomForDir, resolveLunaPath, lunaPreviewArgs, makeArgs } from './build';
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
@@ -24,7 +24,12 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
         vscode.debug.registerDebugConfigurationProvider('luna', new LunaConfigProvider()),
+        vscode.workspace.onDidOpenTextDocument((doc) => void autoConfigureClangd(doc)),
     );
+    // Auto-configure C support for any already-open OpenSNES C files.
+    for (const editor of vscode.window.visibleTextEditors) {
+        void autoConfigureClangd(editor.document);
+    }
 }
 
 export function deactivate(): void {
@@ -298,6 +303,68 @@ class LunaConfigProvider implements vscode.DebugConfigurationProvider {
 // ---------------------------------------------------------------------------
 // Configure clangd (Component #3) — unchanged logic.
 // ---------------------------------------------------------------------------
+
+// Projects auto-configured this session (dedupe; keyed by project dir).
+const autoConfigured = new Set<string>();
+
+/**
+ * On opening a C file in an OpenSNES project, write a `.clangd` automatically so
+ * IntelliSense "just works" — resolving the project from the active file (handles
+ * subfolders) and the SDK from the setting/Makefile, with a single picker prompt
+ * when the SDK can't be found (out-of-tree projects). Never overwrites an existing
+ * `.clangd`; opt out with `cooper.autoConfigureClangd: false`.
+ */
+async function autoConfigureClangd(doc: vscode.TextDocument): Promise<void> {
+    if (doc.languageId !== 'c' || doc.uri.scheme !== 'file') {
+        return;
+    }
+    if (!vscode.workspace.getConfiguration('cooper').get<boolean>('autoConfigureClangd', true)) {
+        return;
+    }
+    const projectDir = findProjectDir(path.dirname(doc.uri.fsPath));
+    if (!projectDir || autoConfigured.has(projectDir)) {
+        return;
+    }
+    autoConfigured.add(projectDir);
+
+    const clangdPath = path.join(projectDir, '.clangd');
+    if (fs.existsSync(clangdPath)) {
+        return; // respect an existing config
+    }
+
+    const configured = vscode.workspace.getConfiguration('cooper').get<string>('opensnesPath')?.trim() || undefined;
+    let sdk = detectSdk({ configured, projectDir });
+    if (!sdk) {
+        // OpenSNES project but SDK unknown (out-of-tree / no setting) — ask once.
+        const pick = await vscode.window.showInformationMessage(
+            'Cooper: point me at the OpenSNES SDK to enable C IntelliSense (completion, go-to-definition).',
+            'Choose SDK folder…',
+        );
+        if (pick !== 'Choose SDK folder…') {
+            return;
+        }
+        const sel = await vscode.window.showOpenDialog({
+            canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Select OpenSNES SDK root',
+        });
+        const chosen = sel?.[0]?.fsPath;
+        if (!chosen) {
+            return;
+        }
+        if (!isOpenSnesRoot(chosen)) {
+            void vscode.window.showErrorMessage(`Cooper: ${chosen} is not an OpenSNES SDK root (missing lib/include/snes.h).`);
+            return;
+        }
+        await vscode.workspace.getConfiguration('cooper').update('opensnesPath', chosen, vscode.ConfigurationTarget.Workspace);
+        sdk = { path: chosen, source: 'setting' as SdkSource };
+    }
+
+    try {
+        fs.writeFileSync(clangdPath, renderClangd(sdk.path));
+    } catch {
+        return; // best-effort; the manual command remains available
+    }
+    void vscode.window.showInformationMessage('Cooper: C IntelliSense configured. If prompted, install/restart clangd.');
+}
 
 async function configureClangd(): Promise<void> {
     const folder = vscode.workspace.workspaceFolders?.[0];

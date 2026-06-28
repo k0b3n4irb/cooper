@@ -4,6 +4,19 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] — 2026-06-28
+
+### Added — Zero-step C support: auto-`.clangd` on open
+
+- Open a C file in an OpenSNES project and Cooper **writes the `.clangd`
+  automatically** — no command to run. C IntelliSense (completion, hover,
+  go-to-definition on `#define ENEMY_SPEED 2`, …) works as soon as clangd is
+  installed (one click: `clangd: Download language server`).
+- Resolves the project from the **active file's nearest Makefile**, so projects in
+  a **subfolder** work; for **out-of-tree** projects, a single picker sets the SDK
+  path. Never overwrites an existing `.clangd`; opt out with
+  `cooper.autoConfigureClangd: false`. (D-027.)
+
 ## [0.9.1] — 2026-06-28
 
 ### Removed

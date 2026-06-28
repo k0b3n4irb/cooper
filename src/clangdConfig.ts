@@ -54,6 +54,32 @@ export function sdkPathFromMakefile(makefileText: string, makefileDir: string): 
     return path.isAbsolute(val) ? val : path.resolve(makefileDir, val);
 }
 
+/**
+ * Walk up from startDir to the nearest OpenSNES *project* dir — the first ancestor
+ * with a `Makefile` that references `OPENSNES`. Lets auto-config resolve a project
+ * from the active file (so subfolder projects work) while leaving non-OpenSNES C
+ * projects alone.
+ */
+export function findProjectDir(startDir: string, maxLevels = 8): string | null {
+    let dir = startDir;
+    for (let i = 0; i < maxLevels; i++) {
+        const mk = path.join(dir, 'Makefile');
+        try {
+            if (fs.existsSync(mk) && /(^|\n)[ \t]*OPENSNES\b/.test(fs.readFileSync(mk, 'utf8'))) {
+                return dir;
+            }
+        } catch {
+            // unreadable — keep walking
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) {
+            break;
+        }
+        dir = parent;
+    }
+    return null;
+}
+
 /** Walk up from startDir looking for an SDK root (project may live in examples/). */
 export function searchUpForSdk(startDir: string, maxLevels = 8): string | null {
     let dir = startDir;

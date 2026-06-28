@@ -44,6 +44,14 @@ check('detectSdk prefers a valid setting',
 check('searchUpForSdk from lib/source finds SDK root',
     C.searchUpForSdk(path.join(OPENSNES, 'lib', 'source')) === OPENSNES);
 
+// findProjectDir: resolve the project from the active file, even in a subfolder
+check('findProjectDir finds the example (Makefile w/ OPENSNES)',
+    C.findProjectDir(helloDir) === helloDir);
+check('findProjectDir walks up from a subdir of the project',
+    C.findProjectDir(path.join(helloDir, 'res', 'gfx')) === helloDir);
+check('findProjectDir is null outside any OpenSNES project',
+    C.findProjectDir(os.tmpdir()) === null);
+
 const rendered = C.renderClangd(OPENSNES);
 check('renderClangd includes lib/include path',
     rendered.includes(`-I${path.join(OPENSNES, 'lib', 'include')}`));

@@ -461,6 +461,33 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-28 — Frictionless C onboarding: auto-`.clangd`
+
+### D-027 — Auto-configure clangd on opening a C file (zero-step C support)
+- **Decision:** when a C file in an OpenSNES project is opened, Cooper writes the
+  `.clangd` **automatically** — no command to run. Activation `onLanguage:c`;
+  `onDidOpenTextDocument` (+ a scan of already-open editors) → `autoConfigureClangd`.
+- **Fixes the three real frictions found in a live test (`test_vscode/shmup_1942`):**
+  1. **Subfolder projects:** the project is resolved from the **active file's
+     nearest Makefile** (`findProjectDir` walks up for a `Makefile` referencing
+     `OPENSNES`), not the workspace root.
+  2. **Out-of-tree projects:** when the SDK can't be auto-resolved (the Makefile's
+     `$(shell cd ../../..)` points outside the SDK), a **single** picker prompt
+     sets `cooper.opensnesPath`, then writes the `.clangd`.
+  3. **"I see nothing":** the missing piece was the clangd *binary*; the `.clangd`
+     is now guaranteed present so clangd works the moment it's installed (one-click
+     `clangd: Download language server`).
+- **Guardrails (per [[cooper-simplicity-over-features]]):** never overwrites an
+  existing `.clangd`; de-dupes per project per session; opt out with
+  `cooper.autoConfigureClangd: false`. The manual `Configure clangd` stays as a
+  fallback / re-run. **Fewer steps, not more** — the aspiration is "open the
+  project → it just works".
+- **Verified both tiers:** Node — `findProjectDir` (subfolder walk-up, null
+  outside a project); integration — opening `main.c` in the Extension Host
+  **auto-writes a correct `.clangd`** (SDK include + `-std=gnu11`).
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.
