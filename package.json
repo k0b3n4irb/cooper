@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -168,14 +168,11 @@
         ],
         "configurationAttributes": {
           "launch": {
-            "required": [
-              "program"
-            ],
+            "required": [],
             "properties": {
               "program": {
                 "type": "string",
-                "description": "Path to the .sfc/.smc ROM to debug (its sibling .sym provides symbols).",
-                "default": "${workspaceFolder}/game.sfc"
+                "description": "Optional path to the .sfc/.smc ROM. If omitted, Cooper resolves it from the project's Makefile TARGET (recommended — stays correct if you restructure the project)."
               },
               "stopOnEntry": {
                 "type": "boolean",
@@ -195,19 +192,17 @@
             "type": "luna",
             "request": "launch",
             "name": "Luna: Debug SNES ROM",
-            "program": "${workspaceFolder}/game.sfc",
             "stopOnEntry": true
           }
         ],
         "configurationSnippets": [
           {
             "label": "Cooper: Debug SNES ROM in luna",
-            "description": "Launch a .sfc ROM under the luna debugger",
+            "description": "Launch the project's ROM under the luna debugger (resolved from the Makefile)",
             "body": {
               "type": "luna",
               "request": "launch",
               "name": "Luna: Debug SNES ROM",
-              "program": "^\"\\${workspaceFolder}/${1:game}.sfc\"",
               "stopOnEntry": true
             }
           }

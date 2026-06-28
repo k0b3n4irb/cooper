@@ -4,6 +4,15 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.12.2] — 2026-06-28
+
+### Changed — `program` is now optional in the luna launch config
+
+- A luna `launch.json` no longer needs a hardcoded `program`. If omitted, Cooper
+  resolves the ROM from the project's Makefile `TARGET` every launch — so it stays
+  correct when you restructure the project. The default config and snippet drop
+  `program`; set it only to pin a specific ROM.
+
 ## [0.12.1] — 2026-06-28
 
 ### Fixed — Debug starts even with a stale launch.json
