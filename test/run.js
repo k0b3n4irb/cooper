@@ -211,10 +211,12 @@ const S = require(tmpS);
 
 console.log('\n=== .sym parser: against the real aim_target.sym ===');
 const symPath = path.join(aimDir, 'aim_target.sym');
-if (!fs.existsSync(symPath)) {
-    console.log('  (building aim_target to produce the .sym)');
-    cp.spawnSync('make', [], { cwd: aimDir, encoding: 'utf8' });
-}
+// Build with -i (asm list info) + -A (addr-to-line) so the .sym carries source
+// line info; the patched cproc emits `; @cline N` markers we join against.
+const asI = `${path.join(OPENSNES, 'bin', 'wla-65816')} -i`;
+const ldA = `${path.join(OPENSNES, 'bin', 'wlalink')} -A`;
+cp.spawnSync('make', [`OPENSNES=${OPENSNES}`, 'clean'], { cwd: aimDir });
+cp.spawnSync('make', [`OPENSNES=${OPENSNES}`, `AS=${asI}`, `LD=${ldA}`], { cwd: aimDir });
 const sym = S.parseSym(fs.readFileSync(symPath, 'utf8'));
 check('parses many labels (>500)', sym.labels.length > 500);
 check('[information] wlasymbol=true', sym.info.wlasymbol === 'true');
@@ -235,9 +237,23 @@ check('addrToSymbol(0x836B) delta === 6', res && res.delta === 6);
 check('formatResolved -> "InitHardware+6"', res && S.formatResolved(res) === 'InitHardware+6');
 check('exact-hit delta is 0', S.addrToSymbol(sym, initAddr).delta === 0);
 
-// Today's .sym is labels-only (no addr-to-line until G0 build flags).
-check('hasLineInfo is false (labels-only today)', sym.hasLineInfo === false);
 check('sections parsed (ROM + RAM)', sym.sections.some((s) => s.kind === 'rom') && sym.sections.some((s) => s.kind === 'ram'));
+
+// Source-level: with -i/-A + the patched cproc, the .sym carries line info, and
+// buildCLineMap joins PC -> generated-asm:line -> C:line (via `; @cline`).
+check('hasLineInfo is true (built with -i/-A)', sym.hasLineInfo === true);
+check('[source files] includes main.c.wrap.asm', [...sym.sourceFiles.values()].some((f) => f.includes('main.c')));
+const wrapAsm = fs.readFileSync(path.join(aimDir, 'main.c.wrap.asm'), 'utf8');
+check('the generated asm carries @cline markers', /;\s*@cline\s+\d+/.test(wrapAsm));
+const clmap = S.buildCLineMap(sym, new Map([['main.c.wrap.asm', wrapAsm]]));
+check('buildCLineMap maps many PCs to C source', clmap.addrToSource.size > 20);
+const mainCLines = fs.readFileSync(path.join(aimDir, 'main.c'), 'utf8').split('\n').length;
+const [someAddr, someSrc] = [...clmap.addrToSource][0];
+check('mapped C file is main.c', someSrc.file === 'main.c');
+check('mapped C line is within main.c', someSrc.line > 0 && someSrc.line <= mainCLines);
+check('cSourceForAddr resolves nearest-below', !!S.cSourceForAddr(clmap, someAddr + 1));
+const k = `main.c:${someSrc.line}`;
+check('sourceToAddr round-trips (lowest PC <= entry)', clmap.sourceToAddr.has(k) && clmap.sourceToAddr.get(k) <= someAddr);
 
 // address parsing + expression resolution (for evaluate / memory view)
 check('parseAddress($008365)', S.parseAddress('$008365') === 0x008365);

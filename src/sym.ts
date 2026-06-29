@@ -35,10 +35,12 @@ export interface SymSection {
 }
 
 export interface SymLineEntry {
-    /** 24-bit address. */
+    /** 24-bit PC address. */
     addr: number;
-    fileId: number;
-    line: number;
+    /** Source-file key `OBJ:SRC` (indexes `sourceFiles`). */
+    fileKey: string;
+    /** Line in the referenced (generated) asm file. */
+    asmLine: number;
 }
 
 export interface SymTable {
@@ -51,7 +53,9 @@ export interface SymTable {
     sections: SymSection[];
     /** Sorted (ascending) unique label addresses, for nearest-preceding lookup. */
     sortedAddrs: number[];
-    /** Present only when the build emitted addr-to-line data (G0); else empty. */
+    /** `OBJ:SRC` → source filename (from `[source files v2]`). */
+    sourceFiles: Map<string, string>;
+    /** Present only when the build emitted addr-to-line data (-i/-A); else empty. */
     lineMap: SymLineEntry[];
     /** True iff an addr-to-line section was present. */
     hasLineInfo: boolean;
@@ -76,6 +80,7 @@ export function parseSym(text: string): SymTable {
         byAddr: new Map(),
         sections: [],
         sortedAddrs: [],
+        sourceFiles: new Map(),
         lineMap: [],
         hasLineInfo: false,
     };
@@ -151,16 +156,21 @@ export function parseSym(text: string): SymTable {
                 break;
             }
             default: {
-                // addr-to-line mapping v2:
-                //   ROMOFF BB:AAAA SLOT FILEID:SRC:LINE   (when -A/-i are on)
-                if (section.startsWith('addr-to-line')) {
+                if (section.startsWith('source files')) {
+                    // `OBJ:SRC checksum filename`
+                    const parts = line.split(/\s+/);
+                    if (/^[0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}$/.test(parts[0]) && parts.length >= 3) {
+                        t.sourceFiles.set(parts[0], parts.slice(2).join(' ').trim());
+                    }
+                } else if (section.startsWith('addr-to-line')) {
+                    // `ROMOFF BB:AAAA SLOT FILEID:SRC:LINE`  (when -i/-A are on)
                     const parts = line.split(/\s+/);
                     const ba = parts[1] ? parseBankAddr(parts[1]) : null;
                     const tail = parts[3]; // FILEID:SRC:LINE
                     if (ba && tail) {
                         const f = tail.split(':');
                         if (f.length === 3) {
-                            t.lineMap.push({ addr: ba.addr, fileId: parseInt(f[0], 16), line: parseInt(f[2], 16) });
+                            t.lineMap.push({ addr: ba.addr, fileKey: `${f[0]}:${f[1]}`, asmLine: parseInt(f[2], 16) });
                         }
                     }
                 }
@@ -245,4 +255,103 @@ export function addrToSymbol(t: SymTable, addr: number, maxDelta?: number): Reso
 /** Format a resolved address as `name` or `name+N` (N in hex). */
 export function formatResolved(r: ResolvedAddr): string {
     return r.delta === 0 ? r.name : `${r.name}+${r.delta.toString(16)}`;
+}
+
+// --- C source-level mapping (the `; @cline N` join) ----------------------------
+
+export interface CSource { file: string; line: number; }
+
+export interface CLineMap {
+    /** PC → C source (file, line). */
+    addrToSource: Map<number, CSource>;
+    /** sorted PC keys of addrToSource (for nearest-preceding lookup). */
+    sortedAddrs: number[];
+    /** `file:line` → lowest PC for that C line (breakpoint target). */
+    sourceToAddr: Map<string, number>;
+}
+
+/** Extract `; @cline N` markers from generated asm → ascending [{asmLine, cLine}]. */
+function clineMarkers(text: string): { asmLine: number; cLine: number }[] {
+    const out: { asmLine: number; cLine: number }[] = [];
+    const lines = text.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+        const m = lines[i].match(/;\s*@cline\s+(\d+)/);
+        if (m) {
+            out.push({ asmLine: i + 1, cLine: parseInt(m[1], 10) }); // 1-based
+        }
+    }
+    return out;
+}
+
+/** Largest `cLine` whose `asmLine <= target`, or undefined. */
+function clineAtOrBefore(markers: { asmLine: number; cLine: number }[], target: number): number | undefined {
+    let lo = 0, hi = markers.length - 1, best = -1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (markers[mid].asmLine <= target) {
+            best = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    return best < 0 ? undefined : markers[best].cLine;
+}
+
+/**
+ * Join the `.sym` addr-to-line table (PC → generated-asm:line) with the
+ * `; @cline N` markers in those asm files (asm:line → C:line) to get PC ↔ C
+ * source. `asmTexts` maps each source filename from `[source files v2]` (e.g.
+ * `main.c.wrap.asm`) to its text. Only files carrying `@cline` markers (the
+ * C-derived ones) contribute; hand-written `.asm` are skipped.
+ */
+export function buildCLineMap(sym: SymTable, asmTexts: Map<string, string>): CLineMap {
+    const addrToSource = new Map<number, CSource>();
+    const sourceToAddr = new Map<string, number>();
+    const cache = new Map<string, { asmLine: number; cLine: number }[]>();
+
+    for (const e of sym.lineMap) {
+        const fname = sym.sourceFiles.get(e.fileKey);
+        if (!fname) {
+            continue;
+        }
+        let markers = cache.get(fname);
+        if (!markers) {
+            const text = asmTexts.get(fname);
+            markers = text ? clineMarkers(text) : [];
+            cache.set(fname, markers);
+        }
+        if (markers.length === 0) {
+            continue; // hand-written asm (no C lines)
+        }
+        const cLine = clineAtOrBefore(markers, e.asmLine);
+        if (cLine === undefined) {
+            continue;
+        }
+        // main.c.wrap.asm → main.c (the original C source)
+        const cFile = fname.replace(/\.wrap\.asm$/, '').replace(/\.asm$/, '');
+        addrToSource.set(e.addr, { file: cFile, line: cLine });
+        const key = `${cFile}:${cLine}`;
+        const prev = sourceToAddr.get(key);
+        if (prev === undefined || e.addr < prev) {
+            sourceToAddr.set(key, e.addr);
+        }
+    }
+    return { addrToSource, sortedAddrs: [...addrToSource.keys()].sort((a, b) => a - b), sourceToAddr };
+}
+
+/** PC → C source, using nearest-preceding (the stopped PC may sit between entries). */
+export function cSourceForAddr(map: CLineMap, addr: number): CSource | undefined {
+    const a = map.sortedAddrs;
+    let lo = 0, hi = a.length - 1, best = -1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (a[mid] <= addr) {
+            best = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    return best < 0 ? undefined : map.addrToSource.get(a[best]);
 }

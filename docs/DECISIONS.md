@@ -640,6 +640,36 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-29 — Source-level C debug (P7) — the cproc path
+
+### D-034 — Cheapest real path: cproc emits `dbgloc`, Cooper joins to C lines
+- **Decision:** make C source-level debug work via path (b) from the de-risk —
+  the compiler emits per-statement line info, Cooper joins it to the existing
+  PC→asm-line table. Verified end-to-end with **correct** mappings (PC 0x6218 →
+  `main.c:198` = `textPrintAt(...)`).
+- **Compiler side (in the `opensnes` repo — author to commit there with its own
+  test process):**
+  - `cproc/stmt.c`: emit `funcdbgloc(f, tok.loc.line)` per statement;
+    `cproc/qbe.c`: `funcdbgloc()` → a `IDBGLOC` inst; `cproc/ops.h`:
+    `OP(IDBGLOC,"dbgloc")`; `cproc/cc.h`: the decl. QBE already parses `dbgloc`.
+  - `qbe/w65816/emit.c`: `case Odbgloc` → `\t; @cline <line>\n` (a **WLA-safe
+    comment** — NOT the shared `.loc`, which WLA rejects; line is an `RInt`, read
+    via `rsval`). Verified: ROM bytes unchanged, still runs.
+  - Built with `wla -i` + `wlalink -A`, the `; @cline` markers survive into
+    `main.c.wrap.asm` and the `.sym` gains `[addr-to-line]` (PC→wrap-asm:line).
+- **Cooper side (`src/sym.ts`, this commit):** `parseSym` now also reads
+  `[source files v2]`; `buildCLineMap` joins PC→asm-line (`.sym`) × asm-line→C-line
+  (`@cline` markers in the wrap.asm) → **PC ↔ `main.c`:line** both ways
+  (`addrToSource`, `sourceToAddr`, nearest-preceding `cSourceForAddr`). Pure,
+  Node-tested against the real aim_target build.
+- **How a user gets it:** build with the two extra flags (Cooper will pass them),
+  and use a compiler built from the patched cproc/QBE. **Next (P7b):** wire the DAP
+  adapter — `stackTrace` frame `source`+`line` (highlight `main.c`), source
+  breakpoints (gutter → PC via `run_until_pc`).
+- **Source:** de-risk agent (cproc/QBE/wla grounding); empirical build + join.
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.
