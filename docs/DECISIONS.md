@@ -668,6 +668,24 @@ rationale and the docs that grounded it. Newest last.
   breakpoints (gutter → PC via `run_until_pc`).
 - **Source:** de-risk agent (cproc/QBE/wla grounding); empirical build + join.
 
+### D-035 — Source-level DAP wiring + auto debug-info flags (P7b)
+- **Decision:** wire the C-line map into `LunaDebugSession`: `launchRequest` builds
+  `buildCLineMap` from the `.sym` + the generated asm; `stackTraceRequest` attaches
+  the frame `source` (`main.c`) + line (→ VS Code highlights it); a new
+  `setBreakPointsRequest` resolves **gutter (source-line) breakpoints** to PCs
+  (`resolveLine` → nearest C line with code) and `run_until_pc` stops there.
+  Function + source PC breakpoints are unified (`pcBreakpoints()`); the stop reason
+  is `'breakpoint'`.
+- **Builds emit debug info by default:** `buildMakeArgs` now also passes
+  `AS=<sdk>/bin/wla-65816 -i` and `LD=<sdk>/bin/wlalink -A` (overriding AS/LD adds
+  the flags without touching the Makefile's `ASFLAGS`). Harmless to the ROM; with
+  the patched cproc it yields C-line info, otherwise asm-line. No new setting.
+- **Verified headlessly end-to-end:** a source breakpoint on `main.c:237` →
+  Continue → the stopped frame carries `source=main.c` + a C line (143→145 Node
+  tests); integration green. This resolves the "Unknown Source" gap (D-032).
+- **Caveat:** needs a compiler built from the patched cproc/QBE; without it the
+  debugger gracefully falls back to symbol/asm level (no C-line frames).
+
 ---
 
 ### Known limitations (Component #1)

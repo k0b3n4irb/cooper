@@ -268,6 +268,8 @@ export interface CLineMap {
     sortedAddrs: number[];
     /** `file:line` → lowest PC for that C line (breakpoint target). */
     sourceToAddr: Map<string, number>;
+    /** file → ascending [{line, addr}] (lowest PC per C line); for breakpoint binding. */
+    linesByFile: Map<string, { line: number; addr: number }[]>;
 }
 
 /** Extract `; @cline N` markers from generated asm → ascending [{asmLine, cLine}]. */
@@ -337,7 +339,36 @@ export function buildCLineMap(sym: SymTable, asmTexts: Map<string, string>): CLi
             sourceToAddr.set(key, e.addr);
         }
     }
-    return { addrToSource, sortedAddrs: [...addrToSource.keys()].sort((a, b) => a - b), sourceToAddr };
+    const linesByFile = new Map<string, { line: number; addr: number }[]>();
+    for (const [key, addr] of sourceToAddr) {
+        const idx = key.lastIndexOf(':');
+        const file = key.slice(0, idx);
+        const line = parseInt(key.slice(idx + 1), 10);
+        const arr = linesByFile.get(file) ?? linesByFile.set(file, []).get(file)!;
+        arr.push({ line, addr });
+    }
+    for (const arr of linesByFile.values()) {
+        arr.sort((a, b) => a.line - b.line);
+    }
+    return { addrToSource, sortedAddrs: [...addrToSource.keys()].sort((a, b) => a - b), sourceToAddr, linesByFile };
+}
+
+/**
+ * Resolve a source breakpoint `(file, line)` to the actual bound line + PC: the
+ * first C line at-or-after the requested one that has code. Returns undefined if
+ * the file has no mapping or no line at/after `line`.
+ */
+export function resolveLine(map: CLineMap, file: string, line: number): { line: number; addr: number } | undefined {
+    const arr = map.linesByFile.get(file);
+    if (!arr) {
+        return undefined;
+    }
+    for (const e of arr) {
+        if (e.line >= line) {
+            return e;
+        }
+    }
+    return undefined;
 }
 
 /** PC → C source, using nearest-preceding (the stopped PC may sit between entries). */

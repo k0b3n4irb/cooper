@@ -111,12 +111,12 @@ check('lunaPreviewArgs builds the grounded run argv',
         ['run', '--steps', '200000', '--screenshot', '/x/out.png', '--force-display', '/x/rom.sfc']));
 check('lunaPreviewArgs honours forceDisplay:false',
     !B.lunaPreviewArgs('r', 'p', { forceDisplay: false }).includes('--force-display'));
-check('buildMakeArgs passes OPENSNES + default goal',
-    JSON.stringify(B.buildMakeArgs('/sdk')) === '["OPENSNES=/sdk"]');
-check('buildMakeArgs adds the target',
-    JSON.stringify(B.buildMakeArgs('/sdk', 'clean')) === '["OPENSNES=/sdk","clean"]');
-check('buildMakeArgs without an sdk is empty',
-    JSON.stringify(B.buildMakeArgs()) === '[]');
+const bma = B.buildMakeArgs('/sdk');
+check('buildMakeArgs passes OPENSNES first', bma[0] === 'OPENSNES=/sdk');
+check('buildMakeArgs adds wla -i (asm line info)', bma.some((x) => /\/bin\/wla-65816 -i$/.test(x)));
+check('buildMakeArgs adds wlalink -A (addr-to-line)', bma.some((x) => /\/bin\/wlalink -A$/.test(x)));
+check('buildMakeArgs appends the target last', B.buildMakeArgs('/sdk', 'clean').slice(-1)[0] === 'clean');
+check('buildMakeArgs without an sdk is empty', JSON.stringify(B.buildMakeArgs()) === '[]');
 // close the loop: `make OPENSNES=<sdk>` actually builds (the override beats the
 // Makefile's wrong $(shell cd ../../..) for out-of-tree projects)
 if (fs.existsSync(path.join(OPENSNES, 'make', 'common.mk'))) {
@@ -482,7 +482,7 @@ try { fs.unlinkSync(tmpT); } catch {}
             check('stopped at entry', true);
 
             await dapCall('continue', { threadId: 1 });
-            await waitEvent(stopped('function breakpoint'));
+            await waitEvent(stopped('breakpoint'));
             check('stopped at the symbol breakpoint', true);
 
             const st = await dapCall('stackTrace', { threadId: 1 });
@@ -546,6 +546,18 @@ try { fs.unlinkSync(tmpT); } catch {}
             const sheet = T.tilesToRgba(T.decodeTileSheet(vramResp.body.bytes, 4, 0x1000 / 32), P.decodeCgram(ppu.body.cgram).slice(0, 16), 16);
             const pngBuf = T.encodePng(sheet.width, sheet.height, sheet.data);
             check('VRAM sheet encodes a valid PNG', pngBuf[0] === 0x89 && pngBuf.slice(1, 4).toString('ascii') === 'PNG');
+
+            // SOURCE-LEVEL: a C-line breakpoint, then a stack frame carrying main.c:line.
+            await dapCall('setDataBreakpoints', { breakpoints: [] });
+            const sbp = await dapCall('setBreakPoints', { source: { path: path.join(aimDir, 'main.c') }, breakpoints: [{ line: 237 }] });
+            check('source breakpoint verified (C line -> PC)', sbp.body.breakpoints[0].verified === true);
+            check('source breakpoint bound to a real C line', typeof sbp.body.breakpoints[0].line === 'number');
+            await dapCall('continue', { threadId: 1 });
+            await waitEvent(stopped('breakpoint'));
+            const st3 = await dapCall('stackTrace', { threadId: 1 });
+            const fr = st3.body.stackFrames[0];
+            check('stopped frame has a main.c source', !!fr.source && /main\.c$/.test(fr.source.path));
+            check('stopped frame carries a C line', typeof fr.line === 'number' && fr.line > 0);
 
             await dapCall('disconnect', {});
             check('disconnect ok', true);

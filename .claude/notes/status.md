@@ -5,6 +5,17 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Source-level C debug (P7) — the jewel** (v0.14.0). Your `main.c` line highlights
+at a stop; gutter breakpoints on C lines. Path: patched cproc/QBE emit `; @cline N`
+→ `.sym` addr-to-line (Cooper auto-passes `wla -i`/`wlalink -A`) → `buildCLineMap`
+joins to PC↔main.c:line → DAP frame `source`+`line` + source breakpoints. Verified
+headless end-to-end (bp on main.c:237 → frame source=main.c). Compiler changes are
+in the OpenSNES repo (cproc/QBE), for the author to commit. D-034/D-035. 145 Node +
+8 integration. Remaining: typed locals (G4). Earlier: walkthrough (0.13), dashboard
+(0.12), sidebar (0.11), …
+
+## Last shipped (earlier)
+
 **The Cooper dashboard "Home"** (v0.12.0). Webview with big Build/Run/Debug
 buttons, a live preview thumbnail (luna screenshot pushed as base64), and
 Palette/Sprites/Tiles cards + status. Opens from the 🏠 sidebar-header button.

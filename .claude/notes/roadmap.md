@@ -90,16 +90,16 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
   free, do early. L2: an OpenSNES MCP. L3: the agentic **verify-in-luna** loop
   (write C → build → run → read framebuffer/state → self-correct).
 
-### ⏳ P7 — Source-level debug (C4 + compiler) — the hard part, late
-- The debug-info chantier (`docs/03`), built on the author-owned toolchain:
-  - **G0** turn on WLA `-i`/`-A` + luna loads the `.sym` → symbolized ASM debug.
-  - **G1** cproc emits `dbgloc`/`dbgfile` (thread token loc onto the AST).
-  - **G2** w65816 handles `Odbgloc` (QBE core already has the infra).
-  - **G3** `.LINE` in wla + emit `.CHANGEFILE`/`.LINE` → native `PC ↔ main.c:line`.
-  - **G4** `[frames]`/`[types]` sidecar → typed local variables.
-  - **G5** DAP exposes file/line breakpoints, stack trace, variables.
-- **Bet to prototype first:** R2 — `.LINE n` in wla survives physical line
-  counting (the whole Architecture C depends on it). ~30 lines + a test `.asm`.
+### ✅ P7 — Source-level C debug (C4 + compiler) — SHIPPED 0.14.0 🎯
+- The debug-info chantier, via the cheapest real path (D-034/D-035):
+  - ✅ **cproc emits `dbgloc <line>`** per statement; **QBE w65816** renders it as a
+    `; @cline N` comment (WLA-safe). (Took the comment route, not `.LINE` in wla.)
+  - ✅ Build with `wla -i` + `wlalink -A` (Cooper passes them auto) → `.sym`
+    addr-to-line; Cooper **joins** asm-line × `@cline` → `PC ↔ main.c:line`.
+  - ✅ DAP: frame `source`+`line` (C line highlights), gutter breakpoints → PC.
+- 🔜 **Remaining (G4):** `[frames]`/`[types]` → typed **local variables** (today
+  the Registers scope only). Needs cproc to emit frame layouts + types.
+- Compiler changes live in the OpenSNES repo (cproc/QBE) — author to commit there.
 
 ### ⏳ P8 — Multi-chip debug (C4, advanced)
 - SPC700 / SA-1 / GSU as DAP "threads". Big differentiator, optional.

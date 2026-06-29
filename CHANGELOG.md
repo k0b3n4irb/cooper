@@ -4,6 +4,21 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] — 2026-06-29
+
+### Added — Source-level C debugging (the jewel) 🎯
+
+- **Your `main.c` line now highlights when you stop**, and you can **set
+  breakpoints in the C gutter** — not just by symbol. Continue lands on real C
+  lines; the call stack shows `main.c:line`.
+- How: the patched `cc65816`/QBE emit per-statement line markers; built with
+  `wla -i` / `wlalink -A` the `.sym` carries PC→line; Cooper joins them to map
+  PC ↔ `main.c`:line. The luna adapter sets the frame `source` and resolves gutter
+  breakpoints to PCs via `run_until_pc`. Cooper passes the debug-info flags
+  automatically — just Build & Debug.
+- Requires a compiler built from the patched cproc/QBE (OpenSNES repo); the
+  `.sym`/asm additions are harmless to the ROM. D-034, D-035.
+
 ## [0.13.0] — 2026-06-29
 
 ### Added — In-editor "Get Started" walkthrough

@@ -121,11 +121,14 @@ The jewel. Workflow:
 
 ![VRAM tile sheet](images/vram.png)
 
-> **Why no highlighted C line yet?** The debugger stops with an *"Unknown Source"*
-> frame: today it works at the **register / memory / symbol** level, not the C
-> source line. Highlighting your `main.c` line (and stepping line-by-line) needs
-> the compiler (`cc65816` / cproc) to emit C line-number info — that's the
-> **source-level debug** work **(coming)**.
+### Source-level (C line) debugging
+
+With a compiler built from the patched `cc65816`/QBE, Cooper debugs at the **C
+source line**: set breakpoints **in the `main.c` gutter**, and when you stop, your
+**C line is highlighted** and the call stack shows `main.c:line`. Cooper passes the
+debug-info build flags automatically. If the compiler isn't patched, the debugger
+gracefully falls back to the symbol/register level (the frame shows a symbol, no
+highlighted line).
 
 ---
 
@@ -159,8 +162,6 @@ clangd**.
 
 ## 10. What's next
 
-- **Source-level debug** — highlight and step your **C lines** (needs cproc to emit
-  line info). The big one.
 - **Asset editors** — palette / tiles / map editing.
 - **AI helper** — an OpenSNES-aware assistant that verifies in luna.
 

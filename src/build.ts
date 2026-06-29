@@ -149,6 +149,12 @@ export function buildMakeArgs(sdkPath?: string, target?: string): string[] {
     const args: string[] = [];
     if (sdkPath) {
         args.push(`OPENSNES=${sdkPath}`);
+        // Emit source-level debug info: `wla -i` (asm list info) + `wlalink -A`
+        // (PC→line in the .sym). Harmless to the ROM; with the patched cproc these
+        // carry C source lines (see docs/DECISIONS.md D-034). Overriding AS/LD adds
+        // the flags without touching the Makefile's ASFLAGS.
+        args.push(`AS=${path.join(sdkPath, 'bin', 'wla-65816')} -i`);
+        args.push(`LD=${path.join(sdkPath, 'bin', 'wlalink')} -A`);
     }
     if (target && target !== 'all') {
         args.push(target);

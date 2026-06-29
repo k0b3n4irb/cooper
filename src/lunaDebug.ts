@@ -12,13 +12,16 @@
 
 import {
     LoggingDebugSession, InitializedEvent, StoppedEvent, TerminatedEvent,
-    OutputEvent, Thread, StackFrame, Scope,
+    OutputEvent, Thread, StackFrame, Scope, Source,
 } from '@vscode/debugadapter';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import * as path from 'path';
 import * as fs from 'fs';
 import { LunaMcp, CpuState } from './lunaMcp';
-import { parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved, resolveExpr, parseAddress } from './sym';
+import {
+    parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved, resolveExpr, parseAddress,
+    buildCLineMap, CLineMap, cSourceForAddr, resolveLine,
+} from './sym';
 
 const THREAD_ID = 1;
 const REGISTERS_REF = 1000;
@@ -79,11 +82,19 @@ export function formatRegisters(cpu: CpuState): DebugProtocol.Variable[] {
 export class LunaDebugSession extends LoggingDebugSession {
     private mcp = new LunaMcp();
     private sym: SymTable | null = null;
-    private breakpoints: number[] = [];      // 24-bit PC addresses
+    private cmap: CLineMap | null = null;     // PC ↔ C source (source-level debug)
+    private projectDir = '';
+    private breakpoints: number[] = [];       // function-breakpoint PC addresses
+    private sourceBreakpoints: number[] = []; // source-line-breakpoint PC addresses
     private dataBreakpoints: { addr: number; access: DebugProtocol.DataBreakpointAccessType }[] = [];
     private configurationDone = false;
     private stopOnEntry = true;
     private maxSteps = 5_000_000;
+
+    /** All PC breakpoints (function + source), deduped. */
+    private pcBreakpoints(): number[] {
+        return [...new Set([...this.breakpoints, ...this.sourceBreakpoints])];
+    }
 
     constructor() {
         super('luna-debug.txt');
@@ -100,6 +111,7 @@ export class LunaDebugSession extends LoggingDebugSession {
         response.body.supportsEvaluateForHovers = true;
         response.body.supportsDataBreakpoints = true;
         response.body.supportsRestartRequest = false;
+        // Source breakpoints handled in setBreakPointsRequest (no extra capability).
         response.body.supportsStepBack = false;
         this.sendResponse(response);
         // Tell the client we're ready to receive breakpoint configuration.
@@ -118,11 +130,29 @@ export class LunaDebugSession extends LoggingDebugSession {
             this.sendErrorResponse(response, 3001, `luna launch failed: ${(e as Error).message}`);
             return;
         }
+        this.projectDir = args.cwd ?? path.dirname(args.program);
         // Load the sibling `.sym` for symbol resolution (best-effort).
         const symPath = args.program.replace(/\.(sfc|smc)$/i, '') + '.sym';
         if (fs.existsSync(symPath)) {
             this.sym = parseSym(fs.readFileSync(symPath, 'utf8'));
             this.sendEvent(new OutputEvent(`Loaded symbols: ${path.basename(symPath)} (${this.sym.labels.length} labels)\n`, 'console'));
+            // Source-level: join the .sym addr-to-line with the `; @cline` markers
+            // in the generated asm (built with wla -i / wlalink -A + patched cproc).
+            if (this.sym.hasLineInfo) {
+                const asmTexts = new Map<string, string>();
+                for (const fname of new Set(this.sym.sourceFiles.values())) {
+                    const p = path.isAbsolute(fname) ? fname : path.join(this.projectDir, fname);
+                    try {
+                        if (fs.existsSync(p)) {
+                            asmTexts.set(fname, fs.readFileSync(p, 'utf8'));
+                        }
+                    } catch { /* skip unreadable */ }
+                }
+                this.cmap = buildCLineMap(this.sym, asmTexts);
+                if (this.cmap.addrToSource.size > 0) {
+                    this.sendEvent(new OutputEvent(`Source-level debug: ${this.cmap.addrToSource.size} C-line mappings.\n`, 'console'));
+                }
+            }
         } else {
             this.sendEvent(new OutputEvent(`No .sym next to ${path.basename(args.program)} — symbol breakpoints unavailable.\n`, 'console'));
         }
@@ -167,6 +197,31 @@ export class LunaDebugSession extends LoggingDebugSession {
                 bps.push({ verified: true, instructionReference: hex(addr, 6) });
             } else {
                 bps.push({ verified: false, message: `unknown symbol '${fb.name}'` });
+            }
+        }
+        response.body = { breakpoints: bps };
+        this.sendResponse(response);
+    }
+
+    /** Source-line breakpoints (clicking the editor gutter): resolve each C line
+     *  to a PC via the cproc/`@cline` map, then run_until_pc to it. */
+    protected setBreakPointsRequest(
+        response: DebugProtocol.SetBreakpointsResponse,
+        args: DebugProtocol.SetBreakpointsArguments,
+    ): void {
+        const file = args.source.path ? path.basename(args.source.path) : '';
+        const bps: DebugProtocol.Breakpoint[] = [];
+        this.sourceBreakpoints = [];
+        for (const b of args.breakpoints ?? []) {
+            const r = this.cmap ? resolveLine(this.cmap, file, b.line) : undefined;
+            if (r) {
+                this.sourceBreakpoints.push(r.addr);
+                bps.push({ verified: true, line: r.line, source: args.source });
+            } else {
+                bps.push({
+                    verified: false, line: b.line,
+                    message: this.cmap ? 'no code at or after this line' : 'build with source-level debug info (wla -i / wlalink -A)',
+                });
             }
         }
         response.body = { breakpoints: bps };
@@ -232,6 +287,13 @@ export class LunaDebugSession extends LoggingDebugSession {
             : `${hex(cpu.pb, 2)}:${hex(cpu.pc, 4).slice(1)}`;
         const frame = new StackFrame(0, name);
         frame.instructionPointerReference = hex(pc24, 6);
+        // Source-level: attach the C file + line so VS Code highlights it.
+        const csrc = this.cmap ? cSourceForAddr(this.cmap, pc24) : undefined;
+        if (csrc) {
+            frame.source = new Source(path.basename(csrc.file), path.join(this.projectDir, csrc.file));
+            frame.line = csrc.line;
+            frame.column = 1;
+        }
         response.body = { stackFrames: [frame], totalFrames: 1 };
         this.sendResponse(response);
     }
@@ -272,10 +334,11 @@ export class LunaDebugSession extends LoggingDebugSession {
         response.body = { ...(response.body ?? {}), allThreadsContinued: true };
         this.sendResponse(response);
 
+        const pcs = this.pcBreakpoints();
         let reason = 'pause';
         try {
             if (this.dataBreakpoints.length >= 1) {
-                if (this.dataBreakpoints.length > 1 || this.breakpoints.length > 0) {
+                if (this.dataBreakpoints.length > 1 || pcs.length > 0) {
                     this.sendEvent(new OutputEvent('luna watches one address per run — only the first data breakpoint is honored this continue.\n', 'console'));
                 }
                 const d = this.dataBreakpoints[0];
@@ -285,13 +348,13 @@ export class LunaDebugSession extends LoggingDebugSession {
                 if (r.hit) {
                     reason = 'data breakpoint';
                 }
-            } else if (this.breakpoints.length === 1) {
-                if ((await this.mcp.runUntilPc(this.breakpoints[0], this.maxSteps)).hit) {
-                    reason = 'function breakpoint';
+            } else if (pcs.length === 1) {
+                if ((await this.mcp.runUntilPc(pcs[0], this.maxSteps)).hit) {
+                    reason = 'breakpoint';
                 }
-            } else if (this.breakpoints.length > 1) {
+            } else if (pcs.length > 1) {
                 if (await this.scanForBreakpoints()) {
-                    reason = 'function breakpoint';
+                    reason = 'breakpoint';
                 }
             } else {
                 // No breakpoints: advance a bounded budget, then pause.
@@ -307,7 +370,7 @@ export class LunaDebugSession extends LoggingDebugSession {
 
     /** Chunked single-step scan for >1 breakpoint (may overshoot — D-016 gap). */
     private async scanForBreakpoints(): Promise<boolean> {
-        const set = new Set(this.breakpoints);
+        const set = new Set(this.pcBreakpoints());
         let steps = 0;
         const chunk = 2000;
         while (steps < this.maxSteps) {
