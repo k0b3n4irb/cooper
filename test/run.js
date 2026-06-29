@@ -274,6 +274,18 @@ check('symbol click sets a breakpoint', model[3].children[0].commandId === 'coop
 check('no project -> single info node', SB.buildTreeModel({ projectDir: null, romName: null, romBuilt: false, sdkName: null, functions: [] }).length === 1);
 try { fs.unlinkSync(tmpSB); } catch {}
 
+// --- walkthrough manifest + media (catches blank-box / unpackaged media) ---
+console.log('\n=== Get Started walkthrough ===');
+const pkgWt = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const wt = (pkgWt.contributes.walkthroughs || [])[0];
+check('walkthrough is contributed', !!wt && wt.id === 'cooper.gettingStarted');
+check('walkthrough has steps', !!wt && wt.steps.length >= 5);
+const repoRoot = path.join(__dirname, '..');
+const missingMedia = (wt ? wt.steps : []).filter((s) => !s.media || !s.media.image || !fs.existsSync(path.join(repoRoot, s.media.image)));
+check('every step media image exists (no blank boxes)', missingMedia.length === 0);
+if (missingMedia.length) { console.log('  missing:', missingMedia.map((s) => s.media && s.media.image)); }
+check('media live under media/ (packaged, not docs/)', (wt ? wt.steps : []).every((s) => s.media.image.startsWith('media/')));
+
 // --- Cooper Home dashboard HTML (pure) ---
 console.log('\n=== Cooper dashboard HTML (pure) ===');
 const tmpD2 = path.join(os.tmpdir(), `cooper_dash_${process.pid}.cjs`);

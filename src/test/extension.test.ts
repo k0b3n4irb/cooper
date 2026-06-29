@@ -41,9 +41,18 @@ suite('Cooper — activation & commands', () => {
     test('contributes its commands', async () => {
         await vscode.extensions.getExtension(EXT_ID)!.activate();
         const cmds = await vscode.commands.getCommands(true);
-        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd', 'cooper.refresh', 'cooper.debug', 'cooper.home']) {
+        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd', 'cooper.refresh', 'cooper.debug', 'cooper.home', 'cooper.openWalkthrough']) {
             assert.ok(cmds.includes(c), `missing command ${c}`);
         }
+    });
+
+    test('contributes a Get Started walkthrough and opens it', async () => {
+        const pkg = vscode.extensions.getExtension(EXT_ID)!.packageJSON;
+        const wt = pkg.contributes.walkthroughs?.[0] as { id: string; steps: unknown[] } | undefined;
+        assert.ok(wt && wt.id === 'cooper.gettingStarted', 'no Get Started walkthrough');
+        assert.ok(wt!.steps.length >= 5, 'walkthrough has too few steps');
+        await vscode.extensions.getExtension(EXT_ID)!.activate();
+        await vscode.commands.executeCommand('cooper.openWalkthrough'); // must not throw
     });
 
     test('opens the Cooper dashboard webview', async () => {

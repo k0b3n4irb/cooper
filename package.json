@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.12.3",
+  "version": "0.13.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -113,6 +113,12 @@
         "title": "Open Dashboard",
         "category": "Cooper",
         "icon": "$(home)"
+      },
+      {
+        "command": "cooper.openWalkthrough",
+        "title": "Get Started",
+        "category": "Cooper",
+        "icon": "$(mortar-board)"
       }
     ],
     "viewsContainers": {
@@ -140,12 +146,68 @@
           "group": "navigation@1"
         },
         {
-          "command": "cooper.refresh",
+          "command": "cooper.openWalkthrough",
           "when": "view == cooperTree",
           "group": "navigation@2"
+        },
+        {
+          "command": "cooper.refresh",
+          "when": "view == cooperTree",
+          "group": "navigation@3"
         }
       ]
     },
+    "walkthroughs": [
+      {
+        "id": "cooper.gettingStarted",
+        "title": "Get Started with Cooper",
+        "description": "Build, run and debug SNES games on the OpenSNES SDK + luna — in a few clicks.",
+        "steps": [
+          {
+            "id": "tools",
+            "title": "Point Cooper at your tools",
+            "description": "Your game lives in its own folder; OpenSNES and luna are installed separately. Tell Cooper where they are.\n\n[Set the OpenSNES SDK path](command:workbench.action.openSettings?%22cooper.opensnesPath%22)\n[Set the luna path](command:workbench.action.openSettings?%22cooper.lunaPath%22)\n\n`cooper.lunaPath` accepts the luna binary **or** the folder that contains it.",
+            "media": { "image": "media/cooper-sidebar.png", "altText": "The Cooper sidebar" },
+            "completionEvents": ["onSettingChanged:cooper.opensnesPath"]
+          },
+          {
+            "id": "sidebar",
+            "title": "Open the Cooper panel",
+            "description": "Click the **Cooper** icon (a gamepad) in the activity bar. Everything is one click — Build, Run, Debug, PPU viewers, and your project's functions.\n\n[Open the Cooper panel](command:workbench.view.extension.cooper)",
+            "media": { "image": "media/cooper-sidebar.png", "altText": "The Cooper sidebar tree" },
+            "completionEvents": ["onView:cooperTree"]
+          },
+          {
+            "id": "build",
+            "title": "Build your ROM",
+            "description": "Compile with `make`. Cooper passes your SDK path automatically, so it works from any folder. Errors land in the Problems panel.\n\n[Build (make)](command:cooper.build)",
+            "media": { "image": "media/cooper-dashboard.png", "altText": "The Cooper dashboard" },
+            "completionEvents": ["onCommand:cooper.build"]
+          },
+          {
+            "id": "run",
+            "title": "Run a frame",
+            "description": "Render a frame in luna and see it inline — your game, on cycle-accurate hardware.\n\n[Run / Preview](command:cooper.preview)",
+            "media": { "image": "media/cooper-preview.png", "altText": "A rendered SNES frame" },
+            "completionEvents": ["onCommand:cooper.preview"]
+          },
+          {
+            "id": "debug",
+            "title": "Debug your game",
+            "description": "In the Cooper panel under **SYMBOLS**, click one of your functions to set a breakpoint, then start debugging and press **Continue**. Inspect CPU registers, memory and the live PPU at the stop.\n\n[Start Debugging](command:cooper.debug)",
+            "media": { "image": "media/cooper-sidebar.png", "altText": "Symbols and Debug in the Cooper panel" },
+            "completionEvents": ["onCommand:cooper.debug"]
+          },
+          {
+            "id": "viewers",
+            "title": "Inspect the PPU",
+            "description": "At a debug stop, view the live **Palette**, **Sprites (OAM)** and **Tiles (VRAM)** — decoded straight from the emulator.\n\n[Open the Dashboard](command:cooper.home)",
+            "media": { "image": "media/cooper-vram.png", "altText": "A decoded VRAM tile sheet" },
+            "completionEvents": ["onCommand:cooper.home", "onCommand:cooper.showVram"]
+          }
+        ]
+      }
+    ],
     "taskDefinitions": [
       {
         "type": "cooper-make",

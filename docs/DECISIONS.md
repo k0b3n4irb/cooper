@@ -620,6 +620,26 @@ rationale and the docs that grounded it. Newest last.
 
 ---
 
+## 2026-06-29 — Documentation layer
+
+### D-033 — In-editor onboarding via `contributes.walkthroughs`
+- **Decision:** ship a **Get Started walkthrough** (VS Code's Welcome page) as the
+  in-editor, graphical complement to `docs/USER_GUIDE.md` — 6 steps (tools →
+  sidebar → build → run → debug → PPU) with screenshots, one-click `command:`
+  buttons, and `completionEvents` so steps check off as the user acts
+  (`onSettingChanged:`/`onView:`/`onCommand:`). Opened auto on install, from the
+  panel header (🎓), or `Cooper: Get Started` (`workbench.action.openWalkthrough`
+  with `opensnes.cooper#cooper.gettingStarted`).
+- **Pure manifest, no runtime** except the one open-command. **Media lives under
+  `media/`** (NOT `docs/`, which `.vscodeignore` excludes) so it's packaged — a
+  Node test asserts every step image exists + lives under `media/` (guards the
+  blank-box gotcha), and an integration test opens the walkthrough in a real host.
+- **Source:** doc-researcher 2026-06 (`contributes.walkthroughs` schema, media
+  `oneOf`, completionEvents, command-link buttons, packaging gotchas).
+- Part of the **"document it" discipline step** (workflow.md step 6).
+
+---
+
 ### Known limitations (Component #1)
 - Standalone accumulator register `A` (e.g. `asl a`) is not scoped, to avoid
   false-positives on identifiers named `a`. Indexed `,x`/`,y`/`,s`/`,b` are.

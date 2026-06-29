@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] — 2026-06-29
+
+### Added — In-editor "Get Started" walkthrough
+
+- A graphical onboarding (VS Code's Welcome / Get Started) that walks you through
+  **point at your tools → open the panel → build → run → debug → inspect the PPU**,
+  with screenshots and one-click buttons; steps check off as you do them. Open it
+  any time from the Cooper panel header (🎓) or **Cooper: Get Started**.
+- Pure manifest (`contributes.walkthroughs`) + media bundled under `media/`. D-033.
+
 ## [0.12.3] — 2026-06-29
 
 ### Fixed — Symbol breakpoints no longer pile up

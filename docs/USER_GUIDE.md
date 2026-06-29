@@ -37,6 +37,10 @@ elsewhere as *user releases*. Point Cooper at them once:
 
 ---
 
+> **In a hurry?** After installing, run **Cooper: Get Started** (or click the 🎓 in
+> the Cooper panel header) for an interactive, in-editor walkthrough that does
+> everything below, step by step.
+
 ## 2. Install Cooper
 
 Install the `.vsix` (`code --install-extension cooper-x.y.z.vsix`) or from the

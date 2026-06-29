@@ -27,6 +27,8 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.showVram', () => showVram()),
         vscode.commands.registerCommand('cooper.refresh', () => tree.refresh()),
         vscode.commands.registerCommand('cooper.home', () => showHome(context)),
+        vscode.commands.registerCommand('cooper.openWalkthrough', () =>
+            vscode.commands.executeCommand('workbench.action.openWalkthrough', 'opensnes.cooper#cooper.gettingStarted', false)),
         vscode.commands.registerCommand('cooper.debug', () => startLunaDebug(tree.current())),
         vscode.commands.registerCommand('cooper.breakOnSymbol', (name: string) => breakOnSymbol(name)),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
