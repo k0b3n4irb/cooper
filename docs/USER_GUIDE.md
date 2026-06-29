@@ -4,7 +4,7 @@ Cooper is a VS Code extension that turns VS Code into an **IDE for making SNES
 games** with the OpenSNES SDK and the luna emulator: C support, one-click build &
 run, and a real **debugger** (breakpoints, registers, memory, live PPU viewers).
 
-> Status: this guide tracks the shipped extension (v0.12.x). Sections marked
+> Status: this guide tracks the shipped extension (v0.15.x). Sections marked
 > **(coming)** are not implemented yet.
 
 ---
@@ -129,6 +129,10 @@ source line**: set breakpoints **in the `main.c` gutter**, and when you stop, yo
 debug-info build flags automatically. If the compiler isn't patched, the debugger
 gracefully falls back to the symbol/register level (the frame shows a symbol, no
 highlighted line).
+
+**Step Over / Into / Out** move by **C source line** (not one CPU instruction):
+*Step Over* (F10) runs past calls; *Step Into* (F11) enters them; *Step Out*
+(Shift+F11) runs until the current function returns.
 
 ---
 

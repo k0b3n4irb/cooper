@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import { LunaMcp, CpuState } from './lunaMcp';
 import {
     parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved, resolveExpr, parseAddress,
-    buildCLineMap, CLineMap, cSourceForAddr, resolveLine,
+    buildCLineMap, CLineMap, CSource, cSourceForAddr, resolveLine,
 } from './sym';
 
 const THREAD_ID = 1;
@@ -77,6 +77,40 @@ export function formatRegisters(cpu: CpuState): DebugProtocol.Variable[] {
         v('P', `${hex(cpu.p, 2)} (${decodeP(cpu.p)})`),
         v('E', String(cpu.e)),
     ];
+}
+
+export type StepMode = 'in' | 'over' | 'out';
+export interface StepPoint { line: number; file: string; sp: number; }
+
+/** 65816 call instruction → its byte length (for step-over to skip the call body
+ *  via run_until_pc), else 0. JSR abs ($20) / JSR (abs,X) ($FC) = 3, JSL ($22) = 4. */
+export function callLen(opcode: number): number {
+    if (opcode === 0x20 || opcode === 0xFC) {
+        return 3;
+    }
+    if (opcode === 0x22) {
+        return 4;
+    }
+    return 0;
+}
+
+/** Pure decision for source-level stepping. The 65816 stack grows DOWN (a push
+ *  decrements SP), so a deeper call has a SMALLER SP; returning raises it.
+ *  - `in`:   stop at the first changed C line (entering calls is fine);
+ *  - `over`: stop at a changed line once back at the start frame or shallower;
+ *  - `out`:  stop once we've returned to a shallower frame. */
+export function stepStops(mode: StepMode, start: StepPoint, cur: { src?: CSource; sp: number }): boolean {
+    if (!cur.src) {
+        return false;
+    }
+    const lineChanged = cur.src.file !== start.file || cur.src.line !== start.line;
+    if (mode === 'out') {
+        return cur.sp > start.sp;
+    }
+    if (mode === 'over') {
+        return lineChanged && cur.sp >= start.sp;
+    }
+    return lineChanged;
 }
 
 export class LunaDebugSession extends LoggingDebugSession {
@@ -385,23 +419,65 @@ export class LunaDebugSession extends LoggingDebugSession {
     }
 
     protected async nextRequest(response: DebugProtocol.NextResponse): Promise<void> {
-        await this.stepOne(response);
+        await this.stepLine(response, 'over');
     }
     protected async stepInRequest(response: DebugProtocol.StepInResponse): Promise<void> {
-        await this.stepOne(response);
+        await this.stepLine(response, 'in');
     }
     protected async stepOutRequest(response: DebugProtocol.StepOutResponse): Promise<void> {
-        await this.stepOne(response);
+        await this.stepLine(response, 'out');
     }
-    /** MVP: every step variant = one instruction (no call/return semantics yet). */
-    private async stepOne(response: DebugProtocol.Response): Promise<void> {
+
+    /**
+     * Source-level stepping: advance until the C source LINE changes (not a single
+     * instruction). `over` skips subroutine calls wholesale via `run_until_pc`;
+     * `out` runs until the current frame returns; `in` stops at the first new line.
+     * Falls back to a single instruction when there is no C-line info at the PC.
+     */
+    private async stepLine(response: DebugProtocol.Response, mode: StepMode): Promise<void> {
         this.sendResponse(response);
         try {
-            await this.mcp.step(1);
+            const s = await this.mcp.cpu();
+            const startPc = ((s.pb << 16) | s.pc) >>> 0;
+            const startSrc = this.cmap ? cSourceForAddr(this.cmap, startPc) : undefined;
+            if (!startSrc) {
+                await this.mcp.step(1); // no C context → instruction-level step
+                this.sendEvent(new StoppedEvent('step', THREAD_ID));
+                return;
+            }
+            const start: StepPoint = { line: startSrc.line, file: startSrc.file, sp: s.sp & 0xFFFF };
+            const bps = new Set(this.pcBreakpoints());
+            let reason = 'step';
+            for (let budget = 200000; budget > 0; budget--) {
+                if (mode === 'over') {
+                    const c0 = await this.mcp.cpu();
+                    const [op] = await this.mcp.peekMemory(c0.pb, c0.pc, 1);
+                    const len = callLen(op ?? 0);
+                    if (len > 0) {
+                        const ret = ((c0.pb << 16) | ((c0.pc + len) & 0xFFFF)) >>> 0;
+                        await this.mcp.runUntilPc(ret, this.maxSteps); // skip the call body
+                    } else {
+                        await this.mcp.step(1);
+                    }
+                } else {
+                    await this.mcp.step(1);
+                }
+                const cpu = await this.mcp.cpu();
+                const pc = ((cpu.pb << 16) | cpu.pc) >>> 0;
+                if (bps.has(pc)) {
+                    reason = 'breakpoint';
+                    break;
+                }
+                const cur = { src: this.cmap ? cSourceForAddr(this.cmap, pc) : undefined, sp: cpu.sp & 0xFFFF };
+                if (stepStops(mode, start, cur)) {
+                    break;
+                }
+            }
+            this.sendEvent(new StoppedEvent(reason, THREAD_ID));
         } catch (e) {
             this.sendEvent(new OutputEvent(`step failed: ${(e as Error).message}\n`, 'stderr'));
+            this.sendEvent(new StoppedEvent('step', THREAD_ID));
         }
-        this.sendEvent(new StoppedEvent('step', THREAD_ID));
     }
 
     /** Evaluate a symbol or address (Watch/hover/REPL): show its first byte and

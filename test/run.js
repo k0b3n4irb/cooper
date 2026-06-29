@@ -444,6 +444,19 @@ try { fs.unlinkSync(tmpT); } catch {}
     check('formatRegisters PC carries memoryReference', regs.find((r) => r.name === 'PC').memoryReference === '0x008365');
     check('formatRegisters P has no memoryReference', regs.find((r) => r.name === 'P').memoryReference === undefined);
 
+    // Source-level stepping decisions (pure): call lengths + the stop predicate.
+    check('callLen JSR ($20) = 3', D.callLen(0x20) === 3);
+    check('callLen JSL ($22) = 4', D.callLen(0x22) === 4);
+    check('callLen NOP ($EA) = 0 (not a call)', D.callLen(0xEA) === 0);
+    const sp0 = { line: 10, file: 'main.c', sp: 0x1FF };
+    check('step in stops on first line change', D.stepStops('in', sp0, { src: { file: 'main.c', line: 11 }, sp: 0x1FF }) === true);
+    check('step in does not stop on same line', D.stepStops('in', sp0, { src: { file: 'main.c', line: 10 }, sp: 0x1FF }) === false);
+    check('step over keeps going inside a call (deeper SP)', D.stepStops('over', sp0, { src: { file: 'main.c', line: 11 }, sp: 0x1F0 }) === false);
+    check('step over stops at same depth, new line', D.stepStops('over', sp0, { src: { file: 'main.c', line: 11 }, sp: 0x1FF }) === true);
+    check('step out stops only when frame returns (SP rises)', D.stepStops('out', sp0, { src: { file: 'main.c', line: 9 }, sp: 0x201 }) === true);
+    check('step out does not stop within the frame', D.stepStops('out', sp0, { src: { file: 'main.c', line: 9 }, sp: 0x1FF }) === false);
+    check('no C source -> never stops', D.stepStops('in', sp0, { src: undefined, sp: 0x1FF }) === false);
+
     const lunaBin2 = B.resolveLunaPath({ sdkPath: OPENSNES });
     if (!lunaBin2 || !fs.existsSync(lunaBin2)) {
         console.log('  SKIP  luna binary not available');
@@ -558,6 +571,14 @@ try { fs.unlinkSync(tmpT); } catch {}
             const fr = st3.body.stackFrames[0];
             check('stopped frame has a main.c source', !!fr.source && /main\.c$/.test(fr.source.path));
             check('stopped frame carries a C line', typeof fr.line === 'number' && fr.line > 0);
+
+            // C-LINE STEPPING: Step Over advances a whole C line, not one instruction.
+            await dapCall('next', { threadId: 1 });
+            await waitEvent(stopped('step'));
+            const st4 = await dapCall('stackTrace', { threadId: 1 });
+            const fr2 = st4.body.stackFrames[0];
+            check('C-line step lands on main.c', !!fr2.source && /main\.c$/.test(fr2.source.path));
+            check('C-line step advanced to a different C line', typeof fr2.line === 'number' && fr2.line !== fr.line);
 
             await dapCall('disconnect', {});
             check('disconnect ok', true);

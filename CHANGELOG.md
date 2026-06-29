@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] — 2026-06-29
+
+### Added — C-line stepping
+
+- **Step Over / Into / Out now advance a whole C source line**, not one CPU
+  instruction. *Step Over* skips subroutine calls wholesale (via `run_until_pc`);
+  *Step Out* runs until the current function returns; *Into* stops at the first new
+  line. Falls back to instruction-level when there's no C-line info at the PC.
+  Pure decision logic (`callLen`, `stepStops`) is unit-tested; verified end-to-end
+  (a Step Over advances to a different `main.c` line). D-036.
+
 ## [0.14.0] — 2026-06-29
 
 ### Added — Source-level C debugging (the jewel) 🎯

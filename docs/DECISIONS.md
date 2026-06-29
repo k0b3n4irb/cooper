@@ -686,6 +686,19 @@ rationale and the docs that grounded it. Newest last.
 - **Caveat:** needs a compiler built from the patched cproc/QBE; without it the
   debugger gracefully falls back to symbol/asm level (no C-line frames).
 
+### D-036 — C-line stepping (source-level Step Over/Into/Out)
+- **Decision:** make the step requests advance by C source line, reusing the
+  `CLineMap` (no compiler work). `stepLine(mode)` single-steps until `stepStops`
+  fires: `in` = first changed C line; `over` = changed line once SP ≥ start (so
+  call bodies are skipped — entered calls are fast-forwarded with
+  `run_until_pc(pc+callLen)`); `out` = SP > start (frame returned). SP grows DOWN
+  on the 65816, so deeper = smaller SP. Stops early on a user breakpoint PC; falls
+  back to one instruction when the PC has no C-line.
+- **Pure/tested:** `callLen` (JSR=3/JSL=4) and `stepStops` are unit-tested; the
+  real-binary DAP test confirms a Step Over moves to a different `main.c` line.
+- **Limitation:** the step-over fast-skip only recognises JSR/JSL opcodes; other
+  call-like flows single-step (bounded by a 200k budget).
+
 ---
 
 ### Known limitations (Component #1)

@@ -5,6 +5,11 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**C-line stepping** (v0.15.0). Step Over/Into/Out advance a C source line, not a
+CPU instruction (over skips calls via run_until_pc; out runs to frame return).
+Pure `callLen`/`stepStops` tested; real-binary DAP test confirms a Step Over moves
+to a different main.c line. 157 Node + 8 integration. D-036.
+
 **Source-level C debug (P7) — the jewel** (v0.14.0). Your `main.c` line highlights
 at a stop; gutter breakpoints on C lines. Path: patched cproc/QBE emit `; @cline N`
 → `.sym` addr-to-line (Cooper auto-passes `wla -i`/`wlalink -A`) → `buildCLineMap`
