@@ -52,6 +52,20 @@ suite('Cooper — activation & commands', () => {
         await vscode.commands.executeCommand('cooper.home');
     });
 
+    test('symbol breakpoint toggles, never duplicates', async () => {
+        await vscode.extensions.getExtension(EXT_ID)!.activate();
+        vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
+        const count = () => vscode.debug.breakpoints.filter(
+            (b) => b instanceof vscode.FunctionBreakpoint && b.functionName === 'enemies_update').length;
+        await vscode.commands.executeCommand('cooper.breakOnSymbol', 'enemies_update');
+        assert.strictEqual(count(), 1, 'first click should set the breakpoint');
+        await vscode.commands.executeCommand('cooper.breakOnSymbol', 'enemies_update');
+        assert.strictEqual(count(), 0, 'second click should toggle it off (never duplicate)');
+        await vscode.commands.executeCommand('cooper.breakOnSymbol', 'enemies_update');
+        assert.strictEqual(count(), 1, 'third click sets it again');
+        vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
+    });
+
     test('contributes the Cooper sidebar view', () => {
         const pkg = vscode.extensions.getExtension(EXT_ID)!.packageJSON;
         const containers = pkg.contributes.viewsContainers.activitybar as { id: string }[];
@@ -133,6 +147,18 @@ suite('Cooper — luna debug adapter (real host)', () => {
                 messages.some((m) => m.type === 'event' && m.event === 'initialized'),
                 'no initialized event seen',
             );
+
+            // Drive the exact chain VS Code runs to fill the VARIABLES view:
+            // threads -> stackTrace -> scopes -> variables. Asserts registers come back.
+            const session = vscode.debug.activeDebugSession!;
+            const threads = await session.customRequest('threads') as { threads: { id: number }[] };
+            assert.ok(threads.threads.length >= 1, 'no threads');
+            const st = await session.customRequest('stackTrace', { threadId: threads.threads[0].id }) as { stackFrames: { id: number }[] };
+            assert.ok(st.stackFrames.length >= 1, 'no stack frame');
+            const scopes = await session.customRequest('scopes', { frameId: st.stackFrames[0].id }) as { scopes: { variablesReference: number }[] };
+            assert.ok(scopes.scopes.length >= 1, 'no scopes');
+            const vars = await session.customRequest('variables', { variablesReference: scopes.scopes[0].variablesReference }) as { variables: { name: string }[] };
+            assert.ok(vars.variables.some((v) => v.name === 'PC'), 'Registers/VARIABLES has no PC');
 
             // Palette viewer (P2.2c): the custom request feeds the live CGRAM, and
             // the command renders a webview — both through the real host.

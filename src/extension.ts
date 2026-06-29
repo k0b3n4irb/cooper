@@ -169,10 +169,19 @@ function startLunaDebug(info: ProjectInfo): void {
     });
 }
 
-/** Set a function breakpoint on a symbol (clicking a symbol in the tree). */
+/** Toggle a function breakpoint on a symbol (clicking a symbol in the tree).
+ *  Clicking again removes it — and it never adds duplicates. */
 function breakOnSymbol(name: string): void {
-    vscode.debug.addBreakpoints([new vscode.FunctionBreakpoint(name)]);
-    void vscode.window.showInformationMessage(`Cooper: breakpoint set on ${name}() — start debugging to hit it.`);
+    const existing = vscode.debug.breakpoints.find(
+        (b): b is vscode.FunctionBreakpoint => b instanceof vscode.FunctionBreakpoint && b.functionName === name,
+    );
+    if (existing) {
+        vscode.debug.removeBreakpoints([existing]);
+        void vscode.window.showInformationMessage(`Cooper: removed breakpoint on ${name}()`);
+    } else {
+        vscode.debug.addBreakpoints([new vscode.FunctionBreakpoint(name)]);
+        void vscode.window.showInformationMessage(`Cooper: breakpoint set on ${name}() — Continue (F5) to hit it.`);
+    }
 }
 
 // ---------------------------------------------------------------------------

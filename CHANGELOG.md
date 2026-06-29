@@ -4,6 +4,15 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.12.3] — 2026-06-29
+
+### Fixed — Symbol breakpoints no longer pile up
+
+- Clicking a function under **SYMBOLS** now **toggles** its breakpoint (click again
+  to remove) instead of adding a duplicate every time. Verified in the Extension
+  Host. Also added a regression test that the debugger's VARIABLES → Registers
+  chain (threads → stackTrace → scopes → variables) returns the CPU registers.
+
 ## [0.12.2] — 2026-06-28
 
 ### Changed — `program` is now optional in the luna launch config
