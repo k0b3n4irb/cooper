@@ -8,6 +8,9 @@ OpenSNES vertical — SDK, compiler (`cc65816`: cproc→QBE→wla), and the luna
 cycle-accurate emulator — into one workflow: edit, build, run, debug, and
 author assets, without seams.
 
+**New to Cooper? → [User Guide](docs/USER_GUIDE.md)** (install, configure, build /
+run / debug, troubleshooting, with screenshots).
+
 The design is captured in [`docs/`](docs/):
 
 - [`docs/01-architecture.md`](docs/01-architecture.md) — the full architecture

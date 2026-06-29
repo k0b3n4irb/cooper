@@ -1,9 +1,9 @@
-# Workflow — research → ground → decide → implement → verify
+# Workflow — research → ground → decide → implement → verify → document
 
 The discipline that produced every Cooper component. Apply it to each new slice.
 The `/new-component` skill is the invokable checklist; this is the rationale.
 
-## The five steps (in order)
+## The six steps (in order)
 
 1. **Research current docs — never trust memory.**
    Before choosing any technology or API, fetch the *current* official docs
@@ -31,6 +31,15 @@ The `/new-component` skill is the invokable checklist; this is the rationale.
 5. **Verify before commit — not optional.**
    Build (`tsc --noEmit` + esbuild), run a *real* test (against the OpenSNES
    corpus or a real example, not a toy), and `vsce package`. Then commit.
+
+6. **Document it — for the user, and for yourself.**
+   A feature that ships undocumented doesn't really exist. Update the user-facing
+   guide (`docs/USER_GUIDE.md`) — what it does, how to use it, the gotchas — and
+   add the step to the in-editor walkthrough (`contributes.walkthroughs`) when it's
+   user-visible. Prefer **didactic**: a screenshot or a short tutorial beats a
+   paragraph. This doubles as the honest status of the project: if you can't write
+   a clear "here's how you use it", the slice isn't done. (User asked for this,
+   2026-06-29: pair development with documentation.)
 
 ## Why verification is mandatory
 

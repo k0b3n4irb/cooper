@@ -59,6 +59,9 @@ For **every** component, in order — see `.claude/rules/workflow.md` and the
 5. **Verify before commit** — build (`tsc` + esbuild), run a real/corpus test,
    `vsce package`. Verification has caught a real bug in every component so far;
    it is not optional.
+6. **Document it** — update `docs/USER_GUIDE.md` (didactic: screenshots/tutorials)
+   and the in-editor walkthrough when user-visible. A feature that ships
+   undocumented doesn't exist; the guide is also the project's honest status.
 
 ## Stack & conventions
 
