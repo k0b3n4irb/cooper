@@ -699,6 +699,34 @@ rationale and the docs that grounded it. Newest last.
 - **Limitation:** the step-over fast-skip only recognises JSR/JSL opcodes; other
   call-like flows single-step (bounded by a 200k budget).
 
+## 2026-06-30 — Typed local variables (G4)
+
+### D-037 — `-g` no-promote + named alloc temps → typed Locals
+- **Decision (full G4, per the de-risk):** make the C locals viewable+typed by
+  keeping them memory-resident and threading their name/type through to the asm.
+- **Compiler (OpenSNES repo — author to commit):**
+  - `qbe/main.c`: a `-g` flag gates `promote(fn)` (allocas would otherwise become
+    SSA temps with no stable address). Verified: no-promote still builds a correct,
+    running ROM (only larger/slower).
+  - `cproc/qbe.c` (`dbgTempName` in `funcalloc`): encode each named local's
+    `<class><bytes>_<cname>` into its alloc temp's `u.name` (e.g. `u2_pad`,
+    `g8_cfg`); QBE preserves the name. class = u/s/p/a/g/f/v.
+  - `qbe/w65816/emit.c`: for each named alloc temp emit `; @dbglocal <name>
+    <(allocslot+1)*2>` (the frame-base byte offset).
+  - `bin/cc65816`: pass `-g` to qbe when `CC65816_G` is set.
+- **Cooper (`src/sym.ts`, `src/lunaDebug.ts`):** `parseLocals` (per-function
+  typed locals from `@dbglocal`), `parseFunctions`/`buildFuncRanges`/
+  `enclosingFunction` (PC → enclosing C function — the nearest-preceding *function
+  entry*, since `.sym` interleaves string/block labels so the nearest *label* is
+  unreliable). A "Locals" scope reads `frameBase + offset` (SP at a stop, bank 0)
+  and `formatLocal` renders it typed. `buildMakeArgs`/the build task set
+  `CC65816_G=1`.
+- **Verified end-to-end:** stop in `on_update`, step over the prologue → `pad`
+  reads as `u16` with a value; all locals typed. 171 Node + 8 integration.
+- **Limitations:** frame base assumed == SP at a stop (true at statement
+  boundaries); aggregates/pointers shown as raw bytes/hex (no member expansion
+  yet); debug (`-g`) builds are unoptimised, so timing differs from release.
+
 ---
 
 ### Known limitations (Component #1)

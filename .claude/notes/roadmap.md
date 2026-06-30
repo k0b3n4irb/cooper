@@ -97,8 +97,11 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
   - ✅ Build with `wla -i` + `wlalink -A` (Cooper passes them auto) → `.sym`
     addr-to-line; Cooper **joins** asm-line × `@cline` → `PC ↔ main.c:line`.
   - ✅ DAP: frame `source`+`line` (C line highlights), gutter breakpoints → PC.
-- 🔜 **Remaining (G4):** `[frames]`/`[types]` → typed **local variables** (today
-  the Registers scope only). Needs cproc to emit frame layouts + types.
+  - ✅ **C-line stepping** (0.15) — Step Over/Into/Out move by C source line.
+  - ✅ **Typed locals (G4)** (0.16) — QBE `-g` no-promote + cproc name/type
+    encoding + `; @dbglocal` → a Locals scope reading frame memory, typed.
+- 🔜 **Remaining:** aggregate/pointer member expansion (structs → fields); a
+  release/optimised build toggle (today Cooper builds with `-g`).
 - Compiler changes live in the OpenSNES repo (cproc/QBE) — author to commit there.
 
 ### ⏳ P8 — Multi-chip debug (C4, advanced)

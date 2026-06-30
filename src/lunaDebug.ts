@@ -21,10 +21,12 @@ import { LunaMcp, CpuState } from './lunaMcp';
 import {
     parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved, resolveExpr, parseAddress,
     buildCLineMap, CLineMap, CSource, cSourceForAddr, resolveLine,
+    parseLocals, LocalVar, parseFunctions, buildFuncRanges, enclosingFunction, FuncRange,
 } from './sym';
 
 const THREAD_ID = 1;
 const REGISTERS_REF = 1000;
+const LOCALS_REF = 1001;
 
 interface LunaLaunchArgs extends DebugProtocol.LaunchRequestArguments {
     /** Path to the .sfc ROM to debug. */
@@ -79,6 +81,40 @@ export function formatRegisters(cpu: CpuState): DebugProtocol.Variable[] {
     ];
 }
 
+function localTypeName(loc: LocalVar): string {
+    switch (loc.cls) {
+        case 'u': return `u${loc.size * 8}`;
+        case 's': return `s${loc.size * 8}`;
+        case 'p': return 'pointer';
+        case 'a': return `array[${loc.size}]`;
+        case 'g': return `struct(${loc.size}B)`;
+        case 'f': return `float${loc.size * 8}`;
+        default: return `bytes(${loc.size})`;
+    }
+}
+
+/** Pure: format a C local's raw little-endian bytes as a typed DAP variable. */
+export function formatLocal(loc: LocalVar, bytes: number[]): DebugProtocol.Variable {
+    const n = bytes.length;
+    let raw = 0;
+    for (let i = n - 1; i >= 0; i--) {
+        raw = raw * 256 + (bytes[i] & 0xFF);
+    }
+    const hexVal = '0x' + raw.toString(16).toUpperCase().padStart(n * 2, '0');
+    let value: string;
+    if (loc.cls === 'p') {
+        value = hexVal;
+    } else if (loc.cls === 's') {
+        const sv = (n > 0 && (bytes[n - 1] & 0x80)) ? raw - Math.pow(2, 8 * n) : raw;
+        value = `${sv} (${hexVal})`;
+    } else if (loc.cls === 'u') {
+        value = `${raw} (${hexVal})`;
+    } else {
+        value = `${hexVal} <${loc.size}B>`;
+    }
+    return { name: loc.name, value, type: localTypeName(loc), variablesReference: 0 };
+}
+
 export type StepMode = 'in' | 'over' | 'out';
 export interface StepPoint { line: number; file: string; sp: number; }
 
@@ -117,6 +153,8 @@ export class LunaDebugSession extends LoggingDebugSession {
     private mcp = new LunaMcp();
     private sym: SymTable | null = null;
     private cmap: CLineMap | null = null;     // PC ↔ C source (source-level debug)
+    private locals = new Map<string, LocalVar[]>(); // function name → its C locals (-g builds)
+    private funcRanges: FuncRange[] = [];     // sorted function entries (PC → enclosing fn)
     private projectDir = '';
     private breakpoints: number[] = [];       // function-breakpoint PC addresses
     private sourceBreakpoints: number[] = []; // source-line-breakpoint PC addresses
@@ -183,8 +221,12 @@ export class LunaDebugSession extends LoggingDebugSession {
                     } catch { /* skip unreadable */ }
                 }
                 this.cmap = buildCLineMap(this.sym, asmTexts);
+                const asmJoined = [...asmTexts.values()].join('\n');
+                this.locals = parseLocals(asmJoined);
+                this.funcRanges = buildFuncRanges(this.sym, parseFunctions(asmJoined));
                 if (this.cmap.addrToSource.size > 0) {
-                    this.sendEvent(new OutputEvent(`Source-level debug: ${this.cmap.addrToSource.size} C-line mappings.\n`, 'console'));
+                    const nLoc = [...this.locals.values()].reduce((s, a) => s + a.length, 0);
+                    this.sendEvent(new OutputEvent(`Source-level debug: ${this.cmap.addrToSource.size} C-line mappings, ${nLoc} locals.\n`, 'console'));
                 }
             }
         } else {
@@ -333,7 +375,7 @@ export class LunaDebugSession extends LoggingDebugSession {
     }
 
     protected scopesRequest(response: DebugProtocol.ScopesResponse): void {
-        response.body = { scopes: [new Scope('Registers', REGISTERS_REF, false)] };
+        response.body = { scopes: [new Scope('Locals', LOCALS_REF, false), new Scope('Registers', REGISTERS_REF, false)] };
         this.sendResponse(response);
     }
 
@@ -344,10 +386,38 @@ export class LunaDebugSession extends LoggingDebugSession {
         if (args.variablesReference === REGISTERS_REF) {
             const cpu = await this.mcp.cpu();
             response.body = { variables: formatRegisters(cpu) };
+        } else if (args.variablesReference === LOCALS_REF) {
+            response.body = { variables: await this.readLocals() };
         } else {
             response.body = { variables: [] };
         }
         this.sendResponse(response);
+    }
+
+    /** Read the current function's C locals from the stack frame. The frame base
+     *  is the stack pointer at a stop (statement boundary); each local sits at
+     *  `S + offset` in bank 0. Source-level (`-g`) builds only. */
+    private async readLocals(): Promise<DebugProtocol.Variable[]> {
+        if (!this.sym) {
+            return [];
+        }
+        const cpu = await this.mcp.cpu();
+        const pc = ((cpu.pb << 16) | cpu.pc) >>> 0;
+        const fn = enclosingFunction(this.funcRanges, pc);
+        const locs = fn ? this.locals.get(fn) : undefined;
+        if (!locs || locs.length === 0) {
+            return [];
+        }
+        const base = cpu.sp & 0xFFFF;
+        const out: DebugProtocol.Variable[] = [];
+        for (const loc of locs) {
+            const off = (base + loc.offset) & 0xFFFF;
+            try {
+                const bytes = await this.mcp.peekMemory(0, off, loc.size);
+                out.push(formatLocal(loc, bytes));
+            } catch { /* skip unreadable */ }
+        }
+        return out;
     }
 
     protected async continueRequest(

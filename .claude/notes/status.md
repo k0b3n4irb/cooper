@@ -5,6 +5,15 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Typed local variables (G4)** (v0.16.0). VARIABLES → Locals shows the current
+function's C vars (pad/dx/cfg…) read from the stack frame, typed (u16/s16/pointer/
+struct). Path: QBE `-g` (no-promote, keeps locals in memory) + cproc encodes
+name+type into the alloc temp + backend emits `; @dbglocal name offset` + Cooper
+parseLocals/enclosingFunction → reads frameBase+offset → formatLocal. Builds pass
+CC65816_G=1. Verified end-to-end (pad=u16 in on_update). 171 Node + 8 integration.
+Compiler changes in the OpenSNES repo. D-037. Limitations: frame base = SP at stop;
+aggregates as raw bytes; -g builds unoptimised.
+
 **C-line stepping** (v0.15.0). Step Over/Into/Out advance a C source line, not a
 CPU instruction (over skips calls via run_until_pc; out runs to frame return).
 Pure `callLen`/`stepStops` tested; real-binary DAP test confirms a Step Over moves

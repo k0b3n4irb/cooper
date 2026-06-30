@@ -164,9 +164,10 @@ suite('Cooper — luna debug adapter (real host)', () => {
             assert.ok(threads.threads.length >= 1, 'no threads');
             const st = await session.customRequest('stackTrace', { threadId: threads.threads[0].id }) as { stackFrames: { id: number }[] };
             assert.ok(st.stackFrames.length >= 1, 'no stack frame');
-            const scopes = await session.customRequest('scopes', { frameId: st.stackFrames[0].id }) as { scopes: { variablesReference: number }[] };
+            const scopes = await session.customRequest('scopes', { frameId: st.stackFrames[0].id }) as { scopes: { name: string; variablesReference: number }[] };
             assert.ok(scopes.scopes.length >= 1, 'no scopes');
-            const vars = await session.customRequest('variables', { variablesReference: scopes.scopes[0].variablesReference }) as { variables: { name: string }[] };
+            const regScope = scopes.scopes.find((s) => s.name === 'Registers') ?? scopes.scopes[0];
+            const vars = await session.customRequest('variables', { variablesReference: regScope.variablesReference }) as { variables: { name: string }[] };
             assert.ok(vars.variables.some((v) => v.name === 'PC'), 'Registers/VARIABLES has no PC');
 
             // Palette viewer (P2.2c): the custom request feeds the live CGRAM, and

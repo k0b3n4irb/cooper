@@ -209,7 +209,12 @@ function makeTask(
         scope,
         name,
         'cooper',
-        new vscode.ShellExecution('make', buildMakeArgs(sdkPath, target), cwd ? { cwd } : undefined),
+        // CC65816_G=1 keeps C locals memory-resident so the debugger can show
+        // typed locals (G4); pairs with the -i/-A debug-info flags in buildMakeArgs.
+        new vscode.ShellExecution('make', buildMakeArgs(sdkPath, target), {
+            ...(cwd ? { cwd } : {}),
+            env: { CC65816_G: '1' },
+        }),
         '$cooper-cc',
     );
     if (name === 'build') {

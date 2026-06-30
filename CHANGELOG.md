@@ -4,6 +4,20 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.16.0] — 2026-06-30
+
+### Added — Typed local variables (G4)
+
+- **The Variables pane now shows a "Locals" scope** with the current function's C
+  variables — `pad`, `dx`, `cfg`… — read live from the stack frame and **typed**
+  (`u16`, `s16`, pointer, `struct`). Not just registers anymore.
+- How: a new `-g` mode in QBE keeps C locals memory-resident (suppresses
+  `promote()`); cproc encodes each local's name+type into its alloc temp; the
+  w65816 backend emits `; @dbglocal <name> <offset>`; Cooper joins them and reads
+  `frameBase + offset` at a stop. Cooper builds pass `CC65816_G=1` automatically.
+- Requires the patched cproc/QBE (OpenSNES repo). Frame base = SP at a stop
+  (statement boundary); aggregates show raw bytes for now. D-037.
+
 ## [0.15.0] — 2026-06-29
 
 ### Added — C-line stepping

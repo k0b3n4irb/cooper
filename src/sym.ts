@@ -386,3 +386,85 @@ export function cSourceForAddr(map: CLineMap, addr: number): CSource | undefined
     }
     return best < 0 ? undefined : map.addrToSource.get(a[best]);
 }
+
+// --- typed locals (the `; @dbglocal` join, G4) ---------------------------------
+
+export interface LocalVar {
+    /** C identifier. */
+    name: string;
+    /** class: u/s = unsigned/signed int, p = pointer, a = array, g = struct/union, f = float, v = other. */
+    cls: string;
+    /** size in bytes (exact C type size). */
+    size: number;
+    /** byte offset from the stack frame base (address = frameBase + offset, bank 0). */
+    offset: number;
+}
+
+/**
+ * Parse `; @dbglocal <class><bytes>_<name>.<id> <offset>` markers (emitted by the
+ * patched cproc/QBE under `-g`), scoped by the `; Function: NAME` banners, into a
+ * per-function list of typed locals. Present only in source-level (`-g`) builds.
+ */
+export function parseLocals(asmText: string): Map<string, LocalVar[]> {
+    const out = new Map<string, LocalVar[]>();
+    let fn = '';
+    for (const raw of asmText.split(/\r?\n/)) {
+        const f = raw.match(/^;\s*Function:\s*(\S+)/);
+        if (f) {
+            fn = f[1];
+            continue;
+        }
+        const m = raw.match(/^;\s*@dbglocal\s+([uspagfv])(\d+)_(.+)\.\d+\s+(\d+)\s*$/);
+        if (m && fn) {
+            const arr = out.get(fn) ?? out.set(fn, []).get(fn)!;
+            arr.push({ name: m[3], cls: m[1], size: parseInt(m[2], 10), offset: parseInt(m[4], 10) });
+        }
+    }
+    return out;
+}
+
+export interface FuncRange { addr: number; name: string; }
+
+/** All function names from the `; Function: NAME` banners, in order. */
+export function parseFunctions(asmText: string): string[] {
+    const out: string[] = [];
+    for (const raw of asmText.split(/\r?\n/)) {
+        const f = raw.match(/^;\s*Function:\s*(\S+)/);
+        if (f) {
+            out.push(f[1]);
+        }
+    }
+    return out;
+}
+
+/**
+ * Sorted entry addresses of the real C functions. Needed because the `.sym` has
+ * many non-function labels (string constants, QBE block labels) interleaved, so
+ * the nearest-preceding label is NOT reliably the enclosing function — but the
+ * nearest-preceding *function entry* is.
+ */
+export function buildFuncRanges(sym: SymTable, names: string[]): FuncRange[] {
+    const r: FuncRange[] = [];
+    for (const n of names) {
+        const a = sym.byName.get(n);
+        if (a !== undefined) {
+            r.push({ addr: a, name: n });
+        }
+    }
+    return r.sort((x, y) => x.addr - y.addr);
+}
+
+/** The C function enclosing a PC (nearest-preceding function entry). */
+export function enclosingFunction(ranges: FuncRange[], pc: number): string | undefined {
+    let lo = 0, hi = ranges.length - 1, best = -1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (ranges[mid].addr <= pc) {
+            best = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    return best < 0 ? undefined : ranges[best].name;
+}

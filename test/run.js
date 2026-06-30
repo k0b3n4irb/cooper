@@ -216,7 +216,8 @@ const symPath = path.join(aimDir, 'aim_target.sym');
 const asI = `${path.join(OPENSNES, 'bin', 'wla-65816')} -i`;
 const ldA = `${path.join(OPENSNES, 'bin', 'wlalink')} -A`;
 cp.spawnSync('make', [`OPENSNES=${OPENSNES}`, 'clean'], { cwd: aimDir });
-cp.spawnSync('make', [`OPENSNES=${OPENSNES}`, `AS=${asI}`, `LD=${ldA}`], { cwd: aimDir });
+// CC65816_G=1 keeps C locals memory-resident (and emits `; @dbglocal`) for G4.
+cp.spawnSync('make', [`OPENSNES=${OPENSNES}`, `AS=${asI}`, `LD=${ldA}`], { cwd: aimDir, env: { ...process.env, CC65816_G: '1' } });
 const sym = S.parseSym(fs.readFileSync(symPath, 'utf8'));
 check('parses many labels (>500)', sym.labels.length > 500);
 check('[information] wlasymbol=true', sym.info.wlasymbol === 'true');
@@ -254,6 +255,16 @@ check('mapped C line is within main.c', someSrc.line > 0 && someSrc.line <= main
 check('cSourceForAddr resolves nearest-below', !!S.cSourceForAddr(clmap, someAddr + 1));
 const k = `main.c:${someSrc.line}`;
 check('sourceToAddr round-trips (lowest PC <= entry)', clmap.sourceToAddr.has(k) && clmap.sourceToAddr.get(k) <= someAddr);
+
+// Typed locals (G4): `; @dbglocal` markers parsed per function from the -g build.
+const localsMap = S.parseLocals(wrapAsm);
+check('parseLocals finds functions with locals', localsMap.size > 0);
+check('on_update has typed locals (pad/dx)', (localsMap.get('on_update') || []).some((l) => l.name === 'pad'));
+const padLoc = (localsMap.get('on_update') || []).find((l) => l.name === 'pad');
+check('local pad decoded (u, 2 bytes, frame offset)', !!padLoc && padLoc.cls === 'u' && padLoc.size === 2 && padLoc.offset > 0);
+check('struct local cfg in main is class g', (localsMap.get('main') || []).some((l) => l.name === 'cfg' && l.cls === 'g'));
+// names with underscores survive (split type code off the front only)
+check('parseLocals keeps underscored C names', (localsMap.get('on_update') || []).some((l) => /_/.test(l.name)));
 
 // address parsing + expression resolution (for evaluate / memory view)
 check('parseAddress($008365)', S.parseAddress('$008365') === 0x008365);
@@ -457,6 +468,13 @@ try { fs.unlinkSync(tmpT); } catch {}
     check('step out does not stop within the frame', D.stepStops('out', sp0, { src: { file: 'main.c', line: 9 }, sp: 0x1FF }) === false);
     check('no C source -> never stops', D.stepStops('in', sp0, { src: undefined, sp: 0x1FF }) === false);
 
+    // Typed local formatting (pure): little-endian, signedness, pointer, type name.
+    check('formatLocal u16 -> decimal + hex', D.formatLocal({ name: 'pad', cls: 'u', size: 2, offset: 2 }, [0x00, 0x04]).value === '1024 (0x0400)');
+    check('formatLocal s16 negative -> signed', D.formatLocal({ name: 'dx', cls: 's', size: 2, offset: 4 }, [0xFF, 0xFF]).value.startsWith('-1 '));
+    check('formatLocal pointer -> hex', D.formatLocal({ name: 'p', cls: 'p', size: 2, offset: 6 }, [0x34, 0x12]).value === '0x1234');
+    check('formatLocal carries the type name', D.formatLocal({ name: 'x', cls: 'u', size: 2, offset: 0 }, [0, 0]).type === 'u16');
+    check('formatLocal u8', D.formatLocal({ name: 'b', cls: 'u', size: 1, offset: 0 }, [0x2A]).value === '42 (0x2A)');
+
     const lunaBin2 = B.resolveLunaPath({ sdkPath: OPENSNES });
     if (!lunaBin2 || !fs.existsSync(lunaBin2)) {
         console.log('  SKIP  luna binary not available');
@@ -572,6 +590,10 @@ try { fs.unlinkSync(tmpT); } catch {}
             check('stopped frame has a main.c source', !!fr.source && /main\.c$/.test(fr.source.path));
             check('stopped frame carries a C line', typeof fr.line === 'number' && fr.line > 0);
 
+            const sc = await dapCall('scopes', { threadId: 1, frameId: 0 });
+            check('a Locals scope is offered', sc.body.scopes.some((s) => s.name === 'Locals'));
+            const localsRef = sc.body.scopes.find((s) => s.name === 'Locals').variablesReference;
+
             // C-LINE STEPPING: Step Over advances a whole C line, not one instruction.
             await dapCall('next', { threadId: 1 });
             await waitEvent(stopped('step'));
@@ -579,6 +601,19 @@ try { fs.unlinkSync(tmpT); } catch {}
             const fr2 = st4.body.stackFrames[0];
             check('C-line step lands on main.c', !!fr2.source && /main\.c$/.test(fr2.source.path));
             check('C-line step advanced to a different C line', typeof fr2.line === 'number' && fr2.line !== fr.line);
+
+            // TYPED LOCALS (G4): stop deterministically inside on_update (a function
+            // with C locals), step past the prologue, then read its typed locals.
+            await dapCall('setBreakPoints', { source: { path: path.join(aimDir, 'main.c') }, breakpoints: [] });
+            await dapCall('setFunctionBreakPoints', { breakpoints: [{ name: 'on_update' }] });
+            await dapCall('continue', { threadId: 1 });
+            await waitEvent(stopped('breakpoint'));
+            await dapCall('next', { threadId: 1 }); // step OVER the prologue/first call → stay in on_update
+            await waitEvent(stopped('step'));
+            const lv = await dapCall('variables', { variablesReference: localsRef });
+            check('Locals are read for the current function', Array.isArray(lv.body.variables) && lv.body.variables.length > 0);
+            check('Locals include pad (u16) with a value', lv.body.variables.some((v) => v.name === 'pad' && v.type === 'u16' && v.value));
+            check('Locals are typed (signed/unsigned/pointer/struct)', lv.body.variables.every((v) => /^[us]\d+$|pointer|struct|array|float|bytes/.test(v.type)));
 
             await dapCall('disconnect', {});
             check('disconnect ok', true);

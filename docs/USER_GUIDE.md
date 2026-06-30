@@ -108,6 +108,9 @@ The jewel. Workflow:
 4. **Inspect** — open **Run and Debug** (`Ctrl/Cmd+Shift+D`):
    - **CALL STACK** shows the stop (e.g. `enemies_update @ 00:84AB`). **Click the
      frame** to populate the variables.
+   - **VARIABLES → Locals**: the current function's C variables (`pad`, `dx`,
+     `cfg`…), read live from the stack frame and typed (`u16`, `s16`, pointer,
+     `struct`). *(Source-level `-g` builds — which Cooper makes by default.)*
    - **VARIABLES → Registers**: `PC, A, X, Y, SP, DP, DB, PB, P` (status flags
      decoded as `nvmxdizc`), `E`.
    - **WATCH**: type a symbol or address (`frame_count`, `$7E0030`) to read it.
