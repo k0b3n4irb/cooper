@@ -11,6 +11,9 @@ const sampleWorkspace = resolve(root, '../opensnes/examples/basics/aim_target');
 export default defineConfig({
     files: 'out/test/**/*.test.js',
     workspaceFolder: sampleWorkspace,
+    // Pin the VS Code build (cached locally) so the run is deterministic and does
+    // not re-download a fresh ~270 MB "stable" when a new version ships.
+    version: '1.126.0',
     // Not root here, so no --no-sandbox; isolate from any host extensions.
     launchArgs: ['--disable-extensions', '--disable-gpu'],
     mocha: {

@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.17.0] — 2026-07-01
+
+### Added — Aggregate expansion (structs & arrays) in Locals
+
+- **Struct and array locals now expand** in the Variables pane: click a `struct`
+  to see its named fields (typed, at their offsets), an array to see its elements
+  (`[0]`, `[1]`…). Nested structs/arrays expand recursively.
+- How: cproc writes a `.dbg` sidecar with each aggregate local's recursive type
+  tree (`g8{init:p4@0;update:p4@4;}`, `a20[u2;10]`); Cooper joins it with the
+  `@dbglocal` frame offset and reads each field/element from memory, typed.
+- Arrays are capped at 256 elements in the pane. D-038.
+
 ## [0.16.0] — 2026-06-30
 
 ### Added — Typed local variables (G4)

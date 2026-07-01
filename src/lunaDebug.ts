@@ -22,6 +22,7 @@ import {
     parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved, resolveExpr, parseAddress,
     buildCLineMap, CLineMap, CSource, cSourceForAddr, resolveLine,
     parseLocals, LocalVar, parseFunctions, buildFuncRanges, enclosingFunction, FuncRange,
+    parseAggregates, AggNode,
 } from './sym';
 
 const THREAD_ID = 1;
@@ -115,6 +116,23 @@ export function formatLocal(loc: LocalVar, bytes: number[]): DebugProtocol.Varia
     return { name: loc.name, value, type: localTypeName(loc), variablesReference: 0 };
 }
 
+/** Pure: the child variables of an aggregate at `addr` — struct fields at their
+ *  offsets, or array elements at `i * elemSize`. Address arithmetic only, no I/O
+ *  (the caller reads memory for scalar leaves). Arrays are capped at 256. */
+export function aggChildren(node: AggNode, addr: number): { name: string; addr: number; node: AggNode }[] {
+    if (node.kind === 'struct') {
+        return node.fields.map((f) => ({ name: f.name, addr: (addr + f.off) & 0xFFFF, node: f.type }));
+    }
+    if (node.kind === 'array') {
+        const out: { name: string; addr: number; node: AggNode }[] = [];
+        for (let i = 0; i < Math.min(node.count, 256); i++) {
+            out.push({ name: `[${i}]`, addr: (addr + i * node.elem.size) & 0xFFFF, node: node.elem });
+        }
+        return out;
+    }
+    return [];
+}
+
 export type StepMode = 'in' | 'over' | 'out';
 export interface StepPoint { line: number; file: string; sp: number; }
 
@@ -155,6 +173,9 @@ export class LunaDebugSession extends LoggingDebugSession {
     private cmap: CLineMap | null = null;     // PC ↔ C source (source-level debug)
     private locals = new Map<string, LocalVar[]>(); // function name → its C locals (-g builds)
     private funcRanges: FuncRange[] = [];     // sorted function entries (PC → enclosing fn)
+    private aggregates = new Map<string, AggNode>(); // `func name` → struct/array type tree
+    private varRefs = new Map<number, { addr: number; node: AggNode }>(); // expandable aggregate refs
+    private nextVarRef = LOCALS_REF + 1000;   // dynamic variablesReference allocator
     private projectDir = '';
     private breakpoints: number[] = [];       // function-breakpoint PC addresses
     private sourceBreakpoints: number[] = []; // source-line-breakpoint PC addresses
@@ -224,6 +245,19 @@ export class LunaDebugSession extends LoggingDebugSession {
                 const asmJoined = [...asmTexts.values()].join('\n');
                 this.locals = parseLocals(asmJoined);
                 this.funcRanges = buildFuncRanges(this.sym, parseFunctions(asmJoined));
+                // Aggregate layouts from the `.dbg` sidecar next to each C source
+                // (main.c.wrap.asm → main.c.dbg): struct/array trees for expansion.
+                for (const fname of new Set(this.sym.sourceFiles.values())) {
+                    const base = fname.replace(/\.wrap\.asm$/, '').replace(/\.asm$/, '');
+                    const p = path.isAbsolute(base) ? `${base}.dbg` : path.join(this.projectDir, `${base}.dbg`);
+                    try {
+                        if (fs.existsSync(p)) {
+                            for (const [k, v] of parseAggregates(fs.readFileSync(p, 'utf8'))) {
+                                this.aggregates.set(k, v);
+                            }
+                        }
+                    } catch { /* skip */ }
+                }
                 if (this.cmap.addrToSource.size > 0) {
                     const nLoc = [...this.locals.values()].reduce((s, a) => s + a.length, 0);
                     this.sendEvent(new OutputEvent(`Source-level debug: ${this.cmap.addrToSource.size} C-line mappings, ${nLoc} locals.\n`, 'console'));
@@ -375,6 +409,10 @@ export class LunaDebugSession extends LoggingDebugSession {
     }
 
     protected scopesRequest(response: DebugProtocol.ScopesResponse): void {
+        // Aggregate expansion refs are per-stop; the client re-requests scopes on
+        // each stop, so reset the dynamic ref allocator here.
+        this.varRefs.clear();
+        this.nextVarRef = LOCALS_REF + 1000;
         response.body = { scopes: [new Scope('Locals', LOCALS_REF, false), new Scope('Registers', REGISTERS_REF, false)] };
         this.sendResponse(response);
     }
@@ -388,10 +426,48 @@ export class LunaDebugSession extends LoggingDebugSession {
             response.body = { variables: formatRegisters(cpu) };
         } else if (args.variablesReference === LOCALS_REF) {
             response.body = { variables: await this.readLocals() };
+        } else if (this.varRefs.has(args.variablesReference)) {
+            response.body = { variables: await this.expandRef(args.variablesReference) };
         } else {
             response.body = { variables: [] };
         }
         this.sendResponse(response);
+    }
+
+    /** Allocate a variablesReference for an expandable aggregate at an address. */
+    private aggRef(addr: number, node: AggNode): number {
+        const ref = this.nextVarRef++;
+        this.varRefs.set(ref, { addr, node });
+        return ref;
+    }
+
+    /** A DAP variable for a value of `node` at `addr`: a leaf for scalars (reads
+     *  memory now), or an expandable node (struct/array) with a child ref. */
+    private async makeVar(name: string, addr: number, node: AggNode): Promise<DebugProtocol.Variable> {
+        if (node.kind === 'scalar') {
+            let bytes: number[] = [];
+            try {
+                bytes = await this.mcp.peekMemory(0, addr & 0xFFFF, node.size);
+            } catch { /* unreadable */ }
+            return formatLocal({ name, cls: node.cls, size: node.size, offset: 0 }, bytes);
+        }
+        const ref = this.aggRef(addr, node);
+        const value = node.kind === 'array' ? `${node.count} elem[]` : `{…} ${node.size}B`;
+        const type = node.kind === 'array' ? `array[${node.count}]` : `struct(${node.size}B)`;
+        return { name, value, type, variablesReference: ref };
+    }
+
+    /** Expand a struct into its fields or an array into its elements. */
+    private async expandRef(ref: number): Promise<DebugProtocol.Variable[]> {
+        const e = this.varRefs.get(ref);
+        if (!e) {
+            return [];
+        }
+        const out: DebugProtocol.Variable[] = [];
+        for (const c of aggChildren(e.node, e.addr)) {
+            out.push(await this.makeVar(c.name, c.addr, c.node));
+        }
+        return out;
     }
 
     /** Read the current function's C locals from the stack frame. The frame base
@@ -411,9 +487,14 @@ export class LunaDebugSession extends LoggingDebugSession {
         const base = cpu.sp & 0xFFFF;
         const out: DebugProtocol.Variable[] = [];
         for (const loc of locs) {
-            const off = (base + loc.offset) & 0xFFFF;
+            const addr = (base + loc.offset) & 0xFFFF;
+            const node = this.aggregates.get(`${fn} ${loc.name}`);
+            if (node && node.kind !== 'scalar') {
+                out.push(await this.makeVar(loc.name, addr, node)); // expandable struct/array
+                continue;
+            }
             try {
-                const bytes = await this.mcp.peekMemory(0, off, loc.size);
+                const bytes = await this.mcp.peekMemory(0, addr, loc.size);
                 out.push(formatLocal(loc, bytes));
             } catch { /* skip unreadable */ }
         }

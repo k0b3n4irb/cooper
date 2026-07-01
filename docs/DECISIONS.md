@@ -727,6 +727,29 @@ rationale and the docs that grounded it. Newest last.
   boundaries); aggregates/pointers shown as raw bytes/hex (no member expansion
   yet); debug (`-g`) builds are unoptimised, so timing differs from release.
 
+### D-038 — Aggregate expansion via a cproc `.dbg` sidecar
+- **Decision:** expand struct/array locals into fields/elements. The member
+  **names** can't fit the temp-name channel (used for scalar locals), and QBE type
+  defs carry no field names — so cproc writes a **`.dbg` sidecar** (the only clean
+  channel for named, nested type trees), joined with the `@dbglocal` frame offset.
+- **Compiler (OpenSNES repo):** `cproc/qbe.c` `writeDbgType` emits a recursive
+  grammar per aggregate local — scalar `u2`/`p4`, array `a<size>[<elem>;<count>]`,
+  struct `g<size>{name:<type>@off;...}` — to `$CC65816_DBG`; `bin/cc65816` sets
+  that env to `<output>.dbg` under `-g`. (Every node carries its byte size, so
+  Cooper knows array strides.)
+- **Cooper:** `parseAggregates` (recursive-descent parse of the grammar, keyed
+  `func<space>local`), `aggChildren` (pure: field/element child descriptors), and
+  dynamic `variablesReference`s (reset per stop in `scopesRequest`) so structs →
+  fields and arrays → elements expand recursively, each read from
+  `frameBase + offset` and typed via `formatLocal`.
+- **Verified:** `parseAggregates` on the real `main.c.dbg` (`cfg` → init/update)
+  + synthetic array/nested; `aggChildren` offsets/strides/cap. 179 Node + 8
+  integration. (Live struct expansion reuses the scalar-local read path, which is
+  integration-tested.)
+- **Gotcha fixed:** a stray NUL byte had slipped into the map-key separator in
+  `sym.ts` (invisible; made `grep` treat the file as binary) — normalised to a
+  space across `sym.ts`/`lunaDebug.ts`/`test`.
+
 ---
 
 ### Known limitations (Component #1)

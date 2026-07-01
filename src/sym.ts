@@ -454,6 +454,73 @@ export function buildFuncRanges(sym: SymTable, names: string[]): FuncRange[] {
     return r.sort((x, y) => x.addr - y.addr);
 }
 
+// --- aggregate layouts (the `.dbg` sidecar, for struct/array expansion) --------
+
+export type AggNode =
+    | { kind: 'scalar'; cls: string; size: number }
+    | { kind: 'array'; size: number; elem: AggNode; count: number }
+    | { kind: 'struct'; size: number; fields: { name: string; off: number; type: AggNode }[] };
+
+/** Recursive-descent parse of the compact type grammar written by cproc:
+ *  scalar `u2`/`s2`/`p4`/`f4`, array `a<size>[<elem>;<count>]`,
+ *  struct `g<size>{name:<type>@off;...}`. Returns [node, nextIndex]. */
+function parseAggType(s: string, i: number): [AggNode, number] {
+    const cls = s[i++];
+    let num = '';
+    while (i < s.length && s[i] >= '0' && s[i] <= '9') {
+        num += s[i++];
+    }
+    const size = parseInt(num, 10);
+    if (cls === 'a') {
+        i++; // '['
+        const [elem, j] = parseAggType(s, i);
+        i = j + 1; // skip ';'
+        let c = '';
+        while (s[i] >= '0' && s[i] <= '9') {
+            c += s[i++];
+        }
+        i++; // ']'
+        return [{ kind: 'array', size, elem, count: parseInt(c, 10) }, i];
+    }
+    if (cls === 'g') {
+        i++; // '{'
+        const fields: { name: string; off: number; type: AggNode }[] = [];
+        while (s[i] !== '}' && i < s.length) {
+            let name = '';
+            while (s[i] !== ':') {
+                name += s[i++];
+            }
+            i++; // ':'
+            const [ft, j] = parseAggType(s, i);
+            i = j + 1; // skip '@'
+            let off = '';
+            while (s[i] >= '0' && s[i] <= '9') {
+                off += s[i++];
+            }
+            i++; // ';'
+            fields.push({ name, off: parseInt(off, 10), type: ft });
+        }
+        i++; // '}'
+        return [{ kind: 'struct', size, fields }, i];
+    }
+    return [{ kind: 'scalar', cls, size }, i];
+}
+
+/** Parse the `.dbg` sidecar (`loc <func> <name> <type>` lines) into a map keyed
+ *  by `func\0localname` → the aggregate's type tree. */
+export function parseAggregates(dbgText: string): Map<string, AggNode> {
+    const out = new Map<string, AggNode>();
+    for (const raw of dbgText.split(/\r?\n/)) {
+        const m = raw.match(/^loc (\S+) (\S+) (.+)$/);
+        if (m) {
+            try {
+                out.set(`${m[1]} ${m[2]}`, parseAggType(m[3], 0)[0]);
+            } catch { /* skip malformed */ }
+        }
+    }
+    return out;
+}
+
 /** The C function enclosing a PC (nearest-preceding function entry). */
 export function enclosingFunction(ranges: FuncRange[], pc: number): string | undefined {
     let lo = 0, hi = ranges.length - 1, best = -1;

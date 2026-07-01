@@ -266,6 +266,17 @@ check('struct local cfg in main is class g', (localsMap.get('main') || []).some(
 // names with underscores survive (split type code off the front only)
 check('parseLocals keeps underscored C names', (localsMap.get('on_update') || []).some((l) => /_/.test(l.name)));
 
+// Aggregate layouts (.dbg sidecar): struct/array type trees for expansion.
+const dbgPath = path.join(aimDir, 'main.c.dbg');
+const aggs = fs.existsSync(dbgPath) ? S.parseAggregates(fs.readFileSync(dbgPath, 'utf8')) : new Map();
+const cfg = aggs.get('main cfg');
+check('parseAggregates finds struct cfg (from the real -g build)', !!cfg && cfg.kind === 'struct');
+check('cfg has init/update fields at offsets 0/4', !!cfg && cfg.fields.length === 2 && cfg.fields[0].name === 'init' && cfg.fields[1].name === 'update' && cfg.fields[1].off === 4);
+const arrAgg = S.parseAggregates('loc f buf a20[u2;10]').get('f buf');
+check('parseAggregates array: 10 × u16', arrAgg.kind === 'array' && arrAgg.count === 10 && arrAgg.elem.size === 2 && arrAgg.elem.cls === 'u');
+const nestedAgg = S.parseAggregates('loc f e g6{pos:g4{x:s2@0;y:s2@2;}@0;hp:u2@4;}').get('f e');
+check('parseAggregates nested struct', nestedAgg.kind === 'struct' && nestedAgg.fields[0].type.kind === 'struct' && nestedAgg.fields[0].type.fields[1].name === 'y' && nestedAgg.fields[1].off === 4);
+
 // address parsing + expression resolution (for evaluate / memory view)
 check('parseAddress($008365)', S.parseAddress('$008365') === 0x008365);
 check('parseAddress(0x7E0030)', S.parseAddress('0x7E0030') === 0x7E0030);
@@ -474,6 +485,19 @@ try { fs.unlinkSync(tmpT); } catch {}
     check('formatLocal pointer -> hex', D.formatLocal({ name: 'p', cls: 'p', size: 2, offset: 6 }, [0x34, 0x12]).value === '0x1234');
     check('formatLocal carries the type name', D.formatLocal({ name: 'x', cls: 'u', size: 2, offset: 0 }, [0, 0]).type === 'u16');
     check('formatLocal u8', D.formatLocal({ name: 'b', cls: 'u', size: 1, offset: 0 }, [0x2A]).value === '42 (0x2A)');
+
+    // Aggregate expansion (pure): child addresses of structs (by offset) and arrays (by stride).
+    const cfgNode = { kind: 'struct', size: 8, fields: [
+        { name: 'init', off: 0, type: { kind: 'scalar', cls: 'p', size: 4 } },
+        { name: 'update', off: 4, type: { kind: 'scalar', cls: 'p', size: 4 } },
+    ] };
+    const ch = D.aggChildren(cfgNode, 0x100);
+    check('aggChildren: struct fields at their offsets', ch.length === 2 && ch[0].addr === 0x100 && ch[1].addr === 0x104 && ch[1].name === 'update');
+    const arrNode = { kind: 'array', size: 20, count: 10, elem: { kind: 'scalar', cls: 'u', size: 2 } };
+    const ael = D.aggChildren(arrNode, 0x200);
+    check('aggChildren: array elements strided by elem size', ael.length === 10 && ael[0].name === '[0]' && ael[2].addr === 0x204);
+    check('aggChildren: arrays capped at 256', D.aggChildren({ kind: 'array', size: 4000, count: 2000, elem: { kind: 'scalar', cls: 'u', size: 2 } }, 0).length === 256);
+    check('aggChildren: scalar has no children', D.aggChildren({ kind: 'scalar', cls: 'u', size: 2 }, 0).length === 0);
 
     const lunaBin2 = B.resolveLunaPath({ sdkPath: OPENSNES });
     if (!lunaBin2 || !fs.existsSync(lunaBin2)) {

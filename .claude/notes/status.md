@@ -5,6 +5,14 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Aggregate expansion** (v0.17.0). Struct/array locals expand in Variables →
+fields (named, typed, at offsets) and elements ([0],[1]…), recursively. Path:
+cproc writes a `.dbg` sidecar (recursive type grammar per aggregate local) →
+Cooper parseAggregates + aggChildren + dynamic variablesReferences read each
+child from frameBase+offset. Verified: parseAggregates on real cfg + synthetic
+array/nested; aggChildren pure. 179 Node + 8 integration. D-038. (Also fixed a
+stray NUL byte in a sym.ts map key.)
+
 **Typed local variables (G4)** (v0.16.0). VARIABLES → Locals shows the current
 function's C vars (pad/dx/cfg…) read from the stack frame, typed (u16/s16/pointer/
 struct). Path: QBE `-g` (no-promote, keeps locals in memory) + cproc encodes

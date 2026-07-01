@@ -110,7 +110,9 @@ The jewel. Workflow:
      frame** to populate the variables.
    - **VARIABLES → Locals**: the current function's C variables (`pad`, `dx`,
      `cfg`…), read live from the stack frame and typed (`u16`, `s16`, pointer,
-     `struct`). *(Source-level `-g` builds — which Cooper makes by default.)*
+     `struct`). **Structs and arrays expand** — click to see named fields or
+     elements (`[0]`, `[1]`…), nested, each typed. *(Source-level `-g` builds —
+     which Cooper makes by default.)*
    - **VARIABLES → Registers**: `PC, A, X, Y, SP, DP, DB, PB, P` (status flags
      decoded as `nvmxdizc`), `E`.
    - **WATCH**: type a symbol or address (`frame_count`, `$7E0030`) to read it.

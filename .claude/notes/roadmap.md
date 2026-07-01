@@ -100,8 +100,10 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
   - ✅ **C-line stepping** (0.15) — Step Over/Into/Out move by C source line.
   - ✅ **Typed locals (G4)** (0.16) — QBE `-g` no-promote + cproc name/type
     encoding + `; @dbglocal` → a Locals scope reading frame memory, typed.
-- 🔜 **Remaining:** aggregate/pointer member expansion (structs → fields); a
-  release/optimised build toggle (today Cooper builds with `-g`).
+  - ✅ **Aggregate expansion** (0.17) — cproc `.dbg` sidecar (recursive type
+    trees) → structs expand to fields, arrays to elements, nested & typed.
+- 🔜 **Remaining:** a release/optimised build toggle (today Cooper builds `-g`);
+  pointer-follow (deref a pointer to show the pointee).
 - Compiler changes live in the OpenSNES repo (cproc/QBE) — author to commit there.
 
 ### ⏳ P8 — Multi-chip debug (C4, advanced)
