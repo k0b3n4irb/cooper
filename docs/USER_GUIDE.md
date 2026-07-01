@@ -19,6 +19,28 @@ Cooper orchestrates tools it does **not** bundle — install them once:
 | **luna** | the SNES emulator (run / preview / debug backend) | setting `cooper.lunaPath`, else the SDK's bundled binary, else `luna` on your PATH |
 | **clangd** | the C language server (completion, hover, go-to-definition) | the bundled *clangd* VS Code extension downloads it in one click |
 
+### Where to get them
+
+- **OpenSNES** — build from source (this also installs the CLI tools —
+  `cc65816`, `qbe`, `wla-65816`, `gfx4snes`… — into its `bin/`):
+  ```sh
+  git clone --recursive https://github.com/k0b3n4irb/opensnes.git
+  cd opensnes && make        # needs a host C toolchain (gcc/clang) + make
+  ```
+  Point `cooper.opensnesPath` at that `opensnes/` directory. (No separate binary
+  to hunt for — everything Cooper calls lives in `opensnes/bin/`.)
+- **luna** — download the prebuilt binary for your OS from the releases page:
+  <https://github.com/k0b3n4irb/luna/releases/latest>. Unzip it and point
+  `cooper.lunaPath` at the `luna` binary **or** the folder it unzips into.
+- **clangd** — you do **not** install this yourself: the bundled *clangd*
+  extension downloads the language server in one click (see §8). (clangd is
+  standalone — you don't need a separate `clang` for IntelliSense.)
+
+> **Source-level C debugging** (highlight your `main.c` line, typed locals, struct
+> expansion — §7) needs an OpenSNES whose `cc65816` emits Cooper debug info
+> (`@cline`/`@dbglocal`). A fresh `git clone` + build has it; an **older** release
+> still works — the debugger just falls back to the symbol/register level.
+
 **Key idea — your project is separate from the SDK.** Your game lives in *its own
 folder* (just your `.c`, assets, and a Makefile). OpenSNES and luna are installed
 elsewhere as *user releases*. Point Cooper at them once:

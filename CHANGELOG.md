@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.17.1] — 2026-07-01
+
+### Docs — new-user onboarding
+
+- User Guide §1 and the in-editor walkthrough now say **where to get the tools**:
+  build OpenSNES from source (`git clone --recursive …/opensnes && make` — installs
+  `cc65816`/`qbe`/`wla-65816` into its `bin/`), download **luna** from its GitHub
+  releases, and clangd is one-click via the bundled extension.
+- Documented that **source-level C debugging** needs an OpenSNES whose `cc65816`
+  emits Cooper debug info; older releases fall back to symbol/register level.
+
 ## [0.17.0] — 2026-07-01
 
 ### Added — Aggregate expansion (structs & arrays) in Locals
