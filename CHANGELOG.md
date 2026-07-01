@@ -4,16 +4,19 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [0.17.1] — 2026-07-01
+## [0.17.2] — 2026-07-01
 
-### Docs — new-user onboarding
+### Docs — new-user onboarding (download, don't compile)
 
-- User Guide §1 and the in-editor walkthrough now say **where to get the tools**:
-  build OpenSNES from source (`git clone --recursive …/opensnes && make` — installs
-  `cc65816`/`qbe`/`wla-65816` into its `bin/`), download **luna** from its GitHub
-  releases, and clangd is one-click via the bundled extension.
-- Documented that **source-level C debugging** needs an OpenSNES whose `cc65816`
-  emits Cooper debug info; older releases fall back to symbol/register level.
+- User Guide §1 and the in-editor walkthrough now tell a newcomer to **download
+  the prebuilt SDK/emulator for their architecture and unzip** — no compilation
+  (matches OpenSNES `GETTING_STARTED`): the OpenSNES release zip per platform
+  (`…_linux_x86_64.zip`, `…_linux_arm64.zip`, `…_darwin_arm64.zip`,
+  `…_windows_x86_64.zip`) from its GitHub Releases, **luna** from its releases,
+  clangd one-click via the bundled extension. Only `make` + a text editor needed.
+- Documented that **source-level C debugging** needs an OpenSNES release including
+  Cooper debug info; older releases fall back to symbol/register level.
+- (Supersedes the 0.17.1 wording, which wrongly said to build from source.)
 
 ## [0.17.0] — 2026-07-01
 

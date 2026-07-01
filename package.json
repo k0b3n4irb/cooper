@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -166,7 +166,7 @@
           {
             "id": "tools",
             "title": "Point Cooper at your tools",
-            "description": "Your game lives in its own folder; OpenSNES and luna are installed separately.\n\n**Get them:** build OpenSNES (`git clone --recursive https://github.com/k0b3n4irb/opensnes && make`) — it installs `cc65816`/`qbe`/`wla-65816` into its `bin/`; download **luna** from https://github.com/k0b3n4irb/luna/releases/latest . Then point Cooper at them:\n\n[Set the OpenSNES SDK path](command:workbench.action.openSettings?%22cooper.opensnesPath%22)\n[Set the luna path](command:workbench.action.openSettings?%22cooper.lunaPath%22)\n\n`cooper.lunaPath` accepts the luna binary **or** the folder that contains it.",
+            "description": "Your game lives in its own folder; OpenSNES and luna are installed separately — **download** the prebuilt build for your architecture (no compiler to install).\n\n**Get them:** the OpenSNES SDK zip for your OS/arch from https://github.com/k0b3n4irb/opensnes/releases (extract it — `cc65816`/`qbe`/`wla-65816` are in its `bin/`), and **luna** from https://github.com/k0b3n4irb/luna/releases/latest . Then point Cooper at them:\n\n[Set the OpenSNES SDK path](command:workbench.action.openSettings?%22cooper.opensnesPath%22)\n[Set the luna path](command:workbench.action.openSettings?%22cooper.lunaPath%22)\n\n`cooper.lunaPath` accepts the luna binary **or** the folder that contains it.",
             "media": { "image": "media/cooper-sidebar.png", "altText": "The Cooper sidebar" },
             "completionEvents": ["onSettingChanged:cooper.opensnesPath"]
           },
