@@ -4,6 +4,19 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] — 2026-07-02
+
+### Added — SNES palette editor (asset editors, C6)
+
+- **Edit a sprite/BG palette in true SNES colours.** Right-click an indexed
+  `.png` (or run **Cooper: Edit Palette**) to open a **BGR555** editor: each
+  channel is 0–31 (the real 15-bit SNES gamut), rows of 16 mark the sub-palettes,
+  entry 0 is transparent. Save writes the PNG's palette (`PLTE`) back — **Build
+  regenerates the `.pal`** (the editor edits the *source* the SDK's `gfx4snes`
+  consumes; conversion stays in the build).
+- Grounded in the SDK: the BGR555 conversion is **byte-identical to `gfx4snes`**
+  (verified against a real asset's `.pal`). D-040.
+
 ## [0.18.0] — 2026-07-02
 
 ### Changed — Release vs debug builds

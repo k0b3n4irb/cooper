@@ -8,6 +8,8 @@ import { resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile 
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
+import { readIndexedPng, writePalette, bgr555ToRgb8 } from './pngPalette';
+import { renderPaletteEditorHtml } from './paletteEditor';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
 import { renderDashboardHtml, DashboardState } from './dashboard';
@@ -31,6 +33,7 @@ export function activate(context: vscode.ExtensionContext): void {
             vscode.commands.executeCommand('workbench.action.openWalkthrough', 'opensnes.cooper#cooper.gettingStarted', false)),
         vscode.commands.registerCommand('cooper.debug', () => startLunaDebug(tree.current())),
         vscode.commands.registerCommand('cooper.breakOnSymbol', (name: string) => breakOnSymbol(name)),
+        vscode.commands.registerCommand('cooper.editPalette', (uri?: vscode.Uri) => editPalette(uri)),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
@@ -181,6 +184,62 @@ function breakOnSymbol(name: string): void {
         vscode.debug.addBreakpoints([new vscode.FunctionBreakpoint(name)]);
         void vscode.window.showInformationMessage(`Cooper: breakpoint set on ${name}() — Continue (F5) to hit it.`);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Asset editors (C6) — the SNES palette editor.
+// ---------------------------------------------------------------------------
+
+/** Edit the palette of an indexed PNG (the source `gfx4snes` consumes). Resolves
+ *  the PNG from the explorer context / active editor / a project quick-pick, then
+ *  opens a BGR555 editor that writes the PNG's PLTE back on Save. */
+async function editPalette(uri?: vscode.Uri): Promise<void> {
+    let pngPath = (uri?.fsPath && uri.fsPath.endsWith('.png')) ? uri.fsPath : undefined;
+    if (!pngPath) {
+        const active = vscode.window.activeTextEditor?.document.uri.fsPath;
+        pngPath = active && active.endsWith('.png') ? active : undefined;
+    }
+    if (!pngPath) {
+        const dir = await resolveProjectDir();
+        const pngs = await vscode.workspace.findFiles(
+            dir ? new vscode.RelativePattern(dir, '**/*.png') : '**/*.png', '**/node_modules/**', 200);
+        if (pngs.length === 0) {
+            void vscode.window.showErrorMessage('Cooper: no PNG found in this project to edit.');
+            return;
+        }
+        const pick = await vscode.window.showQuickPick(
+            pngs.map((u) => ({ label: path.basename(u.fsPath), description: vscode.workspace.asRelativePath(u), u })),
+            { placeHolder: 'Pick an indexed PNG to edit its SNES palette' });
+        if (!pick) {
+            return;
+        }
+        pngPath = pick.u.fsPath;
+    }
+
+    const file = pngPath;
+    let palette;
+    try {
+        palette = readIndexedPng(fs.readFileSync(file)).palette;
+    } catch (e) {
+        void vscode.window.showErrorMessage(`Cooper: ${(e as Error).message}`);
+        return;
+    }
+    const panel = vscode.window.createWebviewPanel(
+        'cooperPalette', `Palette: ${path.basename(file)}`, vscode.ViewColumn.Active,
+        { enableScripts: true, retainContextWhenHidden: true });
+    panel.webview.html = renderPaletteEditorHtml(palette, panel.webview.cspSource, nonce(), { fileName: path.basename(file) });
+    panel.webview.onDidReceiveMessage((m: { type?: string; palette?: number[] }) => {
+        if (m.type === 'save' && Array.isArray(m.palette)) {
+            try {
+                const out = writePalette(fs.readFileSync(file), m.palette.map((v) => bgr555ToRgb8(v)));
+                fs.writeFileSync(file, out);
+                void panel.webview.postMessage({ type: 'saved' });
+                void vscode.window.showInformationMessage(`Cooper: palette saved to ${path.basename(file)} — Build to regenerate the .pal.`);
+            } catch (e) {
+                void vscode.window.showErrorMessage(`Cooper: save failed — ${(e as Error).message}`);
+            }
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,14 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**SNES palette editor (C6, first asset editor)** (v0.19.0). Right-click an indexed
+PNG → BGR555 editor (channels 0–31, rows of 16 = sub-palettes, entry 0 transparent);
+Save writes the PNG's PLTE → Build regenerates the .pal. Edits the *source* PNG
+gfx4snes consumes (conversion stays in make). Pure pngPalette.ts (PLTE read/write +
+BGR555, byte-identical to gfx4snes — verified 16/16 vs a real .pal) + paletteEditor.ts
+webview + cooper.editPalette glue. 193 Node + 8 integration. D-040. Next C6:
+tile/sprite editor (6 OBSEL size pairs), then tilemap.
+
 **Release vs debug builds** (v0.18.0). Build/Run = release (plain make, byte-
 identical to the shipped ROM); Debug (F5) auto-builds `-g` (wla -i/wlalink -A +
 CC65816_G=1) just before launch, so debug info never leaks into a preview and you

@@ -769,6 +769,30 @@ rationale and the docs that grounded it. Newest last.
   `CC65816_G` (verified: 0 `dbgloc` without it, present with it), so a release
   build is byte-identical to the non-debug compiler.
 
+## 2026-07-02 — Asset editors (C6): palette first
+
+### D-040 — SNES palette editor edits the indexed PNG's PLTE
+- **Decision:** the first asset editor is a **palette editor**, and it edits the
+  **indexed PNG** that `gfx4snes` consumes (its `PLTE`), not a `.pal` — because the
+  `.pal` is a build artifact. Conversion stays in `make` (Cooper's "edit source"
+  rule); hardware truth stays with luna (the existing live CGRAM viewer).
+- **Grounded (SDK):** CGRAM is **15-bit BGR555**, `RGB(r,g,b)=(b<<10)|(g<<5)|r`,
+  channels 0–31 (`lib/include/snes/video.h:83`); gfx4snes converts the PNG's 8-bit
+  palette with `>>3`. So the editor works in 5-bit space and expands back with
+  `(v<<3)|(v>>2)` (round-trips `>>3`). Verified: a real asset's PNG palette `>>3`
+  equals its gfx4snes-emitted `.pal` **exactly** (16/16). CGRAM map: 0–127 BG,
+  128–255 sprites (8 palettes of 16, `sprite.h:75`); entry 0 transparent; Mode 0
+  BG layers each own a block.
+- **Shape:** pure `pngPalette.ts` (chunk-level PLTE read/write — pixels untouched —
+  + BGR555 conversions, Node-tested against a real SDK PNG) + pure
+  `paletteEditor.ts` (webview HTML, nonce-CSP) + thin `extension.ts` glue
+  (`cooper.editPalette`, explorer context menu on `.png`).
+- **Corrections from grounding:** the graphics tool is **`gfx4snes`** (input =
+  indexed PNG/BMP), not `png2snes`; `smconv` is audio. The SDK exposes **6** of the
+  8 OBSEL sprite-size pairs (omits the two non-square). Mode↔bpp is documented, not
+  enforced by `setMode` — the editors should enforce it.
+- **Next (C6):** tile/sprite editor (size-pair enforcement) → tilemap.
+
 ---
 
 ### Known limitations (Component #1)

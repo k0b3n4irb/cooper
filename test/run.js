@@ -403,6 +403,55 @@ check('renderVramHtml embeds a PNG data URI', T.renderVramHtml('AAAA', 'vscode-c
 try { fs.unlinkSync(tmpT); } catch {}
 
 // ===========================================================================
+// C6 — SNES palette editor: pngPalette (pure), against a real indexed PNG.
+// ===========================================================================
+console.log('\n=== SNES palette editor: pngPalette (pure) ===');
+const tmpPP = path.join(os.tmpdir(), `cooper_pp_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'pngPalette.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPP });
+const PP = require(tmpPP);
+// BGR555 ↔ RGB8 (the gfx4snes convention: >>3, and (v<<3)|(v>>2) back)
+check('rgb8ToBgr555 packs (b<<10)|(g<<5)|r, 5-bit', PP.rgb8ToBgr555({ r: 255, g: 0, b: 255 }) === 0x7C1F);
+check('bgr555->rgb8->bgr555 round-trips', PP.rgb8ToBgr555(PP.bgr555ToRgb8(0x7C1F)) === 0x7C1F && PP.rgb8ToBgr555(PP.bgr555ToRgb8(0x0421)) === 0x0421);
+check('snapToBgr555 quantises to the SNES 5-bit grid', PP.rgb8ToBgr555(PP.snapToBgr555({ r: 250, g: 3, b: 131 })) === PP.rgb8ToBgr555({ r: 250, g: 3, b: 131 }));
+const pngPath = path.join(OPENSNES, 'examples', 'maps', 'slopemario', 'res', 'mario_sprite.png');
+if (fs.existsSync(pngPath)) {
+    const pbuf = fs.readFileSync(pngPath);
+    const png = PP.readIndexedPng(pbuf);
+    check('reads an indexed PNG palette (colorType 3)', png.colorType === 3 && png.palette.length > 0);
+    // matches gfx4snes exactly, when the .pal artifact is present
+    const palPath = pngPath.replace(/\.png$/, '.pal');
+    if (fs.existsSync(palPath)) {
+        const palBlob = fs.readFileSync(palPath);
+        let exact = true;
+        for (let i = 0; i < Math.min(16, palBlob.length / 2); i++) {
+            if (palBlob.readUInt16LE(i * 2) !== PP.rgb8ToBgr555(png.palette[i])) { exact = false; }
+        }
+        check('PNG palette >>3 == gfx4snes .pal (BGR555, exact)', exact);
+    }
+    // writePalette: edit one entry, re-read, others + pixels intact, same file size
+    const edited = PP.writePalette(pbuf, png.palette.map((c, i) => (i === 1 ? { r: 8, g: 16, b: 24 } : c)));
+    const png2 = PP.readIndexedPng(edited);
+    check('writePalette keeps entry count', png2.palette.length === png.palette.length);
+    check('writePalette edits the target entry', png2.palette[1].r === 8 && png2.palette[1].g === 16 && png2.palette[1].b === 24);
+    check('writePalette leaves other entries intact', png2.palette[0].r === png.palette[0].r && png2.palette[2].b === png.palette[2].b);
+    check('writePalette is in-place (PLTE only, pixels untouched)', edited.length === pbuf.length);
+} else {
+    console.log('  SKIP  no SDK sprite PNG found');
+}
+try { fs.unlinkSync(tmpPP); } catch {}
+
+// palette editor webview (pure HTML render)
+const tmpPE = path.join(os.tmpdir(), `cooper_pe_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'paletteEditor.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPE });
+const PE = require(tmpPE);
+const peHtml = PE.renderPaletteEditorHtml([{ r: 255, g: 0, b: 255 }, { r: 0, g: 0, b: 0 }], 'vscode-csp:x', 'NONCE123', { fileName: 'sprite.png' });
+check('palette editor gates its script by nonce (CSP)', peHtml.includes('nonce-NONCE123') && peHtml.includes('nonce="NONCE123"'));
+check('palette editor names BGR555 + the file', peHtml.includes('BGR555') && peHtml.includes('sprite.png'));
+check('palette editor embeds the palette as BGR555 words', peHtml.includes(JSON.stringify([0x7C1F, 0])));
+check('palette editor has a Save-to-PNG action', /id="save"/.test(peHtml));
+try { fs.unlinkSync(tmpPE); } catch {}
+
+// ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
 // ===========================================================================
 (async () => {

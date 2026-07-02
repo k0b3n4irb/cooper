@@ -207,9 +207,25 @@ clangd**.
 
 ---
 
-## 10. What's next
+## 10. Asset editors — palette
 
-- **Asset editors** — palette / tiles / map editing.
+**Right-click an indexed `.png`** in the Explorer → **Edit Palette (SNES BGR555)**
+(or run **Cooper: Edit Palette**). You get a hardware-accurate palette editor:
+
+- Colours are **BGR555** — each of R/G/B is **0–31** (the real 15-bit SNES gamut,
+  32768 colours), edited with sliders that snap to the hardware grid.
+- Swatches are laid out in **rows of 16 = the sub-palettes**; **entry 0 is
+  transparent**. (CGRAM is 0–127 for backgrounds, 128–255 for sprites.)
+- **Save to PNG** writes the palette back into the image. Because Cooper edits the
+  *source* PNG (the file `gfx4snes` reads), your next **Build** regenerates the
+  `.pal` automatically — no separate palette file to manage.
+
+> Tip: at a debug stop, open **PPU VIEWERS → Palette** to see the **live CGRAM** on
+> real hardware and compare it with what you designed.
+
+## 11. What's next
+
+- **Asset editors** — tiles / sprites (size-accurate) and tilemap editing.
 - **AI helper** — an OpenSNES-aware assistant that verifies in luna.
 
 See `docs/DECISIONS.md` and `.claude/notes/roadmap.md` for the full plan.
