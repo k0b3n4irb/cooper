@@ -111,10 +111,12 @@ check('lunaPreviewArgs builds the grounded run argv',
         ['run', '--steps', '200000', '--screenshot', '/x/out.png', '--force-display', '/x/rom.sfc']));
 check('lunaPreviewArgs honours forceDisplay:false',
     !B.lunaPreviewArgs('r', 'p', { forceDisplay: false }).includes('--force-display'));
-const bma = B.buildMakeArgs('/sdk');
-check('buildMakeArgs passes OPENSNES first', bma[0] === 'OPENSNES=/sdk');
-check('buildMakeArgs adds wla -i (asm line info)', bma.some((x) => /\/bin\/wla-65816 -i$/.test(x)));
-check('buildMakeArgs adds wlalink -A (addr-to-line)', bma.some((x) => /\/bin\/wlalink -A$/.test(x)));
+const bmaRel = B.buildMakeArgs('/sdk');
+check('buildMakeArgs release: OPENSNES first', bmaRel[0] === 'OPENSNES=/sdk');
+check('buildMakeArgs release: NO debug flags (= shipped ROM)', !bmaRel.some((x) => / -i$| -A$/.test(x)));
+const bmaDbg = B.buildMakeArgs('/sdk', undefined, true);
+check('buildMakeArgs debug: adds wla -i (asm line info)', bmaDbg.some((x) => /\/bin\/wla-65816 -i$/.test(x)));
+check('buildMakeArgs debug: adds wlalink -A (addr-to-line)', bmaDbg.some((x) => /\/bin\/wlalink -A$/.test(x)));
 check('buildMakeArgs appends the target last', B.buildMakeArgs('/sdk', 'clean').slice(-1)[0] === 'clean');
 check('buildMakeArgs without an sdk is empty', JSON.stringify(B.buildMakeArgs()) === '[]');
 // close the loop: `make OPENSNES=<sdk>` actually builds (the override beats the

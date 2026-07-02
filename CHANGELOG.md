@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.18.0] — 2026-07-02
+
+### Changed — Release vs debug builds
+
+- **Build and Run/Preview now produce a release build** — plain `make`, no debug
+  flags — so the ROM you preview is byte-identical to the one you ship. (Debug
+  metadata perturbs codegen, so it must not leak into a normal build.)
+- **Debug (F5) builds with `-g` automatically** (`wla -i` / `wlalink -A` +
+  `CC65816_G=1`) right before launching — source-level info is always present and
+  you no longer need to Build first. Build/Run stay release. D-039.
+
 ## [0.17.2] — 2026-07-01
 
 ### Docs — new-user onboarding (download, don't compile)

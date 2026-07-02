@@ -114,6 +114,10 @@ folder** and passes `OPENSNES=<your SDK>`, so the build works even though your
 project lives outside the SDK tree. Compiler errors appear in the **Problems**
 panel (click to jump to the line).
 
+> **Build and Run/Preview are release builds** (optimised) — the ROM you preview
+> is byte-identical to the one you ship. Debugging uses a separate debug build
+> (see §7); you don't manage that yourself.
+
 > If you see `…/make/common.mk: No such file or directory`, set `cooper.opensnesPath`
 > to your OpenSNES release.
 
@@ -135,8 +139,9 @@ The jewel. Workflow:
 1. **Set a breakpoint** — in the sidebar under **SYMBOLS**, click a function (e.g.
    `enemies_update`). It appears under **BREAKPOINTS** in the Run-and-Debug view.
    Click the symbol again to remove it.
-2. **Start** — click **Debug** (sidebar) or press **F5**. luna launches and pauses
-   at the program's entry.
+2. **Start** — click **Debug** (sidebar) or press **F5**. Cooper **builds a debug
+   (`-g`) ROM automatically** (you don't need to Build first), then luna launches
+   and pauses at the program's entry.
 3. **Run to your code** — press **Continue** (F5). It stops at your breakpoint.
 4. **Inspect** — open **Run and Debug** (`Ctrl/Cmd+Shift+D`):
    - **CALL STACK** shows the stop (e.g. `enemies_update @ 00:84AB`). **Click the

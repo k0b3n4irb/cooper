@@ -750,6 +750,25 @@ rationale and the docs that grounded it. Newest last.
   `sym.ts` (invisible; made `grep` treat the file as binary) — normalised to a
   space across `sym.ts`/`lunaDebug.ts`/`test`.
 
+## 2026-07-02 — Release vs debug builds
+
+### D-039 — Build/Run = release, Debug = auto `-g`
+- **Decision:** Cooper's Build and Run/Preview do a **release** build (`make` with
+  only `OPENSNES=`); the **Debug** launch does a `-g` build (`wla -i` /
+  `wlalink -A` + `CC65816_G=1`) automatically, just before starting the session.
+- **Why:** debug metadata is **not codegen-neutral** — the OpenSNES CI proved that
+  a `-g` build renders differently from release for 5 examples (framebuffer hash
+  mismatch). So it must never leak into the ROM you preview/ship. Previously Cooper
+  passed `CC65816_G=1` on *every* build, so Run/Preview showed debug codegen.
+- **How:** `buildMakeArgs(sdk, target, debug)` gates the `-i`/`-A` flags;
+  `makeTask(..., debug)` gates the `CC65816_G` env; `runMakeAndWait` runs a task to
+  completion; `LunaConfigProvider.resolveDebugConfiguration` calls it with
+  `debug=true` before launch (make is incremental, so the rebuild is cheap) — which
+  also means **Debug no longer needs a manual Build first**.
+- **Grounded:** the shipped `~/bin/opensnes` release gates debug emission behind
+  `CC65816_G` (verified: 0 `dbgloc` without it, present with it), so a release
+  build is byte-identical to the non-debug compiler.
+
 ---
 
 ### Known limitations (Component #1)

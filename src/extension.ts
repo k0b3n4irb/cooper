@@ -159,11 +159,8 @@ function startLunaDebug(info: ProjectInfo): void {
         void vscode.window.showErrorMessage('Cooper: no OpenSNES project/ROM to debug.');
         return;
     }
+    // The ROM need not exist yet — the debug config provider does a -g build first.
     const romPath = path.join(info.projectDir, info.romName);
-    if (!fs.existsSync(romPath)) {
-        void vscode.window.showWarningMessage(`Cooper: ${info.romName} isn't built yet — run Build first.`);
-        return;
-    }
     const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(info.projectDir))
         ?? vscode.workspace.workspaceFolders?.[0];
     void vscode.debug.startDebugging(folder, {
@@ -202,18 +199,21 @@ function makeTask(
     scope: vscode.WorkspaceFolder | vscode.TaskScope,
     cwd: string | undefined,
     sdkPath: string | undefined,
+    debug = false,
 ): vscode.Task {
-    const name = target && target !== 'all' ? target : 'build';
+    const base = target && target !== 'all' ? target : 'build';
+    const name = debug ? `${base} (debug)` : base;
     const task = new vscode.Task(
         { type: MAKE_TASK_TYPE, target },
         scope,
         name,
         'cooper',
-        // CC65816_G=1 keeps C locals memory-resident so the debugger can show
-        // typed locals (G4); pairs with the -i/-A debug-info flags in buildMakeArgs.
-        new vscode.ShellExecution('make', buildMakeArgs(sdkPath, target), {
+        // Release build (Build/Run): plain make — byte-identical to the shipped ROM.
+        // Debug build (F5): -i/-A + CC65816_G=1 so the .sym/asm carry source-level
+        // info (debug metadata perturbs codegen, so it never leaks into a release).
+        new vscode.ShellExecution('make', buildMakeArgs(sdkPath, target, debug), {
             ...(cwd ? { cwd } : {}),
-            env: { CC65816_G: '1' },
+            ...(debug ? { env: { CC65816_G: '1' } } : {}),
         }),
         '$cooper-cc',
     );
@@ -223,6 +223,28 @@ function makeTask(
         task.group = vscode.TaskGroup.Clean;
     }
     return task;
+}
+
+/** Run a `make` task and resolve to its success (exit 0). Used to build the -g
+ *  ROM just before a debug session so Debug never uses release codegen. */
+function runMakeAndWait(
+    target: string | undefined,
+    projectDir: string,
+    sdkPath: string | undefined,
+    debug: boolean,
+): Promise<boolean> {
+    const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectDir))
+        ?? vscode.workspace.workspaceFolders?.[0] ?? vscode.TaskScope.Workspace;
+    const task = makeTask(target, folder, projectDir, sdkPath, debug);
+    return new Promise<boolean>((resolve) => {
+        const disp = vscode.tasks.onDidEndTaskProcess((e) => {
+            if (e.execution.task === task) {
+                disp.dispose();
+                resolve(e.exitCode === 0);
+            }
+        });
+        void vscode.tasks.executeTask(task).then(undefined, () => { disp.dispose(); resolve(false); });
+    });
 }
 
 function makeTaskProvider(): vscode.TaskProvider {
@@ -509,14 +531,26 @@ class LunaConfigProvider implements vscode.DebugConfigurationProvider {
             void vscode.window.showErrorMessage('Cooper: no ROM to debug — add a Makefile with a TARGET, or set "program" in launch.json.');
             return undefined;
         }
-        if (!fs.existsSync(romPath)) {
-            void vscode.window.showErrorMessage(`Cooper: ${path.basename(romPath)} isn't built yet — run Build first.`);
-            return undefined;
-        }
         config.program = romPath;
 
         const cfg = vscode.workspace.getConfiguration('cooper');
         const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
+
+        // Debug = a `-g` (source-level) build. Rebuild now — make is incremental —
+        // so Debug always carries debug info and needs no manual Build first, while
+        // Build/Run stay release (byte-identical to the shipped ROM). If the SDK
+        // can't be located, fall back to whatever ROM already exists.
+        if (sdk?.path) {
+            const ok = await runMakeAndWait(undefined, projectDir, sdk.path, true);
+            if (!ok || !fs.existsSync(romPath)) {
+                void vscode.window.showErrorMessage('Cooper: the debug build failed — see the terminal for the make error.');
+                return undefined;
+            }
+        } else if (!fs.existsSync(romPath)) {
+            void vscode.window.showErrorMessage(`Cooper: ${path.basename(romPath)} isn't built, and the SDK couldn't be located to build it (set cooper.opensnesPath).`);
+            return undefined;
+        }
+
         const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
         if (!luna) {
             void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath (the binary or its folder), or cooper.opensnesPath.');

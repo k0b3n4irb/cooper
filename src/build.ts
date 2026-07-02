@@ -144,17 +144,21 @@ export function lunaPreviewArgs(romPath: string, screenshotPath: string, opts: P
  * lives inside the SDK's `examples/` tree, and is wrong for a standalone project.
  * (A command-line variable overrides a makefile `:=` assignment in GNU make.)
  * Empty target = the default goal (builds the ROM).
+ *
+ * `debug` selects a **debug build**: it adds `wla -i` + `wlalink -A` so the `.sym`
+ * carries PC→line info. Paired with `CC65816_G=1` (set on the task env) it yields
+ * source-level debug info. A **release build** (`debug=false`, the default for
+ * Build/Run) omits both, so it is byte-identical to the shipped/optimised ROM —
+ * debug metadata perturbs codegen, so it must not leak into a normal build.
  */
-export function buildMakeArgs(sdkPath?: string, target?: string): string[] {
+export function buildMakeArgs(sdkPath?: string, target?: string, debug = false): string[] {
     const args: string[] = [];
     if (sdkPath) {
         args.push(`OPENSNES=${sdkPath}`);
-        // Emit source-level debug info: `wla -i` (asm list info) + `wlalink -A`
-        // (PC→line in the .sym). Harmless to the ROM; with the patched cproc these
-        // carry C source lines (see docs/DECISIONS.md D-034). Overriding AS/LD adds
-        // the flags without touching the Makefile's ASFLAGS.
-        args.push(`AS=${path.join(sdkPath, 'bin', 'wla-65816')} -i`);
-        args.push(`LD=${path.join(sdkPath, 'bin', 'wlalink')} -A`);
+        if (debug) {
+            args.push(`AS=${path.join(sdkPath, 'bin', 'wla-65816')} -i`);
+            args.push(`LD=${path.join(sdkPath, 'bin', 'wlalink')} -A`);
+        }
     }
     if (target && target !== 'all') {
         args.push(target);

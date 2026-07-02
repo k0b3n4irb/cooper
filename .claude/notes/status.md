@@ -5,6 +5,14 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Release vs debug builds** (v0.18.0). Build/Run = release (plain make, byte-
+identical to the shipped ROM); Debug (F5) auto-builds `-g` (wla -i/wlalink -A +
+CC65816_G=1) just before launch, so debug info never leaks into a preview and you
+needn't Build first. Grounded: debug metadata perturbs codegen (OpenSNES CI: 5
+examples' framebuffer diverged in -g), and the shipped ~/bin/opensnes gates debug
+emission behind CC65816_G (verified). buildMakeArgs(sdk,target,debug) +
+runMakeAndWait + resolveDebugConfiguration. 180 Node + 8 integration. D-039.
+
 **Aggregate expansion** (v0.17.0). Struct/array locals expand in Variables →
 fields (named, typed, at offsets) and elements ([0],[1]…), recursively. Path:
 cproc writes a `.dbg` sidecar (recursive type grammar per aggregate local) →
