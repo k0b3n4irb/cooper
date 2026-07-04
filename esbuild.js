@@ -19,25 +19,29 @@ const esbuildProblemMatcherPlugin = {
   },
 };
 
+const common = {
+  bundle: true,
+  format: 'cjs',
+  minify: production,
+  sourcemap: !production,
+  sourcesContent: false,
+  platform: 'node',
+  logLevel: 'warning',
+  plugins: [esbuildProblemMatcherPlugin],
+};
+
 async function main() {
-  const ctx = await esbuild.context({
-    entryPoints: ['src/extension.ts'],
-    bundle: true,
-    format: 'cjs',
-    minify: production,
-    sourcemap: !production,
-    sourcesContent: false,
-    platform: 'node',
-    outfile: 'dist/extension.js',
-    external: ['vscode'],
-    logLevel: 'warning',
-    plugins: [esbuildProblemMatcherPlugin],
-  });
+  const ctxs = await Promise.all([
+    // The extension (imports vscode → external).
+    esbuild.context({ ...common, entryPoints: ['src/extension.ts'], outfile: 'dist/extension.js', external: ['vscode'] }),
+    // The OpenSNES MCP server — a standalone Node process the AI spawns (no vscode).
+    esbuild.context({ ...common, entryPoints: ['src/opensnesMcp.ts'], outfile: 'dist/opensnes-mcp.js' }),
+  ]);
   if (watch) {
-    await ctx.watch();
+    await Promise.all(ctxs.map((c) => c.watch()));
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
+    await Promise.all(ctxs.map((c) => c.rebuild()));
+    await Promise.all(ctxs.map((c) => c.dispose()));
   }
 }
 

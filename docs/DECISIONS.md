@@ -856,6 +856,24 @@ rationale and the docs that grounded it. Newest last.
 - **Next C7 slice:** (3) an OpenSNES MCP (lookup_api, hardware_constraint) + the
   build→luna verify loop (mostly orchestration over luna's existing MCP tools).
 
+### D-044 — C7 part 3: the OpenSNES MCP server (C7 complete)
+- **Decision:** ship an **OpenSNES MCP server** exposing the SDK as queryable tools
+  (`lookup_api`, `search_api`, `list_headers`, `hardware_constraint`) so the AI
+  reads exact signatures/rules from the *installed* SDK (beats the static
+  AGENTS.md, always matches the user's version).
+- **Hand-rolled the JSON-RPC stdio server** (`opensnesMcp.ts`) instead of adding
+  `@modelcontextprotocol/sdk` + `zod` — same protocol as the luna MCP *client*
+  (`lunaMcp.ts`), so **no new dependency**. Dispatch (`handleMessage`) is pure +
+  Node-tested; the SDK querying (`opensnesApi.ts`) is pure + tested against the real
+  SDK. Bundled as a 2nd esbuild entry → `dist/opensnes-mcp.js`.
+- **Registration:** VS Code MCP-provider API (`contributes.mcpServerDefinitionProviders`
+  + `registerMcpServerDefinitionProvider` + `McpStdioServerDefinition`), used via
+  **feature-detection + any-cast** so `engines.vscode` stays `^1.75` (a no-op on
+  older VS Code — the AGENTS.md context still applies). Runs the bundled server with
+  `process.execPath` + `ELECTRON_RUN_AS_NODE=1`.
+- **C7 complete:** context (AGENTS.md) + luna MCP (drive/verify) + OpenSNES MCP
+  (query the SDK) → write C → build → run in luna → observe → self-correct.
+
 ---
 
 ### Known limitations (Component #1)

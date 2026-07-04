@@ -4,6 +4,22 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.24.0] — 2026-07-04
+
+### Added — AI helper (C7) part 3: the OpenSNES MCP server (C7 complete)
+
+- Cooper now ships an **OpenSNES MCP server** and registers it with your assistant,
+  so the AI can query the **installed SDK** directly:
+  - `lookup_api` — a function/macro's exact signature + header + doc comment;
+  - `search_api` — find symbols by substring; `list_headers`;
+  - `hardware_constraint` — the SNES rules host intuition gets wrong.
+  This beats the static `AGENTS.md`: it always matches the user's actual SDK.
+- Hand-rolled JSON-RPC stdio server (**no new dependency**), bundled to
+  `dist/opensnes-mcp.js`, registered via VS Code's MCP-provider API
+  (feature-detected — no `engines` bump; a no-op on older VS Code). D-044.
+- **C7 is complete:** context (AGENTS.md) + luna MCP (drive/verify) + OpenSNES MCP
+  (query the SDK) → the AI writes C, builds, runs in luna, and self-corrects.
+
 ## [0.23.0] — 2026-07-04
 
 ### Added — AI helper (C7) part 2: register luna as an MCP server

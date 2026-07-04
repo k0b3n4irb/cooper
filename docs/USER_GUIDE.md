@@ -256,12 +256,19 @@ Run **Cooper: Configure AI (OpenSNES context)**. It:
   can *drive the emulator* — peek VRAM/memory, read state, screenshot — and
   **verify its own changes on real hardware**, not by guessing.
 
-Reload the window (or start agent mode) so your assistant picks up the MCP server.
+Cooper also ships an **OpenSNES MCP server**: your assistant can query the
+*installed SDK* directly — exact function signatures (`lookup_api`), symbol search
+(`search_api`), header list, and hardware constraints. So it writes correct
+OpenSNES C, looks up the real API instead of guessing, and verifies in luna.
+
+Reload the window (or start agent mode) so your assistant picks up the MCP servers.
 
 ## 12. What's next
 
-- **AI helper** — register luna's MCP so the assistant can drive the emulator, and
-  an OpenSNES MCP + a build→run→verify loop (C7 parts 2–3).
+Cooper's core is complete — build/run, source-level debugger, asset editors +
+tilemap viewer, and an OpenSNES-aware AI (context + luna + SDK MCP). Ongoing
+polish: a live BG viewer from luna, richer asset editing, and Marketplace/OpenVSX
+publishing.
 - **AI helper** — an OpenSNES-aware assistant that verifies in luna.
 
 See `docs/DECISIONS.md` and `.claude/notes/roadmap.md` for the full plan.

@@ -520,6 +520,30 @@ const pc = JSON.parse(MC.mergeProjectMcp(null, '/bin/luna'));
 check('mergeProjectMcp: key "mcpServers" (Claude Code / Cursor)', pc.mcpServers.luna.command === '/bin/luna' && JSON.stringify(pc.mcpServers.luna.args) === '["mcp"]');
 try { fs.unlinkSync(tmpMC); } catch {}
 
+// OpenSNES MCP (C7 part 3): SDK querying + the server dispatch, vs the real SDK
+console.log('\n=== OpenSNES MCP (SDK query + server) ===');
+const tmpOA = path.join(os.tmpdir(), `cooper_oa_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'opensnesApi.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpOA });
+const OA = require(tmpOA);
+check('listHeaders finds the SDK snes/*.h', OA.listHeaders(OPENSNES).some((h) => h.name === 'snes.h') && OA.listHeaders(OPENSNES).length > 10);
+const oam = OA.lookupApi(OPENSNES, 'oamSet');
+check('lookupApi finds oamSet signature in sprite.h', !!oam && /oamSet/.test(oam.signature) && oam.header.includes('sprite.h'));
+check('lookupApi finds a macro (OBJ_SIZE8_L32)', (() => { const m = OA.lookupApi(OPENSNES, 'OBJ_SIZE8_L32'); return !!m && /define\s+OBJ_SIZE8_L32/.test(m.signature); })());
+check('searchApi matches symbols by substring', OA.searchApi(OPENSNES, 'oam').some((x) => x.symbol === 'oamInit'));
+check('hardwareConstraint(compiler) says int is 2 bytes', OA.hardwareConstraint('compiler').includes('2 bytes'));
+try { fs.unlinkSync(tmpOA); } catch {}
+
+const tmpOM = path.join(os.tmpdir(), `cooper_om_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'opensnesMcp.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpOM });
+const OM = require(tmpOM);
+check('MCP initialize returns serverInfo', OM.handleMessage(OPENSNES, { id: 1, method: 'initialize', params: {} }).result.serverInfo.name === 'opensnes');
+check('MCP notifications/initialized has no reply', OM.handleMessage(OPENSNES, { method: 'notifications/initialized' }) === null);
+check('MCP tools/list lists the 4 tools', OM.handleMessage(OPENSNES, { id: 2, method: 'tools/list' }).result.tools.length === 4);
+const mcall = OM.handleMessage(OPENSNES, { id: 3, method: 'tools/call', params: { name: 'lookup_api', arguments: { symbol: 'oamSet' } } });
+check('MCP tools/call lookup_api returns the signature', /oamSet/.test(mcall.result.content[0].text));
+check('MCP unknown method -> JSON-RPC error', !!OM.handleMessage(OPENSNES, { id: 4, method: 'bogus' }).error);
+try { fs.unlinkSync(tmpOM); } catch {}
+
 // ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
 // ===========================================================================

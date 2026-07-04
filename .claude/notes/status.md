@@ -5,6 +5,16 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**AI helper (C7) part 3 — OpenSNES MCP server (C7 COMPLETE)** (v0.24.0). Cooper
+ships a hand-rolled JSON-RPC stdio MCP server (dist/opensnes-mcp.js, no new dep —
+same protocol as lunaMcp.ts client) exposing the SDK: lookup_api (exact signature +
+header + doc), search_api, list_headers, hardware_constraint. Registered via VS
+Code MCP-provider API (feature-detected + any-cast → engines stays ^1.75; no-op on
+old VS Code). Pure opensnesApi.ts + opensnesMcp.ts handleMessage, tested vs the real
+SDK. C7 done: context (AGENTS.md) + luna MCP + OpenSNES MCP → the AI writes C →
+build → run in luna → observe → self-correct. 228 Node + 8 integration. D-044.
+**All headline capabilities (C1–C7) shipped.**
+
 **AI helper (C7) part 2 — register luna as MCP** (v0.23.0). Cooper: Configure AI
 now also writes .vscode/mcp.json (key servers, Copilot) + .mcp.json (key mcpServers,
 Claude Code/Cursor) registering `luna mcp`, merging into existing config (skips

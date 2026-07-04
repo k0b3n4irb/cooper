@@ -50,10 +50,49 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.workspace.onDidSaveTextDocument(() => void tree.refresh()),
     );
     void tree.refresh();
+    registerOpensnesMcp(context);
     // Auto-configure C support for any already-open OpenSNES C files.
     for (const editor of vscode.window.visibleTextEditors) {
         void autoConfigureClangd(editor.document);
     }
+}
+
+/** Register the bundled OpenSNES MCP server (dist/opensnes-mcp.js) via VS Code's
+ *  MCP-provider API so an AI assistant can query the SDK. Feature-detected +
+ *  best-effort: on a VS Code without the API (older than ~1.101) it's a no-op —
+ *  the AGENTS.md context (Configure AI) still applies. Uses ELECTRON_RUN_AS_NODE
+ *  so VS Code's own runtime executes the server. */
+function registerOpensnesMcp(context: vscode.ExtensionContext): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lm = (vscode as any).lm;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const McpStdio = (vscode as any).McpStdioServerDefinition;
+    if (!lm?.registerMcpServerDefinitionProvider || !McpStdio) {
+        return;
+    }
+    const serverPath = context.asAbsolutePath('dist/opensnes-mcp.js');
+    const emitter = new vscode.EventEmitter<void>();
+    try {
+        context.subscriptions.push(lm.registerMcpServerDefinitionProvider('cooper.opensnes', {
+            onDidChangeMcpServerDefinitions: emitter.event,
+            provideMcpServerDefinitions: async () => {
+                const dir = await resolveProjectDir();
+                const cfg = vscode.workspace.getConfiguration('cooper');
+                const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: dir ?? '' });
+                if (!sdk) {
+                    return [];
+                }
+                return [new McpStdio({
+                    label: 'OpenSNES SDK',
+                    command: process.execPath,
+                    args: [serverPath, sdk.path],
+                    env: { ELECTRON_RUN_AS_NODE: '1' },
+                })];
+            },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            resolveMcpServerDefinition: (s: any) => s,
+        }));
+    } catch { /* API shape differs on this build — skip, AGENTS.md still applies */ }
 }
 
 export function deactivate(): void {
