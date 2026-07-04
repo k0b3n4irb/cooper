@@ -8,6 +8,8 @@
 // gfx4snes converts the PNG's 8-bit RGB palette with `>>3`, so we display/edit in
 // that exact 5-bit space and expand back with `(v<<3)|(v>>2)` (round-trips `>>3`).
 
+import * as zlib from 'zlib';
+
 export interface Rgb { r: number; g: number; b: number; }
 
 const SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -109,6 +111,82 @@ export function readIndexedPng(buf: Buffer): IndexedPng {
         colorType,
         palette,
     };
+}
+
+function paeth(a: number, b: number, c: number): number {
+    const p = a + b - c;
+    const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+    return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c);
+}
+
+/**
+ * Decode an indexed PNG's per-pixel palette indices (for the live preview). Inflates
+ * IDAT, unfilters the scanlines, and unpacks 1/2/4/8-bit indices → one byte/pixel.
+ * Non-interlaced only. Uses Node zlib (kept external by esbuild, like the encoder).
+ */
+export function readIndexedPixels(buf: Buffer): { width: number; height: number; indices: Uint8Array } {
+    const chunks = walk(buf);
+    const ihdr = chunks.find((c) => c.type === 'IHDR');
+    if (!ihdr) {
+        throw new Error('PNG has no IHDR');
+    }
+    const width = buf.readUInt32BE(ihdr.dataStart);
+    const height = buf.readUInt32BE(ihdr.dataStart + 4);
+    const bitDepth = buf[ihdr.dataStart + 8];
+    const colorType = buf[ihdr.dataStart + 9];
+    const interlace = buf[ihdr.dataStart + 12];
+    if (colorType !== 3) {
+        throw new Error('PNG is not indexed');
+    }
+    if (interlace !== 0) {
+        throw new Error('interlaced PNG not supported');
+    }
+    const idat = Buffer.concat(chunks.filter((c) => c.type === 'IDAT').map((c) => buf.subarray(c.dataStart, c.dataStart + c.length)));
+    const raw = zlib.inflateSync(idat);
+
+    const rowBytes = Math.ceil((width * bitDepth) / 8);
+    const bpp = 1; // indexed: filter operates on 1-byte units
+    const unfiltered = Buffer.alloc(height * rowBytes);
+    let prev = Buffer.alloc(rowBytes);
+    let p = 0;
+    for (let y = 0; y < height; y++) {
+        const filter = raw[p++];
+        const cur = unfiltered.subarray(y * rowBytes, y * rowBytes + rowBytes);
+        for (let x = 0; x < rowBytes; x++) {
+            const rb = raw[p++];
+            const a = x >= bpp ? cur[x - bpp] : 0;
+            const b = prev[x];
+            const c = x >= bpp ? prev[x - bpp] : 0;
+            let v: number;
+            switch (filter) {
+                case 0: v = rb; break;
+                case 1: v = rb + a; break;
+                case 2: v = rb + b; break;
+                case 3: v = rb + ((a + b) >> 1); break;
+                case 4: v = rb + paeth(a, b, c); break;
+                default: throw new Error(`unknown PNG filter ${filter}`);
+            }
+            cur[x] = v & 0xFF;
+        }
+        prev = cur;
+    }
+
+    const indices = new Uint8Array(width * height);
+    const mask = (1 << bitDepth) - 1;
+    const perByte = 8 / bitDepth;
+    for (let y = 0; y < height; y++) {
+        const row = y * rowBytes;
+        for (let x = 0; x < width; x++) {
+            if (bitDepth === 8) {
+                indices[y * width + x] = unfiltered[row + x];
+            } else {
+                const byte = unfiltered[row + Math.floor(x / perByte)];
+                const shift = 8 - bitDepth * ((x % perByte) + 1);
+                indices[y * width + x] = (byte >> shift) & mask;
+            }
+        }
+    }
+    return { width, height, indices };
 }
 
 /**

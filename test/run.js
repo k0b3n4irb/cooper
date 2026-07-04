@@ -435,6 +435,10 @@ if (fs.existsSync(pngPath)) {
     check('writePalette edits the target entry', png2.palette[1].r === 8 && png2.palette[1].g === 16 && png2.palette[1].b === 24);
     check('writePalette leaves other entries intact', png2.palette[0].r === png.palette[0].r && png2.palette[2].b === png.palette[2].b);
     check('writePalette is in-place (PLTE only, pixels untouched)', edited.length === pbuf.length);
+    // decode pixels for the live preview
+    const px = PP.readIndexedPixels(pbuf);
+    check('readIndexedPixels decodes width*height indices', px.indices.length === png.width * png.height);
+    check('every pixel index is within the palette', Array.from(px.indices).every((i) => i < png.palette.length));
 } else {
     console.log('  SKIP  no SDK sprite PNG found');
 }
@@ -444,11 +448,13 @@ try { fs.unlinkSync(tmpPP); } catch {}
 const tmpPE = path.join(os.tmpdir(), `cooper_pe_${process.pid}.cjs`);
 esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'paletteEditor.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPE });
 const PE = require(tmpPE);
-const peHtml = PE.renderPaletteEditorHtml([{ r: 255, g: 0, b: 255 }, { r: 0, g: 0, b: 0 }], 'vscode-csp:x', 'NONCE123', { fileName: 'sprite.png' });
+const peHtml = PE.renderPaletteEditorHtml([{ r: 255, g: 0, b: 255 }, { r: 0, g: 0, b: 0 }], 'vscode-csp:x', 'NONCE123', { fileName: 'sprite.png', pixels: { width: 2, height: 1, indices: [0, 1] } });
 check('palette editor gates its script by nonce (CSP)', peHtml.includes('nonce-NONCE123') && peHtml.includes('nonce="NONCE123"'));
 check('palette editor names BGR555 + the file', peHtml.includes('BGR555') && peHtml.includes('sprite.png'));
 check('palette editor embeds the palette as BGR555 words', peHtml.includes(JSON.stringify([0x7C1F, 0])));
 check('palette editor has a Save-to-PNG action', /id="save"/.test(peHtml));
+check('palette editor has a bpp (sub-palette size) selector', /id="bpp"/.test(peHtml));
+check('palette editor embeds pixels for the live preview canvas', /id="spr"/.test(peHtml) && peHtml.includes('"indices":[0,1]'));
 try { fs.unlinkSync(tmpPE); } catch {}
 
 // ===========================================================================

@@ -8,7 +8,7 @@ import { resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile 
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
-import { readIndexedPng, writePalette, bgr555ToRgb8 } from './pngPalette';
+import { readIndexedPng, readIndexedPixels, writePalette, bgr555ToRgb8 } from './pngPalette';
 import { renderPaletteEditorHtml } from './paletteEditor';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
@@ -218,8 +218,14 @@ async function editPalette(uri?: vscode.Uri): Promise<void> {
 
     const file = pngPath;
     let palette;
+    let pixels: { width: number; height: number; indices: number[] } | undefined;
     try {
-        palette = readIndexedPng(fs.readFileSync(file)).palette;
+        const buf = fs.readFileSync(file);
+        palette = readIndexedPng(buf).palette;
+        try {
+            const px = readIndexedPixels(buf); // live preview (best-effort)
+            pixels = { width: px.width, height: px.height, indices: Array.from(px.indices) };
+        } catch { /* preview optional — the palette still edits */ }
     } catch (e) {
         void vscode.window.showErrorMessage(`Cooper: ${(e as Error).message}`);
         return;
@@ -227,7 +233,7 @@ async function editPalette(uri?: vscode.Uri): Promise<void> {
     const panel = vscode.window.createWebviewPanel(
         'cooperPalette', `Palette: ${path.basename(file)}`, vscode.ViewColumn.Active,
         { enableScripts: true, retainContextWhenHidden: true });
-    panel.webview.html = renderPaletteEditorHtml(palette, panel.webview.cspSource, nonce(), { fileName: path.basename(file) });
+    panel.webview.html = renderPaletteEditorHtml(palette, panel.webview.cspSource, nonce(), { fileName: path.basename(file), pixels });
     panel.webview.onDidReceiveMessage((m: { type?: string; palette?: number[] }) => {
         if (m.type === 'save' && Array.isArray(m.palette)) {
             try {

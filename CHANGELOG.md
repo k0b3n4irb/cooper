@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.19.1] — 2026-07-04
+
+### Improved — palette editor: live sprite preview + bpp selector
+
+- The palette editor now shows a **live preview of the actual image**, recoloured
+  as you drag the sliders (WYSIWYG) — Cooper decodes the indexed PNG's pixels
+  (`readIndexedPixels`: inflate + unfilter + unpack 1/2/4/8-bit indices).
+- A **sub-palette size selector** (4 / 16 / 256 = 2bpp / 4bpp / 8bpp) lays the
+  swatches out to match the target depth.
+
 ## [0.19.0] — 2026-07-02
 
 ### Added — SNES palette editor (asset editors, C6)

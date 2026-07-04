@@ -216,6 +216,9 @@ clangd**.
   32768 colours), edited with sliders that snap to the hardware grid.
 - Swatches are laid out in **rows of 16 = the sub-palettes**; **entry 0 is
   transparent**. (CGRAM is 0–127 for backgrounds, 128–255 for sprites.)
+- A **live preview** of the actual image recolours as you drag the sliders, and a
+  **sub-palette size** selector (4 / 16 / 256 = 2bpp / 4bpp / 8bpp) matches the grid
+  to your target depth.
 - **Save to PNG** writes the palette back into the image. Because Cooper edits the
   *source* PNG (the file `gfx4snes` reads), your next **Build** regenerates the
   `.pal` automatically — no separate palette file to manage.
