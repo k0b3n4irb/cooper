@@ -493,6 +493,21 @@ const asmF = TM.assembleTilemapRgba([{ tile: 0, pal: 0, prio: 0, hflip: 1, vflip
 check('assembleTilemapRgba: applies H-flip', asmF.data[(0 * 8 + 7) * 4] === 255 && asmF.data[(0 * 8 + 7) * 4 + 3] === 255 && asmF.data[3] === 0);
 try { fs.unlinkSync(tmpTM); } catch {}
 
+// AI context (C7 part 1): AGENTS.md carries the OpenSNES/SNES rules
+const tmpAI = path.join(os.tmpdir(), `cooper_ai_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'aiContext.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpAI });
+const AI = require(tmpAI);
+const md = AI.renderAgentsMd({ projectName: 'shmup', romName: 'shmup.sfc' });
+check('AGENTS.md warns int is 2 bytes (cc65816)', md.includes('is 2 bytes'));
+check('AGENTS.md recommends fixed-width types', md.includes('u8/u16/u32'));
+check('AGENTS.md documents BGR555 + CGRAM layout', md.includes('BGR555') && md.includes('sprites'));
+check('AGENTS.md documents sprite sizes (OBSEL) + assets (gfx4snes)', md.includes('OBSEL') && md.includes('gfx4snes'));
+check('AGENTS.md points at luna for verification', md.includes('luna'));
+check('AGENTS.md names the project', md.includes('shmup'));
+const ci = AI.renderCopilotInstructions();
+check('copilot-instructions points at AGENTS.md + int caveat', ci.includes('AGENTS.md') && ci.includes('2 bytes'));
+try { fs.unlinkSync(tmpAI); } catch {}
+
 // ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
 // ===========================================================================

@@ -827,6 +827,27 @@ rationale and the docs that grounded it. Newest last.
 - **v1 scope:** 32-wide (single 32×32 screen — the common case). Follow-ups: 64-wide
   block de-interleave; a **live BG from luna** (peek VRAM map+tiles at a debug stop).
 
+## 2026-07-04 — AI helper (C7)
+
+### D-043 — C7 part 1: ship OpenSNES context via `AGENTS.md`
+- **Decision:** the first C7 slice ships SDK/hardware context as an **`AGENTS.md`**
+  (the converging cross-assistant standard — Copilot reads it behind a setting,
+  Claude Code natively) plus a `.github/copilot-instructions.md` pointer (Copilot's
+  guaranteed path). Declarative, zero runtime, immediate value. `cooper.configureAI`
+  writes them; `renderAgentsMd`/`renderCopilotInstructions` are pure + Node-tested.
+- **Content** distils this session's grounding: `int`=2 (cc65816) + fixed-width
+  types; BGR555/CGRAM (0–127 BG, 128–255 sprites, colour 0 transparent); BG modes↔
+  bpp; sprite limits + OBSEL sizes; tilemap entry `vhopppcc cccccccc` + sizes;
+  edit-source-PNG assets (gfx4snes); build (release) / debug (`-g`) / verify-in-luna.
+- **Grounded (doc-researcher, current 2026):** MCP registration paths for the next
+  slices — VS Code extension API `contributes.mcpServerDefinitionProviders` +
+  `vscode.lm.registerMcpServerDefinitionProvider` + `McpStdioServerDefinition`
+  (zero-config for Copilot); `.mcp.json` (`mcpServers`) for Claude Code/Cursor;
+  `.vscode/mcp.json` (`servers`). OpenSNES MCP = `@modelcontextprotocol/sdk` v1.x
+  (pin; v2 beta), pure Node. Verify loop = orchestration over luna's 17 MCP tools.
+- **Next C7 slices:** (2) register luna's MCP via the extension API; (3) an
+  OpenSNES MCP (lookup_api, hardware_constraint) + the build→luna verify loop.
+
 ---
 
 ### Known limitations (Component #1)

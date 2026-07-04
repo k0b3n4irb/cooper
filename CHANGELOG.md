@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.22.0] — 2026-07-04
+
+### Added — AI helper (C7) part 1: ship OpenSNES context
+
+- **Cooper: Configure AI (OpenSNES context)** writes an **`AGENTS.md`** (+ a
+  `.github/copilot-instructions.md` pointer) into your project, so any AI assistant
+  that reads them (Copilot, Claude Code, Cursor…) becomes **OpenSNES-expert**: the
+  `int`=2 caveat, BGR555/CGRAM rules, sprite sizes, tilemap format, the
+  build/run/luna workflow, and "verify in luna, not by reasoning".
+- Grounded, current MCP/assistant facts captured for the next slices (register
+  luna's MCP via the VS Code extension API; an OpenSNES MCP). D-043.
+
 ## [0.21.1] — 2026-07-04
 
 ### Improved — tile editor: undo / redo

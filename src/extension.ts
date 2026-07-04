@@ -12,6 +12,7 @@ import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bg
 import { renderPaletteEditorHtml } from './paletteEditor';
 import { renderTileEditorHtml } from './tileEditor';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
+import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
 import { renderDashboardHtml, DashboardState } from './dashboard';
@@ -38,6 +39,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.editPalette', (uri?: vscode.Uri) => editPalette(uri)),
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
+        vscode.commands.registerCommand('cooper.configureAI', () => configureAI()),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
@@ -323,6 +325,52 @@ async function viewTilemap(uri?: vscode.Uri): Promise<void> {
     } catch (e) {
         void vscode.window.showErrorMessage(`Cooper: tilemap view failed — ${(e as Error).message}`);
     }
+}
+
+// ---------------------------------------------------------------------------
+// AI helper (C7) — part 1: ship OpenSNES context so any assistant is expert.
+// ---------------------------------------------------------------------------
+
+/** Write AGENTS.md (+ .github/copilot-instructions.md) with the OpenSNES/SNES
+ *  hardware + SDK rules, so Copilot / Claude Code / Cursor become OpenSNES-aware. */
+async function configureAI(): Promise<void> {
+    const dir = (await resolveProjectDir()) ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!dir) {
+        void vscode.window.showErrorMessage('Cooper: open an OpenSNES project first.');
+        return;
+    }
+    const info = await resolveProjectInfo();
+    const agents = path.join(dir, 'AGENTS.md');
+    if (fs.existsSync(agents)) {
+        const ans = await vscode.window.showWarningMessage(
+            'AGENTS.md already exists. Overwrite it with the OpenSNES context?', 'Overwrite', 'Cancel');
+        if (ans !== 'Overwrite') {
+            return;
+        }
+    }
+    try {
+        fs.writeFileSync(agents, renderAgentsMd({
+            projectName: info.romName ? info.romName.replace(/\.(sfc|smc)$/i, '') : path.basename(dir),
+            romName: info.romName ?? undefined,
+        }));
+        const gh = path.join(dir, '.github');
+        fs.mkdirSync(gh, { recursive: true });
+        const copilot = path.join(gh, 'copilot-instructions.md');
+        if (!fs.existsSync(copilot)) {
+            fs.writeFileSync(copilot, renderCopilotInstructions());
+        }
+    } catch (e) {
+        void vscode.window.showErrorMessage(`Cooper: could not write the AI context — ${(e as Error).message}`);
+        return;
+    }
+    void vscode.window.showInformationMessage(
+        'Cooper: wrote AGENTS.md + .github/copilot-instructions.md — your AI assistant now knows OpenSNES.',
+        'Open AGENTS.md',
+    ).then((a) => {
+        if (a) {
+            void vscode.window.showTextDocument(vscode.Uri.file(agents));
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------

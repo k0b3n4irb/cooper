@@ -5,6 +5,15 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**AI helper (C7) part 1 — ship OpenSNES context** (v0.22.0). Cooper: Configure AI
+writes AGENTS.md (+ .github/copilot-instructions.md) with the SNES/OpenSNES rules
+(int=2, BGR555/CGRAM, sprite/tilemap limits, build/run/luna) so any assistant
+becomes OpenSNES-expert. Pure aiContext.ts (renderAgentsMd/renderCopilotInstructions)
++ cooper.configureAI. Grounded current MCP facts for the next slices (register luna
+MCP via VS Code extension API `mcpServerDefinitionProviders`; OpenSNES MCP via
+@modelcontextprotocol/sdk v1.x). 215 Node + 8 integration. D-043. Also: tile editor
+undo/redo (0.21.1). Next C7: (2) register luna MCP, (3) OpenSNES MCP + verify loop.
+
 **Tilemap viewer (C6, hardware-faithful — not a Tiled clone)** (v0.21.0).
 Right-click a .map → assembled background with real per-cell 16-bit attributes
 (sub-palette + H/V flip) that Tiled doesn't show. Grounding decided: tilemap

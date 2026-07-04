@@ -244,9 +244,18 @@ the real per-cell attributes (**sub-palette**, **H/V flip**). This is a *viewer*
 for **authoring** tilemaps, use **Tiled** (`.tmj`) — the SDK converts it with
 `tmx2snes` in the build.
 
-## 11. What's next
+## 11. Make your AI OpenSNES-aware
 
-- **AI helper** — an OpenSNES-aware assistant that verifies in luna (C7).
+Run **Cooper: Configure AI (OpenSNES context)**. It writes an **`AGENTS.md`** (and
+a `.github/copilot-instructions.md`) into your project with the SNES/OpenSNES rules
+— the `int`=2 gotcha, colour/sprite/tilemap hardware limits, and the build/run/luna
+workflow. Any assistant that reads those files (Copilot, Claude Code, Cursor…) then
+writes correct OpenSNES C and knows to **verify in luna**, not by guessing.
+
+## 12. What's next
+
+- **AI helper** — register luna's MCP so the assistant can drive the emulator, and
+  an OpenSNES MCP + a build→run→verify loop (C7 parts 2–3).
 - **AI helper** — an OpenSNES-aware assistant that verifies in luna.
 
 See `docs/DECISIONS.md` and `.claude/notes/roadmap.md` for the full plan.
