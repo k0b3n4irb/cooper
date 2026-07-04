@@ -214,3 +214,70 @@ export function writePalette(buf: Buffer, palette: Rgb[]): Buffer {
     out.writeUInt32BE(crc32(crcInput), plte.dataStart + plte.length);
     return out;
 }
+
+function makeChunk(type: string, data: Buffer): Buffer {
+    const out = Buffer.alloc(12 + data.length);
+    out.writeUInt32BE(data.length, 0);
+    out.write(type, 4, 'ascii');
+    data.copy(out, 8);
+    out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length);
+    return out;
+}
+
+/**
+ * Return a new PNG with its pixels replaced by `indices` (one palette index per
+ * pixel, row-major). Re-encodes IDAT (filter None + zlib) and keeps IHDR, PLTE,
+ * tRNS… so a painted image round-trips through gfx4snes. Non-interlaced only.
+ */
+export function writeIndexedPixels(buf: Buffer, indices: ArrayLike<number>): Buffer {
+    const chunks = walk(buf);
+    const ihdr = chunks.find((c) => c.type === 'IHDR');
+    if (!ihdr) {
+        throw new Error('PNG has no IHDR');
+    }
+    const width = buf.readUInt32BE(ihdr.dataStart);
+    const height = buf.readUInt32BE(ihdr.dataStart + 4);
+    const bitDepth = buf[ihdr.dataStart + 8];
+    const rowBytes = Math.ceil((width * bitDepth) / 8);
+    const mask = (1 << bitDepth) - 1;
+    const perByte = 8 / bitDepth;
+
+    const rawLen = height * (rowBytes + 1);
+    const raw = Buffer.alloc(rawLen);
+    let o = 0;
+    for (let y = 0; y < height; y++) {
+        raw[o++] = 0; // filter type: None
+        if (bitDepth === 8) {
+            for (let x = 0; x < width; x++) {
+                raw[o++] = indices[y * width + x] & 0xFF;
+            }
+        } else {
+            for (let bx = 0; bx < rowBytes; bx++) {
+                let byte = 0;
+                for (let k = 0; k < perByte; k++) {
+                    const x = bx * perByte + k;
+                    const idx = x < width ? (indices[y * width + x] & mask) : 0;
+                    byte |= idx << (8 - bitDepth * (k + 1));
+                }
+                raw[o++] = byte;
+            }
+        }
+    }
+    const idatData = zlib.deflateSync(raw);
+
+    // Rebuild: every non-IDAT chunk in order, with one fresh IDAT where the old
+    // IDAT stream was.
+    const parts: Buffer[] = [buf.subarray(0, 8)]; // signature
+    let idatWritten = false;
+    for (const c of chunks) {
+        if (c.type === 'IDAT') {
+            if (!idatWritten) {
+                parts.push(makeChunk('IDAT', idatData));
+                idatWritten = true;
+            }
+            continue; // drop old IDAT chunks
+        }
+        parts.push(buf.subarray(c.start, c.dataStart + c.length + 4)); // whole chunk incl crc
+    }
+    return Buffer.concat(parts);
+}

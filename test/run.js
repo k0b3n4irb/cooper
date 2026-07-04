@@ -439,6 +439,13 @@ if (fs.existsSync(pngPath)) {
     const px = PP.readIndexedPixels(pbuf);
     check('readIndexedPixels decodes width*height indices', px.indices.length === png.width * png.height);
     check('every pixel index is within the palette', Array.from(px.indices).every((i) => i < png.palette.length));
+    // writeIndexedPixels: paint one pixel, re-encode, round-trip + palette kept
+    const painted = Array.from(px.indices);
+    painted[0] = painted[0] === 3 ? 2 : 3;
+    const rw = PP.writeIndexedPixels(pbuf, painted);
+    const px2 = PP.readIndexedPixels(rw);
+    check('writeIndexedPixels round-trips the pixels', px2.indices.length === painted.length && Array.from(px2.indices).every((v, i) => v === painted[i]));
+    check('writeIndexedPixels preserves the palette', PP.readIndexedPng(rw).palette.length === png.palette.length);
 } else {
     console.log('  SKIP  no SDK sprite PNG found');
 }
@@ -456,6 +463,17 @@ check('palette editor has a Save-to-PNG action', /id="save"/.test(peHtml));
 check('palette editor has a bpp (sub-palette size) selector', /id="bpp"/.test(peHtml));
 check('palette editor embeds pixels for the live preview canvas', /id="spr"/.test(peHtml) && peHtml.includes('"indices":[0,1]'));
 try { fs.unlinkSync(tmpPE); } catch {}
+
+// tile/sprite editor webview (pure HTML render)
+const tmpTE = path.join(os.tmpdir(), `cooper_te_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'tileEditor.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpTE });
+const TE = require(tmpTE);
+check('SPRITE_CELLS are the SNES square sizes (×8)', JSON.stringify(TE.SPRITE_CELLS) === '[8,16,32,64]');
+const teHtml = TE.renderTileEditorHtml({ width: 2, height: 2, indices: [0, 1, 2, 3] }, [{ r: 0, g: 0, b: 0 }, { r: 255, g: 0, b: 0 }], 'vscode-csp:x', 'TN123', { fileName: 'tiles.png' });
+check('tile editor gates its script by nonce (CSP)', teHtml.includes('nonce-TN123') && teHtml.includes('nonce="TN123"'));
+check('tile editor embeds the pixel indices', teHtml.includes('"indices":[0,1,2,3]') && teHtml.includes('tiles.png'));
+check('tile editor has a cell-size overlay + Save', /id="cell"/.test(teHtml) && /id="save"/.test(teHtml));
+try { fs.unlinkSync(tmpTE); } catch {}
 
 // ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.

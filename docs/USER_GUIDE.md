@@ -226,9 +226,19 @@ clangd**.
 > Tip: at a debug stop, open **PPU VIEWERS → Palette** to see the **live CGRAM** on
 > real hardware and compare it with what you designed.
 
+### Tiles / sprites
+
+**Right-click a `.png` → Edit Tiles / Sprites** (or **Cooper: Edit Tiles /
+Sprites**). A zoomable paint grid over the indexed image:
+
+- Pick a colour from the palette strip and **paint pixels** (click/drag).
+- Grey lines mark the **8×8 tiles**; blue lines mark the **sprite cell** (choose
+  8 / 16 / 32 / 64 — the SNES square sizes). Index 0 is transparent.
+- **Save to PNG** writes the pixels back; **Build** regenerates the `.pic`.
+
 ## 11. What's next
 
-- **Asset editors** — tiles / sprites (size-accurate) and tilemap editing.
+- **Asset editors** — tilemap editing (`.tmx` / per-mode `.map`).
 - **AI helper** — an OpenSNES-aware assistant that verifies in luna.
 
 See `docs/DECISIONS.md` and `.claude/notes/roadmap.md` for the full plan.

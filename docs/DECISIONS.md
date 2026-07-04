@@ -793,6 +793,20 @@ rationale and the docs that grounded it. Newest last.
   enforced by `setMode` — the editors should enforce it.
 - **Next (C6):** tile/sprite editor (size-pair enforcement) → tilemap.
 
+### D-041 — Tile/sprite editor paints the indexed PNG's pixels
+- **Decision:** the second asset editor paints the **indexed PNG's pixels** (the
+  same source `gfx4snes` consumes), with an 8×8 tile grid + a sprite-cell overlay
+  (8/16/32/64 — the square sizes; the 6 OBSEL *pairs* pick small/large per sprite
+  at runtime, which is a game/`oamInit` concern, not a pixel one). Reuses
+  `readIndexedPixels` (decode) + new `writeIndexedPixels` (re-encode IDAT, filter
+  None + zlib, keeping IHDR/PLTE).
+- **Verified end-to-end:** paint a pixel → `writeIndexedPixels` → `gfx4snes`
+  accepts the PNG and emits a `.pic`; decode round-trips exactly; palette
+  preserved. Pure `tileEditor.ts` (nonce-CSP webview) + `cooper.editTiles` glue
+  + explorer context menu.
+- **v1 scope:** paint/zoom/grid/save; palette strip shows the first N (4bpp = 16).
+  Not yet: per-tile flip/dedup (gfx4snes `-F`), metasprite layout, undo history.
+
 ---
 
 ### Known limitations (Component #1)

@@ -5,6 +5,13 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**SNES tile/sprite editor (C6)** (v0.20.0). Right-click a .png → paint grid over the
+indexed image: palette-strip colour pick, 8×8 tile overlay + sprite-cell guide
+(8/16/32/64), zoom, Save → writeIndexedPixels re-encodes IDAT (filter None + zlib,
+keeps PLTE) → Build regenerates the .pic. Verified end-to-end (paint → gfx4snes
+accepts → round-trips). tileEditor.ts + cooper.editTiles. Palette editor got live
+preview + bpp selector (0.19.1). 203 Node + 8 integration. D-041. Next C6: tilemap.
+
 **SNES palette editor (C6, first asset editor)** (v0.19.0). Right-click an indexed
 PNG → BGR555 editor (channels 0–31, rows of 16 = sub-palettes, entry 0 transparent);
 Save writes the PNG's PLTE → Build regenerates the .pal. Edits the *source* PNG

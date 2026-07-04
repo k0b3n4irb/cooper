@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.19.1",
+  "version": "0.20.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -124,6 +124,11 @@
         "command": "cooper.editPalette",
         "title": "Edit Palette (SNES BGR555)",
         "category": "Cooper"
+      },
+      {
+        "command": "cooper.editTiles",
+        "title": "Edit Tiles / Sprites",
+        "category": "Cooper"
       }
     ],
     "viewsContainers": {
@@ -149,6 +154,11 @@
           "command": "cooper.editPalette",
           "when": "resourceExtname == .png",
           "group": "cooper@1"
+        },
+        {
+          "command": "cooper.editTiles",
+          "when": "resourceExtname == .png",
+          "group": "cooper@2"
         }
       ],
       "view/title": [

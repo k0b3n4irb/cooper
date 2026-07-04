@@ -8,8 +8,9 @@ import { resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile 
 import { LunaDebugSession } from './lunaDebug';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
-import { readIndexedPng, readIndexedPixels, writePalette, bgr555ToRgb8 } from './pngPalette';
+import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
 import { renderPaletteEditorHtml } from './paletteEditor';
+import { renderTileEditorHtml } from './tileEditor';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
 import { renderDashboardHtml, DashboardState } from './dashboard';
@@ -34,6 +35,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.debug', () => startLunaDebug(tree.current())),
         vscode.commands.registerCommand('cooper.breakOnSymbol', (name: string) => breakOnSymbol(name)),
         vscode.commands.registerCommand('cooper.editPalette', (uri?: vscode.Uri) => editPalette(uri)),
+        vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
@@ -190,33 +192,35 @@ function breakOnSymbol(name: string): void {
 // Asset editors (C6) — the SNES palette editor.
 // ---------------------------------------------------------------------------
 
-/** Edit the palette of an indexed PNG (the source `gfx4snes` consumes). Resolves
- *  the PNG from the explorer context / active editor / a project quick-pick, then
- *  opens a BGR555 editor that writes the PNG's PLTE back on Save. */
-async function editPalette(uri?: vscode.Uri): Promise<void> {
-    let pngPath = (uri?.fsPath && uri.fsPath.endsWith('.png')) ? uri.fsPath : undefined;
-    if (!pngPath) {
-        const active = vscode.window.activeTextEditor?.document.uri.fsPath;
-        pngPath = active && active.endsWith('.png') ? active : undefined;
+/** Resolve an editable indexed PNG: explorer context → active editor → quick-pick. */
+async function resolveEditablePng(uri: vscode.Uri | undefined, purpose: string): Promise<string | undefined> {
+    if (uri?.fsPath && uri.fsPath.endsWith('.png')) {
+        return uri.fsPath;
     }
-    if (!pngPath) {
-        const dir = await resolveProjectDir();
-        const pngs = await vscode.workspace.findFiles(
-            dir ? new vscode.RelativePattern(dir, '**/*.png') : '**/*.png', '**/node_modules/**', 200);
-        if (pngs.length === 0) {
-            void vscode.window.showErrorMessage('Cooper: no PNG found in this project to edit.');
-            return;
-        }
-        const pick = await vscode.window.showQuickPick(
-            pngs.map((u) => ({ label: path.basename(u.fsPath), description: vscode.workspace.asRelativePath(u), u })),
-            { placeHolder: 'Pick an indexed PNG to edit its SNES palette' });
-        if (!pick) {
-            return;
-        }
-        pngPath = pick.u.fsPath;
+    const active = vscode.window.activeTextEditor?.document.uri.fsPath;
+    if (active && active.endsWith('.png')) {
+        return active;
     }
+    const dir = await resolveProjectDir();
+    const pngs = await vscode.workspace.findFiles(
+        dir ? new vscode.RelativePattern(dir, '**/*.png') : '**/*.png', '**/node_modules/**', 200);
+    if (pngs.length === 0) {
+        void vscode.window.showErrorMessage('Cooper: no PNG found in this project to edit.');
+        return undefined;
+    }
+    const pick = await vscode.window.showQuickPick(
+        pngs.map((u) => ({ label: path.basename(u.fsPath), description: vscode.workspace.asRelativePath(u), u })),
+        { placeHolder: `Pick an indexed PNG to ${purpose}` });
+    return pick?.u.fsPath;
+}
 
-    const file = pngPath;
+/** Edit the palette of an indexed PNG (the source `gfx4snes` consumes) — a BGR555
+ *  editor that writes the PNG's PLTE back on Save. */
+async function editPalette(uri?: vscode.Uri): Promise<void> {
+    const file = await resolveEditablePng(uri, 'edit its SNES palette');
+    if (!file) {
+        return;
+    }
     let palette;
     let pixels: { width: number; height: number; indices: number[] } | undefined;
     try {
@@ -241,6 +245,41 @@ async function editPalette(uri?: vscode.Uri): Promise<void> {
                 fs.writeFileSync(file, out);
                 void panel.webview.postMessage({ type: 'saved' });
                 void vscode.window.showInformationMessage(`Cooper: palette saved to ${path.basename(file)} — Build to regenerate the .pal.`);
+            } catch (e) {
+                void vscode.window.showErrorMessage(`Cooper: save failed — ${(e as Error).message}`);
+            }
+        }
+    });
+}
+
+/** Edit the pixels of an indexed PNG (tiles/sprites) — a paint grid with an 8×8
+ *  tile overlay + sprite-cell guide; writes the PNG's pixels back on Save. */
+async function editTiles(uri?: vscode.Uri): Promise<void> {
+    const file = await resolveEditablePng(uri, 'edit its tiles/sprites');
+    if (!file) {
+        return;
+    }
+    let palette;
+    let pixels: { width: number; height: number; indices: number[] };
+    try {
+        const buf = fs.readFileSync(file);
+        palette = readIndexedPng(buf).palette;
+        const px = readIndexedPixels(buf);
+        pixels = { width: px.width, height: px.height, indices: Array.from(px.indices) };
+    } catch (e) {
+        void vscode.window.showErrorMessage(`Cooper: ${(e as Error).message}`);
+        return;
+    }
+    const panel = vscode.window.createWebviewPanel(
+        'cooperTiles', `Tiles: ${path.basename(file)}`, vscode.ViewColumn.Active,
+        { enableScripts: true, retainContextWhenHidden: true });
+    panel.webview.html = renderTileEditorHtml(pixels, palette, panel.webview.cspSource, nonce(), { fileName: path.basename(file) });
+    panel.webview.onDidReceiveMessage((m: { type?: string; indices?: number[] }) => {
+        if (m.type === 'save' && Array.isArray(m.indices)) {
+            try {
+                fs.writeFileSync(file, writeIndexedPixels(fs.readFileSync(file), m.indices));
+                void panel.webview.postMessage({ type: 'saved' });
+                void vscode.window.showInformationMessage(`Cooper: tiles saved to ${path.basename(file)} — Build to regenerate the .pic.`);
             } catch (e) {
                 void vscode.window.showErrorMessage(`Cooper: save failed — ${(e as Error).message}`);
             }

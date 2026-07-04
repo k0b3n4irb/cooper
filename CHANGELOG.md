@@ -4,6 +4,19 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.20.0] — 2026-07-04
+
+### Added — SNES tile/sprite editor (asset editors, C6)
+
+- **Paint an indexed PNG's pixels.** Right-click a `.png` → **Edit Tiles /
+  Sprites** (or *Cooper: Edit Tiles / Sprites*): a zoomable paint grid with an
+  **8×8 tile overlay** and a selectable **sprite-cell** guide (8/16/32/64 — the
+  SNES square sizes). Pick a colour from the palette strip, paint, **Save to
+  PNG** → **Build** regenerates the `.pic`.
+- Cooper now round-trips pixels through the PNG: `writeIndexedPixels` re-encodes
+  IDAT (filter None + zlib), keeping IHDR/PLTE. Verified end-to-end — a painted
+  PNG is accepted by `gfx4snes` and round-trips exactly. D-041.
+
 ## [0.19.1] — 2026-07-04
 
 ### Improved — palette editor: live sprite preview + bpp selector
