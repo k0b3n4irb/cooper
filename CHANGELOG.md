@@ -4,6 +4,13 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.21.1] — 2026-07-04
+
+### Improved — tile editor: undo / redo
+
+- The tile/sprite editor now has **undo / redo** (buttons + **Ctrl/Cmd+Z** and
+  **Ctrl/Cmd+Shift+Z** / **Ctrl+Y**) — one history entry per paint stroke.
+
 ## [0.21.0] — 2026-07-04
 
 ### Added — Tilemap viewer (hardware-accurate, not a Tiled clone)

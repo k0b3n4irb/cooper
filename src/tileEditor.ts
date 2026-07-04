@@ -62,7 +62,7 @@ export function renderTileEditorHtml(
     <span id="pos" class="sub"></span>
   </div>
   <div id="wrap"><canvas id="c"></canvas></div>
-  <div class="bar"><button id="save">Save to PNG</button> <span id="status" class="sub"></span></div>
+  <div class="bar"><button id="undo">Undo</button> <button id="redo">Redo</button> <button id="save">Save to PNG</button> <span id="status" class="sub"></span></div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
   const pal = ${bgr};
@@ -104,12 +104,21 @@ export function renderTileEditorHtml(
     const x=Math.floor((ev.clientX-r.left)/scale), y=Math.floor((ev.clientY-r.top)/scale);
     if(x<0||y<0||x>=W||y>=H) return;
     document.getElementById('pos').textContent='('+x+','+y+')';
-    if(painting && idx[y*W+x]!==active){ idx[y*W+x]=active; draw(); }
+    if(painting && idx[y*W+x]!==active){ idx[y*W+x]=active; dirty=true; draw(); }
   }
+  // undo/redo history (snapshots of the whole index array, one per stroke)
+  let hist=[idx.slice()], hi=0, dirty=false;
+  function snapshot(){ hist=hist.slice(0,hi+1); hist.push(idx.slice()); hi=hist.length-1; if(hist.length>200){hist.shift();hi--;} }
+  function restore(a){ for(let i=0;i<idx.length;i++) idx[i]=a[i]; draw(); }
+  function undo(){ if(hi>0){ hi--; restore(hist[hi]); } }
+  function redo(){ if(hi<hist.length-1){ hi++; restore(hist[hi]); } }
   let painting=false;
-  c.addEventListener('mousedown',e=>{painting=true; const r=c.getBoundingClientRect(); const x=Math.floor((e.clientX-r.left)/scale),y=Math.floor((e.clientY-r.top)/scale); if(x>=0&&y>=0&&x<W&&y<H){idx[y*W+x]=active; draw();}});
-  window.addEventListener('mouseup',()=>painting=false);
+  c.addEventListener('mousedown',e=>{painting=true; dirty=false; const r=c.getBoundingClientRect(); const x=Math.floor((e.clientX-r.left)/scale),y=Math.floor((e.clientY-r.top)/scale); if(x>=0&&y>=0&&x<W&&y<H&&idx[y*W+x]!==active){idx[y*W+x]=active; dirty=true; draw();}});
+  window.addEventListener('mouseup',()=>{ if(painting&&dirty){ snapshot(); } painting=false; });
   c.addEventListener('mousemove',paintAt);
+  document.getElementById('undo').onclick=undo;
+  document.getElementById('redo').onclick=redo;
+  window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); } else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); } });
   document.getElementById('cell').onchange=e=>{cell=+e.target.value; draw();};
   document.getElementById('gridck').onchange=e=>{showGrid=e.target.checked; draw();};
   document.getElementById('zin').onclick=()=>{scale=Math.min(24,scale+2); draw();};
