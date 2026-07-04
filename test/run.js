@@ -475,6 +475,23 @@ check('tile editor embeds the pixel indices', teHtml.includes('"indices":[0,1,2,
 check('tile editor has a cell-size overlay + Save', /id="cell"/.test(teHtml) && /id="save"/.test(teHtml));
 try { fs.unlinkSync(tmpTE); } catch {}
 
+// tilemap viewer: parse 16-bit entries + assemble with sub-palette + flip
+const tmpTM = path.join(os.tmpdir(), `cooper_tm_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'tilemap.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpTM });
+const TM = require(tmpTM);
+const ents = TM.parseTilemapEntries([0x01, 0x00, 0x02, 0x84]); // 0x0001, 0x8402
+check('parseTilemapEntries: tile/palette/flip bits (vhopppcc cccccccc)',
+    ents.length === 2 && ents[0].tile === 1 && ents[0].pal === 0 && ents[0].vflip === 0
+    && ents[1].tile === 2 && ents[1].pal === 1 && ents[1].vflip === 1);
+const oneTile = new Array(64).fill(0); oneTile[0] = 1; // only the top-left pixel is index 1
+const pal2 = [{ r: 0, g: 0, b: 0 }, { r: 255, g: 0, b: 0 }];
+const asm = TM.assembleTilemapRgba([{ tile: 0, pal: 0, prio: 0, hflip: 0, vflip: 0 }], [oneTile], pal2, 1);
+check('assembleTilemapRgba: paints index via sub-palette', asm.width === 8 && asm.height === 8 && asm.data[0] === 255 && asm.data[3] === 255);
+check('assembleTilemapRgba: index 0 is transparent', asm.data[(1 * 8 + 1) * 4 + 3] === 0);
+const asmF = TM.assembleTilemapRgba([{ tile: 0, pal: 0, prio: 0, hflip: 1, vflip: 0 }], [oneTile], pal2, 1);
+check('assembleTilemapRgba: applies H-flip', asmF.data[(0 * 8 + 7) * 4] === 255 && asmF.data[(0 * 8 + 7) * 4 + 3] === 255 && asmF.data[3] === 0);
+try { fs.unlinkSync(tmpTM); } catch {}
+
 // ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
 // ===========================================================================

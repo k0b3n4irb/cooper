@@ -236,9 +236,17 @@ Sprites**). A zoomable paint grid over the indexed image:
   8 / 16 / 32 / 64 — the SNES square sizes). Index 0 is transparent.
 - **Save to PNG** writes the pixels back; **Build** regenerates the `.pic`.
 
+### Tilemaps
+
+**Right-click a `.map` → View Tilemap (assembled)** to see the background the way
+the SNES draws it — Cooper reads the `.map` + `.pic` tileset + `.pal` and applies
+the real per-cell attributes (**sub-palette**, **H/V flip**). This is a *viewer*:
+for **authoring** tilemaps, use **Tiled** (`.tmj`) — the SDK converts it with
+`tmx2snes` in the build.
+
 ## 11. What's next
 
-- **Asset editors** — tilemap editing (`.tmx` / per-mode `.map`).
+- **AI helper** — an OpenSNES-aware assistant that verifies in luna (C7).
 - **AI helper** — an OpenSNES-aware assistant that verifies in luna.
 
 See `docs/DECISIONS.md` and `.claude/notes/roadmap.md` for the full plan.

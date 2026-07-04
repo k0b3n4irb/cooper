@@ -41,7 +41,7 @@ suite('Cooper — activation & commands', () => {
     test('contributes its commands', async () => {
         await vscode.extensions.getExtension(EXT_ID)!.activate();
         const cmds = await vscode.commands.getCommands(true);
-        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd', 'cooper.refresh', 'cooper.debug', 'cooper.home', 'cooper.openWalkthrough', 'cooper.editPalette', 'cooper.editTiles']) {
+        for (const c of ['cooper.build', 'cooper.preview', 'cooper.configureClangd', 'cooper.refresh', 'cooper.debug', 'cooper.home', 'cooper.openWalkthrough', 'cooper.editPalette', 'cooper.editTiles', 'cooper.viewTilemap']) {
             assert.ok(cmds.includes(c), `missing command ${c}`);
         }
     });

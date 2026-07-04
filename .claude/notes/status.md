@@ -5,6 +5,15 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Tilemap viewer (C6, hardware-faithful — not a Tiled clone)** (v0.21.0).
+Right-click a .map → assembled background with real per-cell 16-bit attributes
+(sub-palette + H/V flip) that Tiled doesn't show. Grounding decided: tilemap
+*authoring* = Tiled (off-the-shelf, SDK integrates via tmx2snes) so Cooper builds
+the VIEWER, not an editor (D-042). Pure tilemap.ts (parseTilemapEntries +
+assembleTilemapRgba, reuses tiles.ts) + cooper.viewTilemap. Verified visually (mode1
+→ exact OpenSNES-logo bg). 207 Node + 8 integration. C6 asset editors: palette +
+tiles (editors) + tilemap (viewer) done. Next big axis: C7 (AI helper).
+
 **SNES tile/sprite editor (C6)** (v0.20.0). Right-click a .png → paint grid over the
 indexed image: palette-strip colour pick, 8×8 tile overlay + sprite-cell guide
 (8/16/32/64), zoom, Save → writeIndexedPixels re-encodes IDAT (filter None + zlib,

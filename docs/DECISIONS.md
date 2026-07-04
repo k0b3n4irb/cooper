@@ -807,6 +807,26 @@ rationale and the docs that grounded it. Newest last.
 - **v1 scope:** paint/zoom/grid/save; palette strip shows the first N (4bpp = 16).
   Not yet: per-tile flip/dedup (gfx4snes `-F`), metasprite layout, undo history.
 
+### D-042 — Tilemap: a hardware-faithful VIEWER, not a Tiled clone
+- **Decision (garde-fou):** Cooper does **not** build a tilemap editor. Grounding
+  showed the OpenSNES map workflow is two paths: (A) a **big PNG → `gfx4snes -m`**
+  (the tile editor already covers editing that PNG; the `.map` is a derived, dedup
+  artifact — no per-cell authoring), and (B) a **Tiled `.tmj` → `tmx2snes`** (Tiled
+  is a best-in-class off-the-shelf tilemap editor the SDK already integrates).
+  Cloning Tiled would violate "off-the-shelf everywhere except the differentiators"
+  + "no parallel asset pipeline". So Cooper ships a **read-only viewer** — the
+  SNES-truth Tiled can't show.
+- **Grounded (SDK):** the 16-bit entry is `vhopppcc cccccccc` — tile 0-1023 (bits
+  0-9), palette (10-12), priority (13), H-flip (14), V-flip (15) — from
+  `gfx4snes/common.h` + `tmx2snes.c`. Legal map sizes 32×32/64×32/32×64/64×64
+  (`background.h:30`). Mode 7 differs (128×128 byte map, no per-cell attributes).
+- **Shape:** pure `tilemap.ts` (`parseTilemapEntries` + `assembleTilemapRgba`,
+  reusing `tiles.ts` decode + `encodePng`) + `cooper.viewTilemap` glue reading the
+  `.map`/`.pic`/`.pal` trio; renders via the existing `renderVramHtml`. Verified
+  visually: the mode1 example assembles to its exact OpenSNES-logo background.
+- **v1 scope:** 32-wide (single 32×32 screen — the common case). Follow-ups: 64-wide
+  block de-interleave; a **live BG from luna** (peek VRAM map+tiles at a debug stop).
+
 ---
 
 ### Known limitations (Component #1)

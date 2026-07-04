@@ -4,6 +4,20 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.21.0] — 2026-07-04
+
+### Added — Tilemap viewer (hardware-accurate, not a Tiled clone)
+
+- **View a `.map` assembled the way the SNES draws it.** Right-click a `.map` →
+  **View Tilemap (assembled)** (or *Cooper: View Tilemap*): Cooper reads the
+  gfx4snes `.map` + `.pic` tileset + `.pal`, and paints the full background
+  applying the real per-cell 16-bit attributes — **sub-palette and H/V flip** —
+  which Tiled doesn't render hardware-faithfully.
+- **Not an editor:** tilemap *authoring* is Tiled (which the SDK already
+  integrates via `tmx2snes`); cloning it would be debt. Cooper adds the SNES-truth
+  *viewer* instead. Verified end-to-end (the mode1 example assembles to its exact
+  background). D-042.
+
 ## [0.20.0] — 2026-07-04
 
 ### Added — SNES tile/sprite editor (asset editors, C6)

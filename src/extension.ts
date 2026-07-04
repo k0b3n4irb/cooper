@@ -11,6 +11,7 @@ import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile }
 import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
 import { renderPaletteEditorHtml } from './paletteEditor';
 import { renderTileEditorHtml } from './tileEditor';
+import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
 import { renderDashboardHtml, DashboardState } from './dashboard';
@@ -36,6 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.breakOnSymbol', (name: string) => breakOnSymbol(name)),
         vscode.commands.registerCommand('cooper.editPalette', (uri?: vscode.Uri) => editPalette(uri)),
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
+        vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
@@ -192,32 +194,33 @@ function breakOnSymbol(name: string): void {
 // Asset editors (C6) — the SNES palette editor.
 // ---------------------------------------------------------------------------
 
-/** Resolve an editable indexed PNG: explorer context → active editor → quick-pick. */
-async function resolveEditablePng(uri: vscode.Uri | undefined, purpose: string): Promise<string | undefined> {
-    if (uri?.fsPath && uri.fsPath.endsWith('.png')) {
+/** Resolve a project file of a given extension: explorer context → active editor
+ *  → quick-pick over the project. */
+async function resolveProjectFile(uri: vscode.Uri | undefined, ext: string, purpose: string): Promise<string | undefined> {
+    if (uri?.fsPath && uri.fsPath.endsWith(ext)) {
         return uri.fsPath;
     }
     const active = vscode.window.activeTextEditor?.document.uri.fsPath;
-    if (active && active.endsWith('.png')) {
+    if (active && active.endsWith(ext)) {
         return active;
     }
     const dir = await resolveProjectDir();
-    const pngs = await vscode.workspace.findFiles(
-        dir ? new vscode.RelativePattern(dir, '**/*.png') : '**/*.png', '**/node_modules/**', 200);
-    if (pngs.length === 0) {
-        void vscode.window.showErrorMessage('Cooper: no PNG found in this project to edit.');
+    const found = await vscode.workspace.findFiles(
+        dir ? new vscode.RelativePattern(dir, `**/*${ext}`) : `**/*${ext}`, '**/node_modules/**', 400);
+    if (found.length === 0) {
+        void vscode.window.showErrorMessage(`Cooper: no ${ext} file found in this project.`);
         return undefined;
     }
     const pick = await vscode.window.showQuickPick(
-        pngs.map((u) => ({ label: path.basename(u.fsPath), description: vscode.workspace.asRelativePath(u), u })),
-        { placeHolder: `Pick an indexed PNG to ${purpose}` });
+        found.map((u) => ({ label: path.basename(u.fsPath), description: vscode.workspace.asRelativePath(u), u })),
+        { placeHolder: `Pick a ${ext} to ${purpose}` });
     return pick?.u.fsPath;
 }
 
 /** Edit the palette of an indexed PNG (the source `gfx4snes` consumes) — a BGR555
  *  editor that writes the PNG's PLTE back on Save. */
 async function editPalette(uri?: vscode.Uri): Promise<void> {
-    const file = await resolveEditablePng(uri, 'edit its SNES palette');
+    const file = await resolveProjectFile(uri, '.png', 'edit its SNES palette');
     if (!file) {
         return;
     }
@@ -255,7 +258,7 @@ async function editPalette(uri?: vscode.Uri): Promise<void> {
 /** Edit the pixels of an indexed PNG (tiles/sprites) — a paint grid with an 8×8
  *  tile overlay + sprite-cell guide; writes the PNG's pixels back on Save. */
 async function editTiles(uri?: vscode.Uri): Promise<void> {
-    const file = await resolveEditablePng(uri, 'edit its tiles/sprites');
+    const file = await resolveProjectFile(uri, '.png', 'edit its tiles/sprites');
     if (!file) {
         return;
     }
@@ -285,6 +288,41 @@ async function editTiles(uri?: vscode.Uri): Promise<void> {
             }
         }
     });
+}
+
+/** View a `.map` (gfx4snes output) assembled with its `.pic` tileset + `.pal`,
+ *  applying the real SNES per-cell attributes (sub-palette + H/V flip) — what
+ *  Tiled doesn't show hardware-faithfully. Read-only. */
+async function viewTilemap(uri?: vscode.Uri): Promise<void> {
+    const mapPath = await resolveProjectFile(uri, '.map', 'view assembled');
+    if (!mapPath) {
+        return;
+    }
+    const base = mapPath.replace(/\.map$/, '');
+    const picPath = `${base}.pic`, palPath = `${base}.pal`;
+    if (!fs.existsSync(picPath) || !fs.existsSync(palPath)) {
+        void vscode.window.showErrorMessage(`Cooper: need ${path.basename(picPath)} + ${path.basename(palPath)} beside the .map — Build first (gfx4snes -m -p).`);
+        return;
+    }
+    try {
+        const entries = parseTilemapEntries(fs.readFileSync(mapPath));
+        const picBytes = Array.from(fs.readFileSync(picPath));
+        const tiles = decodeTileSheet(picBytes, 4, Math.floor(picBytes.length / bytesPerTile(4)));
+        const palBlob = fs.readFileSync(palPath);
+        const palette = [];
+        for (let i = 0; i + 1 < palBlob.length; i += 2) {
+            palette.push(bgr555ToRgb8(palBlob.readUInt16LE(i)));
+        }
+        const width = 32; // a single 32×32 screen — the common gfx4snes -m output
+        const img = assembleTilemapRgba(entries, tiles, palette, width);
+        const png = encodePng(img.width, img.height, img.data).toString('base64');
+        const panel = vscode.window.createWebviewPanel(
+            'cooperTilemap', `Tilemap: ${path.basename(mapPath)}`, vscode.ViewColumn.Active, { enableScripts: false });
+        const info = `${entries.length} entries · ${width}×${Math.ceil(entries.length / width)} tiles · ${img.width}×${img.height}px`;
+        panel.webview.html = renderVramHtml(png, panel.webview.cspSource, info, Math.min(640, img.width * 2));
+    } catch (e) {
+        void vscode.window.showErrorMessage(`Cooper: tilemap view failed — ${(e as Error).message}`);
+    }
 }
 
 // ---------------------------------------------------------------------------
