@@ -4,6 +4,19 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.23.0] — 2026-07-04
+
+### Added — AI helper (C7) part 2: register luna as an MCP server
+
+- **Cooper: Configure AI** now also registers **luna as an MCP server** for your
+  assistant — it writes `.vscode/mcp.json` (VS Code / Copilot, key `servers`) and
+  `.mcp.json` (Claude Code / Cursor, key `mcpServers`), merging into any existing
+  config (a config it can't parse is left untouched). Your AI can then drive the
+  emulator — peek VRAM/memory, read state, screenshot, run to a PC — to **verify
+  its own changes on cycle-accurate hardware**.
+- File-based on purpose (works on any VS Code + any assistant, no `engines` bump).
+  D-043.
+
 ## [0.22.0] — 2026-07-04
 
 ### Added — AI helper (C7) part 1: ship OpenSNES context

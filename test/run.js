@@ -508,6 +508,18 @@ const ci = AI.renderCopilotInstructions();
 check('copilot-instructions points at AGENTS.md + int caveat', ci.includes('AGENTS.md') && ci.includes('2 bytes'));
 try { fs.unlinkSync(tmpAI); } catch {}
 
+// MCP config (C7 part 2): register luna for the AI, per-assistant keys
+const tmpMC = path.join(os.tmpdir(), `cooper_mc_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'mcpConfig.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpMC });
+const MC = require(tmpMC);
+const vc = JSON.parse(MC.mergeVscodeMcp(null, '/bin/luna'));
+check('mergeVscodeMcp: key "servers" + luna stdio (VS Code/Copilot)', vc.servers.luna.type === 'stdio' && vc.servers.luna.command === '/bin/luna' && JSON.stringify(vc.servers.luna.args) === '["mcp"]');
+const vcM = JSON.parse(MC.mergeVscodeMcp('{"servers":{"other":{"type":"http","url":"x"}}}', '/bin/luna'));
+check('mergeVscodeMcp: preserves existing servers', !!vcM.servers.other && !!vcM.servers.luna);
+const pc = JSON.parse(MC.mergeProjectMcp(null, '/bin/luna'));
+check('mergeProjectMcp: key "mcpServers" (Claude Code / Cursor)', pc.mcpServers.luna.command === '/bin/luna' && JSON.stringify(pc.mcpServers.luna.args) === '["mcp"]');
+try { fs.unlinkSync(tmpMC); } catch {}
+
 // ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
 // ===========================================================================

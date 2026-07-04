@@ -5,6 +5,14 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**AI helper (C7) part 2 — register luna as MCP** (v0.23.0). Cooper: Configure AI
+now also writes .vscode/mcp.json (key servers, Copilot) + .mcp.json (key mcpServers,
+Claude Code/Cursor) registering `luna mcp`, merging into existing config (skips
+unparseable). Chose files over the extension mcpServerDefinitionProviders API to
+keep engines ^1.75 (API needs ~1.101). Pure mcpConfig.ts (mergeVscodeMcp/
+mergeProjectMcp). 218 Node + 8 integration. D-043. Next C7: (3) OpenSNES MCP +
+build→luna verify loop.
+
 **AI helper (C7) part 1 — ship OpenSNES context** (v0.22.0). Cooper: Configure AI
 writes AGENTS.md (+ .github/copilot-instructions.md) with the SNES/OpenSNES rules
 (int=2, BGR555/CGRAM, sprite/tilemap limits, build/run/luna) so any assistant

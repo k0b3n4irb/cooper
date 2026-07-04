@@ -13,6 +13,7 @@ import { renderPaletteEditorHtml } from './paletteEditor';
 import { renderTileEditorHtml } from './tileEditor';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
+import { mergeVscodeMcp, mergeProjectMcp } from './mcpConfig';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
 import { renderDashboardHtml, DashboardState } from './dashboard';
@@ -348,6 +349,7 @@ async function configureAI(): Promise<void> {
             return;
         }
     }
+    let mcpNote = '';
     try {
         fs.writeFileSync(agents, renderAgentsMd({
             projectName: info.romName ? info.romName.replace(/\.(sfc|smc)$/i, '') : path.basename(dir),
@@ -359,18 +361,44 @@ async function configureAI(): Promise<void> {
         if (!fs.existsSync(copilot)) {
             fs.writeFileSync(copilot, renderCopilotInstructions());
         }
+        mcpNote = registerLunaMcp(dir);
     } catch (e) {
         void vscode.window.showErrorMessage(`Cooper: could not write the AI context — ${(e as Error).message}`);
         return;
     }
     void vscode.window.showInformationMessage(
-        'Cooper: wrote AGENTS.md + .github/copilot-instructions.md — your AI assistant now knows OpenSNES.',
+        `Cooper: wrote AGENTS.md + copilot-instructions${mcpNote} — your AI knows OpenSNES${mcpNote ? ' and can drive luna' : ''}. Reload / start agent mode to pick up the MCP server.`,
         'Open AGENTS.md',
     ).then((a) => {
         if (a) {
             void vscode.window.showTextDocument(vscode.Uri.file(agents));
         }
     });
+}
+
+/** Register luna as an MCP server for whatever assistant the user has: writes
+ *  `.vscode/mcp.json` (VS Code / Copilot, key `servers`) + `.mcp.json` (Claude
+ *  Code / Cursor, key `mcpServers`), merging into any existing file. Returns a note
+ *  for the summary, or '' if luna wasn't found. Skips a file it can't parse (so a
+ *  hand-authored JSONC config is never clobbered). */
+function registerLunaMcp(dir: string): string {
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: dir });
+    const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
+    if (!luna) {
+        return '';
+    }
+    const write = (file: string, merge: (existing: string | null, cmd: string) => string): void => {
+        try {
+            const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+            fs.writeFileSync(file, merge(existing, luna));
+        } catch { /* unparseable (JSONC/comments) — leave it, don't clobber */ }
+    };
+    const vscodeDir = path.join(dir, '.vscode');
+    fs.mkdirSync(vscodeDir, { recursive: true });
+    write(path.join(vscodeDir, 'mcp.json'), (e, c) => mergeVscodeMcp(e, c));
+    write(path.join(dir, '.mcp.json'), (e, c) => mergeProjectMcp(e, c));
+    return ' + luna MCP (.vscode/mcp.json, .mcp.json)';
 }
 
 // ---------------------------------------------------------------------------

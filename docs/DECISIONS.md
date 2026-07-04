@@ -845,8 +845,16 @@ rationale and the docs that grounded it. Newest last.
   (zero-config for Copilot); `.mcp.json` (`mcpServers`) for Claude Code/Cursor;
   `.vscode/mcp.json` (`servers`). OpenSNES MCP = `@modelcontextprotocol/sdk` v1.x
   (pin; v2 beta), pure Node. Verify loop = orchestration over luna's 17 MCP tools.
-- **Next C7 slices:** (2) register luna's MCP via the extension API; (3) an
-  OpenSNES MCP (lookup_api, hardware_constraint) + the build→luna verify loop.
+- **C7 part 2 (done):** `Configure AI` also **registers luna as an MCP server** by
+  writing config files — `.vscode/mcp.json` (key `servers`, VS Code/Copilot) +
+  `.mcp.json` (key `mcpServers`, Claude Code/Cursor), merging into any existing
+  file, skipping one it can't parse. **Chose files over the extension
+  `mcpServerDefinitionProviders` API on purpose:** the API would force
+  `engines.vscode` from `^1.75` to ~`1.101` (kills the wide-reach value), whereas
+  files work on any VS Code + every assistant. Pure `mcpConfig.ts`
+  (`mergeVscodeMcp`/`mergeProjectMcp`), Node-tested.
+- **Next C7 slice:** (3) an OpenSNES MCP (lookup_api, hardware_constraint) + the
+  build→luna verify loop (mostly orchestration over luna's existing MCP tools).
 
 ---
 

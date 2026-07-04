@@ -246,11 +246,17 @@ for **authoring** tilemaps, use **Tiled** (`.tmj`) — the SDK converts it with
 
 ## 11. Make your AI OpenSNES-aware
 
-Run **Cooper: Configure AI (OpenSNES context)**. It writes an **`AGENTS.md`** (and
-a `.github/copilot-instructions.md`) into your project with the SNES/OpenSNES rules
-— the `int`=2 gotcha, colour/sprite/tilemap hardware limits, and the build/run/luna
-workflow. Any assistant that reads those files (Copilot, Claude Code, Cursor…) then
-writes correct OpenSNES C and knows to **verify in luna**, not by guessing.
+Run **Cooper: Configure AI (OpenSNES context)**. It:
+
+- writes an **`AGENTS.md`** (+ `.github/copilot-instructions.md`) with the
+  SNES/OpenSNES rules — the `int`=2 gotcha, colour/sprite/tilemap hardware limits,
+  the build/run/luna workflow — so any assistant (Copilot, Claude Code, Cursor…)
+  writes correct OpenSNES C; and
+- **registers luna as an MCP server** (`.vscode/mcp.json` + `.mcp.json`) so the AI
+  can *drive the emulator* — peek VRAM/memory, read state, screenshot — and
+  **verify its own changes on real hardware**, not by guessing.
+
+Reload the window (or start agent mode) so your assistant picks up the MCP server.
 
 ## 12. What's next
 
