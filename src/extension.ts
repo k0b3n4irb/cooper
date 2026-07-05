@@ -51,49 +51,10 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.workspace.onDidSaveTextDocument(() => void tree.refresh()),
     );
     void tree.refresh();
-    registerOpensnesMcp(context);
     // Auto-configure C support for any already-open OpenSNES C files.
     for (const editor of vscode.window.visibleTextEditors) {
         void autoConfigureClangd(editor.document);
     }
-}
-
-/** Register the bundled OpenSNES MCP server (dist/opensnes-mcp.js) via VS Code's
- *  MCP-provider API so an AI assistant can query the SDK. Feature-detected +
- *  best-effort: on a VS Code without the API (older than ~1.101) it's a no-op —
- *  the AGENTS.md context (Configure AI) still applies. Uses ELECTRON_RUN_AS_NODE
- *  so VS Code's own runtime executes the server. */
-function registerOpensnesMcp(context: vscode.ExtensionContext): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lm = (vscode as any).lm;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const McpStdio = (vscode as any).McpStdioServerDefinition;
-    if (!lm?.registerMcpServerDefinitionProvider || !McpStdio) {
-        return;
-    }
-    const serverPath = context.asAbsolutePath('dist/opensnes-mcp.js');
-    const emitter = new vscode.EventEmitter<void>();
-    try {
-        context.subscriptions.push(lm.registerMcpServerDefinitionProvider('cooper.opensnes', {
-            onDidChangeMcpServerDefinitions: emitter.event,
-            provideMcpServerDefinitions: async () => {
-                const dir = await resolveProjectDir();
-                const cfg = vscode.workspace.getConfiguration('cooper');
-                const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: dir ?? '' });
-                if (!sdk) {
-                    return [];
-                }
-                return [new McpStdio({
-                    label: 'OpenSNES SDK',
-                    command: process.execPath,
-                    args: [serverPath, sdk.path],
-                    env: { ELECTRON_RUN_AS_NODE: '1' },
-                })];
-            },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            resolveMcpServerDefinition: (s: any) => s,
-        }));
-    } catch { /* API shape differs on this build — skip, AGENTS.md still applies */ }
 }
 
 export function deactivate(): void {
@@ -705,17 +666,22 @@ async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> 
     }
     const steps = Math.min(cfg.get<number>('preview.steps') ?? 200000, 500000);
     return vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Window, title: 'Cooper: reading the PPU from luna…' },
+        { location: vscode.ProgressLocation.Notification, title: 'Cooper: reading the PPU from luna…', cancellable: false },
         async () => {
             const mcp = new LunaMcp();
             try {
-                await mcp.connect(luna, info.projectDir ?? undefined);
-                await mcp.loadRom(rom);
-                await mcp.step(steps);
-                const s = await mcp.state() as { ppu?: { cgram?: number[]; oam_full?: number[] } };
-                const ppu = s.ppu ?? {};
-                const vram = needVram ? await mcp.peekVram(0, 0x4000) : [];
-                return { cgram: ppu.cgram ?? [], oam: ppu.oam_full ?? [], vram };
+                // Hard overall timeout so a stuck luna handshake can never hang the
+                // viewer silently (the old behaviour the user hit).
+                const snap = await withTimeout((async () => {
+                    await mcp.connect(luna, info.projectDir ?? undefined);
+                    await mcp.loadRom(rom);
+                    await mcp.step(steps);
+                    const s = await mcp.state() as { ppu?: { cgram?: number[]; oam_full?: number[] } };
+                    const ppu = s.ppu ?? {};
+                    const vram = needVram ? await mcp.peekVram(0, 0x4000) : [];
+                    return { cgram: ppu.cgram ?? [], oam: ppu.oam_full ?? [], vram };
+                })(), 25000, `luna at ${luna}`);
+                return snap;
             } catch (e) {
                 void vscode.window.showErrorMessage(`Cooper: could not read the PPU from luna — ${(e as Error).message}`);
                 return undefined;
@@ -724,6 +690,15 @@ async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> 
             }
         },
     );
+}
+
+/** Reject after `ms` if `p` hasn't settled — a guard so a wedged child process
+ *  surfaces an error instead of hanging a progress spinner forever. */
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error(`timed out after ${ms / 1000}s waiting for ${what}`)), ms);
+        p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+    });
 }
 
 const viewerPanels = new Map<string, vscode.WebviewPanel>();

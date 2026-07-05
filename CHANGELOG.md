@@ -4,6 +4,21 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.24.2] — 2026-07-05
+
+### Fixed — PPU viewers never hang silently; safer startup
+
+- The standalone PPU viewers (Palette / Sprites / Tiles) could hang with an
+  invisible status-bar spinner if luna didn't respond. Now they show a visible
+  **notification**, have a **25 s timeout**, and always surface a clear error
+  (ROM not built, `cooper.lunaPath` unset, or luna timed out) instead of doing
+  nothing.
+- Removed the experimental VS Code MCP-provider auto-registration (`contributes.
+  mcpServerDefinitionProviders` + `vscode.lm` call) added in 0.24.0. The OpenSNES
+  MCP server still ships (`dist/opensnes-mcp.js`) and is configured via the file
+  approach (`.vscode/mcp.json` / `.mcp.json`) like luna — no dependency on a
+  recent, unstable VS Code API.
+
 ## [0.24.1] — 2026-07-05
 
 ### Fixed — PPU viewers (Palette / Sprites / Tiles) work without a debug session
