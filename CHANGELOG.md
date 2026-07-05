@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.24.1] — 2026-07-05
+
+### Fixed — PPU viewers (Palette / Sprites / Tiles) work without a debug session
+
+- Opening **Palette / Sprites / Tiles** from the dashboard or sidebar no longer
+  errors with *"start a Luna debug session first"*. If a debug session is paused
+  they show the **live** PPU at that stop (as before); otherwise Cooper runs the
+  built ROM to a frame in a **transient luna** (like Preview) and shows that — so
+  the viewers work standalone. (If the ROM isn't built, it says so.)
+
 ## [0.24.0] — 2026-07-04
 
 ### Added — AI helper (C7) part 3: the OpenSNES MCP server (C7 complete)

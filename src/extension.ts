@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, findProjectDir } from './clangdConfig';
 import { resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile } from './build';
 import { LunaDebugSession } from './lunaDebug';
+import { LunaMcp } from './lunaMcp';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
 import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
@@ -666,21 +667,63 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
 // Palette viewer (P2.2c) — a webview of the live CGRAM at a debug stop.
 // ---------------------------------------------------------------------------
 
-interface PpuSnapshot { cgram?: number[]; oam?: number[]; }
+interface PpuSnapshot { cgram: number[]; oam: number[]; vram: number[]; }
 
-/** Read the live PPU snapshot from the active luna debug session, or surface an error. */
-async function activePpu(): Promise<PpuSnapshot | undefined> {
+/**
+ * Get a PPU snapshot for the viewers. If a luna debug session is paused, read the
+ * **live** PPU at that stop. Otherwise run the built ROM to a frame in a
+ * **transient luna** (like Preview) so the viewers work standalone from the
+ * dashboard — no manual debug session needed.
+ */
+async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> {
     const session = vscode.debug.activeDebugSession;
-    if (!session || session.type !== 'luna') {
-        void vscode.window.showErrorMessage('Cooper: start a Luna debug session (and pause) before opening a viewer.');
+    if (session && session.type === 'luna') {
+        try {
+            const ppu = await session.customRequest('cooperPpu') as { cgram?: number[]; oam?: number[] };
+            const vram = needVram
+                ? ((await session.customRequest('cooperVram', { offset: 0, count: 0x4000 })) as { bytes?: number[] }).bytes ?? []
+                : [];
+            return { cgram: ppu.cgram ?? [], oam: ppu.oam ?? [], vram };
+        } catch (e) {
+            void vscode.window.showErrorMessage(`Cooper: could not read the PPU state: ${String(e)}`);
+            return undefined;
+        }
+    }
+
+    const info = await resolveProjectInfo();
+    const rom = info.projectDir && info.romName ? path.join(info.projectDir, info.romName) : undefined;
+    if (!rom || !fs.existsSync(rom)) {
+        void vscode.window.showErrorMessage('Cooper: build the ROM first (or start a Debug session) to view the PPU.');
         return undefined;
     }
-    try {
-        return await session.customRequest('cooperPpu') as PpuSnapshot;
-    } catch (e) {
-        void vscode.window.showErrorMessage(`Cooper: could not read the PPU state: ${String(e)}`);
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const sdk = info.projectDir ? detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: info.projectDir }) : null;
+    const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
+    if (!luna) {
+        void vscode.window.showErrorMessage('Cooper: set cooper.lunaPath to view the PPU.');
         return undefined;
     }
+    const steps = Math.min(cfg.get<number>('preview.steps') ?? 200000, 500000);
+    return vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: 'Cooper: reading the PPU from luna…' },
+        async () => {
+            const mcp = new LunaMcp();
+            try {
+                await mcp.connect(luna, info.projectDir ?? undefined);
+                await mcp.loadRom(rom);
+                await mcp.step(steps);
+                const s = await mcp.state() as { ppu?: { cgram?: number[]; oam_full?: number[] } };
+                const ppu = s.ppu ?? {};
+                const vram = needVram ? await mcp.peekVram(0, 0x4000) : [];
+                return { cgram: ppu.cgram ?? [], oam: ppu.oam_full ?? [], vram };
+            } catch (e) {
+                void vscode.window.showErrorMessage(`Cooper: could not read the PPU from luna — ${(e as Error).message}`);
+                return undefined;
+            } finally {
+                mcp.dispose();
+            }
+        },
+    );
 }
 
 const viewerPanels = new Map<string, vscode.WebviewPanel>();
@@ -698,42 +741,32 @@ function showViewer(id: string, title: string, render: (webview: vscode.Webview)
 }
 
 async function showPalette(): Promise<void> {
-    const ppu = await activePpu();
+    const ppu = await ppuSnapshot(false);
     if (!ppu) {
         return;
     }
-    const colors = decodeCgram(ppu.cgram ?? []);
+    const colors = decodeCgram(ppu.cgram);
     showViewer('cooperPalette', 'CGRAM Palette', (w) => renderPaletteHtml(colors, w.cspSource));
 }
 
 async function showOam(): Promise<void> {
-    const ppu = await activePpu();
+    const ppu = await ppuSnapshot(false);
     if (!ppu) {
         return;
     }
-    const sprites = decodeOam(ppu.oam ?? []);
+    const sprites = decodeOam(ppu.oam);
     showViewer('cooperOam', 'OAM (sprites)', (w) => renderOamHtml(sprites, w.cspSource));
 }
 
 async function showVram(): Promise<void> {
-    const session = vscode.debug.activeDebugSession;
-    if (!session || session.type !== 'luna') {
-        void vscode.window.showErrorMessage('Cooper: start a Luna debug session (and pause) before opening a viewer.');
+    const ppu = await ppuSnapshot(true);
+    if (!ppu) {
         return;
     }
-    const BPP = 4, TILES_PER_ROW = 16, VRAM_BYTES = 0x4000; // first 512 4bpp tiles
-    let cgram: number[] = [];
-    let vram: number[] = [];
-    try {
-        cgram = ((await session.customRequest('cooperPpu')) as { cgram?: number[] }).cgram ?? [];
-        vram = ((await session.customRequest('cooperVram', { offset: 0, count: VRAM_BYTES })) as { bytes?: number[] }).bytes ?? [];
-    } catch (e) {
-        void vscode.window.showErrorMessage(`Cooper: could not read VRAM: ${String(e)}`);
-        return;
-    }
-    const count = Math.floor(vram.length / bytesPerTile(BPP));
-    const tiles = decodeTileSheet(vram, BPP, count);
-    const palette = decodeCgram(cgram).slice(0, 16); // sub-palette 0
+    const BPP = 4, TILES_PER_ROW = 16;
+    const count = Math.floor(ppu.vram.length / bytesPerTile(BPP));
+    const tiles = decodeTileSheet(ppu.vram, BPP, count);
+    const palette = decodeCgram(ppu.cgram).slice(0, 16); // sub-palette 0
     const { width, height, data } = tilesToRgba(tiles, palette, TILES_PER_ROW);
     const png = encodePng(width, height, data).toString('base64');
     showViewer('cooperVram', 'VRAM tiles',
