@@ -31,6 +31,20 @@ export interface DisasmLine {
     symbol?: string | null;
 }
 
+/** One recorded bus access (luna `take_mem_trace`). */
+export interface MemTraceEvent {
+    mclk: number;
+    pc: number;
+    addr: number;
+    kind: 'read' | 'write' | 'nmi' | 'irq';
+    value: number;
+    line: number;
+    hclock: number;
+    blank: boolean;
+    force_blank: boolean;
+    symbol?: string | null;
+}
+
 /** `run_until_break` outcome (luna ≥ v1.6.0 breakpoint registry). */
 export interface BreakHit {
     steps: number;
@@ -276,6 +290,29 @@ export class LunaMcp {
      *  address-taking tools accept `symbol:`. Returns the label count. */
     loadSymbols(symPath: string): Promise<{ count: number }> {
         return this.callTool('load_symbols', { path: symPath }) as Promise<{ count: number }>;
+    }
+
+    // --- memory tracing (luna ≥ v1.6.0) ---
+
+    /** Start recording bus accesses into a capped ring, optionally filtered to a
+     *  bank and an inclusive offset range. Drain with `takeMemTrace`. */
+    enableMemTrace(opts: { maxEvents: number; bank?: number; lo?: number; hi?: number }): Promise<unknown> {
+        return this.callTool('enable_mem_trace', {
+            max_events: opts.maxEvents,
+            ...(opts.bank !== undefined ? { bank: opts.bank } : {}),
+            ...(opts.lo !== undefined ? { lo: opts.lo } : {}),
+            ...(opts.hi !== undefined ? { hi: opts.hi } : {}),
+        });
+    }
+
+    /** Drain the recorded accesses (oldest first; draining resets the ring). */
+    takeMemTrace(): Promise<{ events: MemTraceEvent[] }> {
+        return this.callTool('take_mem_trace', {}) as Promise<{ events: MemTraceEvent[] }>;
+    }
+
+    /** Run until the next full frame boundary (bounded by `maxSteps`). */
+    stepUntilFrame(maxSteps: number): Promise<{ executed: number }> {
+        return this.callTool('step_until_frame', { max_steps: maxSteps }) as Promise<{ executed: number }>;
     }
 
     // --- savestates (luna ≥ v1.6.0) ---

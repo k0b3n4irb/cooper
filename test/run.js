@@ -370,6 +370,22 @@ check('disasm html escapes instruction text', dhtml.includes('RTS &lt;x&gt;'));
 check('disasm html title carries the live PC', dhtml.includes('PC $00:C46E'));
 check('disasm html is static (CSP, no scripts)', dhtml.includes("default-src 'none'") && !dhtml.includes('<script'));
 try { fs.unlinkSync(tmpDs); } catch {}
+
+// --- memory-trace viewer HTML (pure) ---
+console.log('\n=== memory-trace viewer HTML (pure) ===');
+const tmpMt = path.join(os.tmpdir(), `cooper_memtrace_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'memTraceView.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpMt });
+const MT = require(tmpMt);
+const mthtml = MT.renderMemTraceHtml('frame_count', 0x7E0030, [
+    { mclk: 1, pc: 0x00C480, addr: 0x7E0030, kind: 'write', value: 0x2A, line: 42, hclock: 0, blank: true, force_blank: false, pcSymbol: 'on_update' },
+    { mclk: 2, pc: 0x00C490, addr: 0x7E0030, kind: 'read', value: 0x2A, line: 43, hclock: 0, blank: false, force_blank: false, pcSymbol: null },
+], 'vscode-csp');
+check('mem-trace html titles the expr + resolved addr', mthtml.includes('frame_count') && mthtml.includes('$7E:0030'));
+check('mem-trace html names the accessing function', mthtml.includes('>on_update</td>'));
+check('mem-trace html shows kind + value + vblank', mthtml.includes('write') && mthtml.includes('$2A') && mthtml.includes('42 (vblank)'));
+check('mem-trace html empty state', MT.renderMemTraceHtml('x', 0, [], 'csp').includes('No access'));
+check('mem-trace html is static (no scripts)', !mthtml.includes('<script'));
+try { fs.unlinkSync(tmpMt); } catch {}
 check('dashboard escapes the project name (no HTML injection)',
     D2.renderDashboardHtml({ hasProject: true, projectName: '<img>', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N').includes('&lt;img&gt;'));
 try { fs.unlinkSync(tmpD2); } catch {}
@@ -665,6 +681,21 @@ try { fs.unlinkSync(tmpOM); } catch {}
                 dis.lines.every((l) => typeof l.text === 'string' && l.text.length > 0 && Array.isArray(l.bytes)));
             check('disasm is symbol-annotated after load_symbols',
                 dis.lines.some((l) => typeof l.symbol === 'string' && l.symbol.length > 0));
+
+            // --- D-048: mem trace over one frame ("who writes $2100?") ---
+            await m.reset();
+            await m.stepUntilFrame(2000000); // frame 1 ends before InitHardware's writes
+            await m.enableMemTrace({ maxEvents: 1024, bank: 0x00, lo: 0x2100, hi: 0x2100 });
+            await m.stepUntilFrame(2000000); // frame 2 carries the INIDISP writes
+            const trace = await m.takeMemTrace();
+            // luna interleaves nmi/irq context markers — the adapter filters to bus accesses
+            const rw = trace.events.filter((ev) => ev.kind === 'read' || ev.kind === 'write');
+            check('mem trace records the INIDISP writes (filtered to the address)',
+                rw.length > 0 && rw.every((ev) => (ev.addr & 0xFFFF) === 0x2100 && ev.kind === 'write'));
+            check('mem trace events carry pc/value/scanline',
+                rw.every((ev) => typeof ev.pc === 'number' && typeof ev.value === 'number' && typeof ev.line === 'number'));
+            check('mem trace attributes a write to InitHardware',
+                rw.some((ev) => (S.addrToSymbol(sym, ev.pc) || {}).name === 'InitHardware'));
         } catch (e) {
             check('MCP end-to-end threw: ' + String((e && e.message) || e), false);
         } finally {

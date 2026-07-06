@@ -930,6 +930,24 @@ rationale and the docs that grounded it. Newest last.
   `is_pc`, symbol annotations present after `load_symbols`; renderer escapes
   text and carries no scripts.
 
+### D-048 — "Who accesses this address?" via luna mem trace (2026-07-06)
+- **Decision:** `Cooper: Trace Memory Accesses (one frame)…` at a debug stop —
+  prompt a symbol/address, record every bus access to that exact address over
+  one frame (`enable_mem_trace` filtered `bank`+`lo..hi` → `step_until_frame` →
+  `take_mem_trace`), attribute each access to its function (PC → Cooper `.sym`),
+  render a static table (kind, value, PC, function, scanline/vblank). The
+  machine advances one frame → `stopped('trace')` refreshes the debugger UI.
+- **Grounding:** `enable_mem_trace {max_events, bank?, lo?, hi?}`,
+  `take_mem_trace {} → {events:[{mclk, pc, addr, kind, value, line, hclock,
+  blank, force_blank, symbol?}]}`, `step_until_frame {max_steps} → {executed}`.
+  **Caveat found live:** luna interleaves `nmi`/`irq` context markers that
+  bypass the address filter — the adapter keeps only `read`/`write` events.
+  Watch is bank-exact (mirrors not folded) — surfaced in the prompt + the view.
+- **Verified:** real-binary Node test — INIDISP `$2100` writes captured on the
+  init frame, all filtered events are writes to `$2100`, and one attributes to
+  `InitHardware` via the `.sym`. Pure renderer tested (escaping, vblank tag,
+  empty state, no scripts).
+
 ---
 
 ### Known limitations (Component #1)

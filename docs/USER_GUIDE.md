@@ -163,6 +163,11 @@ The jewel. Workflow:
    **Disassembly** — **Cooper: Show Disassembly** opens the 65816 instructions at
    the stop, disassembled by luna itself and annotated with your symbols
    (`main`, `enemies_update+0x12`…), the current PC highlighted.
+   **Who writes this address?** — **Cooper: Trace Memory Accesses (one frame)…**:
+   give it a symbol or address (`frame_count`, `$7E0030`) and it records every
+   read/write to it over the next frame, each attributed to the function that did
+   it (kind, value, PC, scanline). Note: the watch is bank-exact — use the bank
+   your code actually executes from.
 6. **See the PPU at the stop** — sidebar → **PPU VIEWERS**:
 
 | Palette (CGRAM) | Sprites (OAM) | Tiles (VRAM) |

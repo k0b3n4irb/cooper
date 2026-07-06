@@ -8,6 +8,7 @@ import { resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile 
 import { LunaDebugSession } from './lunaDebug';
 import { LunaMcp, DisasmLine } from './lunaMcp';
 import { renderDisasmHtml } from './disasmView';
+import { renderMemTraceHtml, TracedEvent } from './memTraceView';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
 import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
@@ -66,6 +67,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.saveSnapshot', () => saveSnapshot(context)),
         vscode.commands.registerCommand('cooper.restoreSnapshot', () => restoreSnapshot(context)),
         vscode.commands.registerCommand('cooper.showDisasm', () => showDisasm()),
+        vscode.commands.registerCommand('cooper.traceMemory', () => traceMemory()),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
@@ -700,6 +702,31 @@ async function showDisasm(): Promise<void> {
         showViewer('cooperDisasm', 'Disassembly', (w) => renderDisasmHtml(r.lines, w.cspSource));
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Memory trace — "who accesses this address?" over one frame (luna mem trace).
+// ---------------------------------------------------------------------------
+
+async function traceMemory(): Promise<void> {
+    const session = activeLunaSession();
+    if (!session) {
+        return;
+    }
+    const expr = await vscode.window.showInputBox({
+        prompt: 'Which address? A symbol (frame_count) or an address ($7E0030) — the watch is bank-exact.',
+        placeHolder: 'frame_count · $7E0030',
+    });
+    if (!expr) {
+        return;
+    }
+    try {
+        const r = await session.customRequest('cooperMemTrace', { expr }) as { addr: number; events: TracedEvent[] };
+        log(`mem trace: ${expr} → ${r.events.length} event(s) over one frame`);
+        showViewer('cooperMemTrace', `Trace ${expr}`, (w) => renderMemTraceHtml(expr, r.addr, r.events, w.cspSource));
+    } catch (e) {
+        fail(`memory trace failed: ${String(e)}`);
     }
 }
 

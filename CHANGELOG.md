@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.29.0] — 2026-07-06
+
+### Added — "who accesses this address?"
+
+- **Cooper: Trace Memory Accesses (one frame)…** — at a debug stop, give it a
+  symbol or address (`frame_count`, `$7E0030`) and it records every read/write
+  to it over the next frame, **each attributed to the function that did it**
+  (kind, value, PC, scanline, vblank). The classic "why did my variable change?"
+  now takes one command. (The watch is bank-exact; the machine advances one
+  frame and the debugger refreshes at the new stop.)
+
 ## [0.28.0] — 2026-07-06
 
 ### Added — disassembly at the stop

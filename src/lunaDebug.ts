@@ -725,6 +725,34 @@ export class LunaDebugSession extends LoggingDebugSession {
             }
             return;
         }
+        if (command === 'cooperMemTrace') {
+            const a = (args ?? {}) as { expr?: string };
+            const addr = this.sym ? resolveExpr(this.sym, a.expr ?? '') : parseAddress(a.expr ?? '');
+            if (addr === undefined) {
+                this.sendErrorResponse(response, 3011, `cannot resolve '${a.expr}' to an address`);
+                return;
+            }
+            try {
+                // Record every access to that exact bus address over ONE frame.
+                await this.mcp.enableMemTrace({ maxEvents: 1024, bank: (addr >> 16) & 0xFF, lo: addr & 0xFFFF, hi: addr & 0xFFFF });
+                await this.mcp.stepUntilFrame(2_000_000);
+                const t = await this.mcp.takeMemTrace();
+                // luna also records NMI/IRQ signal markers for context — keep only
+                // the actual bus accesses to the watched address.
+                const events = t.events.filter((ev) => ev.kind === 'read' || ev.kind === 'write').map((ev) => ({
+                    ...ev,
+                    // "who accessed" = the instruction's function, from Cooper's .sym
+                    pcSymbol: this.sym ? (addrToSymbol(this.sym, ev.pc)?.name ?? null) : null,
+                }));
+                response.body = { addr, events };
+                this.sendResponse(response);
+                // The machine advanced a frame — refresh the UI at the new stop.
+                this.sendEvent(new StoppedEvent('trace', THREAD_ID));
+            } catch (e) {
+                this.sendErrorResponse(response, 3012, `mem trace failed: ${(e as Error).message}`);
+            }
+            return;
+        }
         if (command === 'cooperSaveState') {
             try {
                 const s = await this.mcp.saveState();
