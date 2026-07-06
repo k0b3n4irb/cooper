@@ -103,17 +103,20 @@ build; hardware truth comes from luna); **off-the-shelf everywhere except** C4
   `/regen-wla-grammar` (`scripts/gen-wla-grammar.py`).
 - **luna**: `luna mcp` is a persistent stdio MCP server holding **live emulator
   state across calls**. **Ground its catalogue with a live JSON-RPC `tools/list`,
-  NOT `luna mcp --help`** — the pinned v1.1.0 binary's `--help` is stale (lists 8
-  read-only tools); the **live catalogue is 17 tools** (verified 2026-06-27):
-  reads (`peek_memory`, `peek_vram`, `peek_aram`, `search_memory`, `state`,
-  `screenshot`, `drain_audio`), writes (`poke_memory`, `set_cpu_register`,
-  `set_joypad`), run/breakpoint (`step`, `step_until_frame`, **`run_until_pc`**,
-  **`run_until_mem_write`**, **`run_until_mem_read`**), lifecycle (`load_rom`,
-  `reset`). The runtime **breakpoint primitives ARE in the pinned binary** — P2
-  (symbol/ASM debugger) is buildable against it today, no luna RFE. luna source
-  is v1.3.0; `peek_cgram` exists in `luna-api` but is **not** MCP-registered, and
-  there is no `peek_oam`. Mem-watch is **bank-exact, not mirror-folded**. See
-  `docs/02-debugger-dap-luna.md` §10.
+  NOT `luna mcp --help`** (`--help` lags reality). Pinned binary = **v1.7.0**
+  (SDK ≥ 0.28.0), **live catalogue = 39 tools** (verified 2026-07-06): the
+  original 17 (peeks/pokes/`state`/`screenshot`/`step*`/`run_until_*`/
+  lifecycle) + the **breakpoint registry** (`bp_add`/`bp_remove`/`bp_clear_all`/
+  `bp_list`, **`run_until_break`** = native multi-bp continue), savestates
+  (`save_state`/`load_state`, ROM-hash-guarded), `disasm_cpu`/`disasm_spc`,
+  CPU/mem traces (`enable_*`/`take_*` — mem trace interleaves `nmi`/`irq`
+  context markers that bypass the address filter), `.sym` ingestion
+  (`load_symbols`/`resolve_symbol`, `symbol:` args), `peek_cgram`, 4 debug PNG
+  renders, Mouse/Scope. Cooper's debugger uses the registry since D-045.
+  **Still true:** no raw `peek_oam` (only `render_sprite_sheet`; OAM =
+  `state.ppu.oam_full`), no async stop events (`max_steps` mandatory), and
+  mem-watch is **bank-exact, not mirror-folded**. See
+  `docs/02-debugger-dap-luna.md` §10 (MÀJ 2026-07-06).
 - All OpenSNES example Makefiles use `OPENSNES := $(shell cd ../../.. && pwd)`.
 - The OpenSNES SDK lives at `../opensnes` relative to this repo; luna source at
   `../luna`; the pinned luna binary at `../opensnes/tools/luna-test/bin/luna`.

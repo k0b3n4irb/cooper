@@ -9,7 +9,12 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 after the full project review in /tmp/cooper-review-2026-07-06.md):
 - **CI** (.github/workflows/ci.yml): build+package job + the full two-tier suite
   vs a real SDK build + pinned luna; tool-gated test skips are counted and fail
-  CI (COOPER_REQUIRE_TOOLS=1). NOTE: no git remote yet — CI runs on first push.
+  CI (COOPER_REQUIRE_TOOLS=1). Live at github.com/k0b3n4irb/cooper (public,
+  created 2026-07-06; .env with the gh token is gitignored). Release CI: push a
+  v* tag → the .vsix (never committed) publishes as a GitHub release with
+  CHANGELOG-extracted notes — v0.30.0 released, CI green (verified in the logs).
+  OPENSNES_REF pins the SDK release the suite runs against (v0.28.0, which pins
+  luna v1.7.0 — the temporary LUNA_BIN override was removed).
 - **Cooper output channel** (Show Log): every make/luna/MCP spawn, timeout and
   error logged; LunaMcp takes onLog (stays pure); luna stderr captured.
 - **UX**: cooper.debug/breakOnSymbol/showLog in the palette; dashboard has a

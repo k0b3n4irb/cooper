@@ -39,9 +39,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # The SDK ref the suite runs against. Bump deliberately; the compiler
-      # submodule pins inside that ref are what Cooper's debug-info relies on.
-      OPENSNES_REF: main
+      # The SDK release the suite runs against. Bump deliberately on OpenSNES
+      # releases; the compiler submodule pins and the luna pin inside that ref
+      # are what Cooper's debug-info + debugger tests rely on (luna ≥ 1.6 since
+      # SDK 0.28.0).
+      OPENSNES_REF: v0.28.0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,24 +68,15 @@ jobs:
       - name: Build the OpenSNES SDK (compiler + tools + lib + examples)
         working-directory: opensnes
         run: make -j"$(nproc)"
-      - name: Install luna (Cooper's own pin — the SDK's can lag)
+      - name: Install the SDK's pinned luna binary
         working-directory: opensnes
         env:
           # install-luna.sh downloads via `gh`, which needs a token in Actions
           GH_TOKEN: ${{ github.token }}
-          LUNA_REF: v1.7.0
         run: |
-          # Cooper needs luna's v1.6+ MCP surface (bp registry, savestates,
-          # disasm, mem traces). The SDK's own pin (tools/luna-test/luna.version)
-          # can lag on the remote, so fetch OUR pinned release and hand it to
-          # install-luna.sh through its documented LUNA_BIN override.
-          gh release download "$LUNA_REF" -R k0b3n4irb/luna \
-            --pattern "luna-${LUNA_REF}-linux-x86_64.tar.gz" -O /tmp/luna.tar.gz
-          mkdir -p /tmp/luna-bin
-          tar -xzf /tmp/luna.tar.gz -C /tmp/luna-bin
-          LUNA_BIN="$(find /tmp/luna-bin -type f -name luna | head -1)"
-          chmod +x "$LUNA_BIN"
-          LUNA_BIN="$LUNA_BIN" scripts/install-luna.sh
+          # SDK ≥ 0.28.0 pins luna ≥ v1.7.0 — the v1.6+ MCP surface Cooper's
+          # debugger tests need (bp registry, savestates, disasm, mem traces).
+          scripts/install-luna.sh
       - name: npm ci
         working-directory: cooper
         run: npm ci
