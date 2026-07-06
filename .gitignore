@@ -15,3 +15,6 @@ test/fixtures/**/.clangd
 test/fixtures/**/*.inc
 test/fixtures/**/project_*
 test/fixtures/**/*.pic
+
+# local secrets (gh token)
+.env
