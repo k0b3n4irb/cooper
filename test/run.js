@@ -19,10 +19,22 @@ esbuild.buildSync({
 });
 const C = require(tmp);
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, skip = 0;
 function check(name, cond) {
     if (cond) { pass++; console.log(`  PASS  ${name}`); }
     else { fail++; console.log(`  FAIL  ${name}`); }
+}
+// A skipped group means an external tool was absent, so the run did NOT cover
+// that path. Always counted and reported; with COOPER_REQUIRE_TOOLS=1 (CI) any
+// skip fails the run — green must mean covered.
+function skipped(what) {
+    skip++;
+    console.log(`  SKIP  ${what}`);
+}
+
+if (!fs.existsSync(path.join(OPENSNES, 'lib', 'include', 'snes.h'))) {
+    console.error(`FATAL: OpenSNES SDK not found at ${OPENSNES} — set OPENSNES=/path/to/opensnes (dev tree).`);
+    process.exit(1);
 }
 
 const helloDir = path.join(OPENSNES, 'examples', 'text', 'hello_world');
@@ -64,7 +76,7 @@ const flags = [...rendered.matchAll(/- "([^"]+)"/g)].map((m) => m[1]);
 const main = path.join(helloDir, 'main.c');
 const hasClang = cp.spawnSync('clang', ['--version']).status === 0;
 if (!hasClang) {
-    console.log('  SKIP  clang not available');
+    skipped('clang not available');
 } else {
     // clangd resolves "-I." relative to the file's dir; emulate by adding -I<helloDir>
     const r = cp.spawnSync('clang', ['-fsyntax-only', ...flags, `-I${helloDir}`, main], { encoding: 'utf8' });
@@ -177,7 +189,7 @@ if (cc && fs.existsSync(cc65816)) {
     }
     try { fs.unlinkSync(brokenC); } catch {}
 } else {
-    console.log('  SKIP  cc65816 not available');
+    skipped('cc65816 not available');
 }
 
 // --- close the loop: luna renders a NON-BLACK preview of the real ROM ---
@@ -196,7 +208,7 @@ if (luna && fs.existsSync(luna)) {
     check(`luna produced a non-black preview PNG (${size} bytes > 2000)`, size > 2000);
     try { fs.unlinkSync(outPng); } catch {}
 } else {
-    console.log('  SKIP  luna binary not available');
+    skipped('luna binary not available');
 }
 
 try { fs.unlinkSync(tmpB); } catch {}
@@ -447,7 +459,7 @@ if (fs.existsSync(pngPath)) {
     check('writeIndexedPixels round-trips the pixels', px2.indices.length === painted.length && Array.from(px2.indices).every((v, i) => v === painted[i]));
     check('writeIndexedPixels preserves the palette', PP.readIndexedPng(rw).palette.length === png.palette.length);
 } else {
-    console.log('  SKIP  no SDK sprite PNG found');
+    skipped('no SDK sprite PNG found');
 }
 try { fs.unlinkSync(tmpPP); } catch {}
 
@@ -557,7 +569,7 @@ try { fs.unlinkSync(tmpOM); } catch {}
     const { LunaMcp } = require(tmpM);
     const lunaBin = B.resolveLunaPath({ sdkPath: OPENSNES });
     if (!lunaBin || !fs.existsSync(lunaBin)) {
-        console.log('  SKIP  luna binary not available');
+        skipped('luna binary not available');
     } else {
         if (!fs.existsSync(ri.rom)) { cp.spawnSync('make', [], { cwd: aimDir }); }
         const m = new LunaMcp({ timeoutMs: 30000 });
@@ -645,7 +657,7 @@ try { fs.unlinkSync(tmpOM); } catch {}
 
     const lunaBin2 = B.resolveLunaPath({ sdkPath: OPENSNES });
     if (!lunaBin2 || !fs.existsSync(lunaBin2)) {
-        console.log('  SKIP  luna binary not available');
+        skipped('luna binary not available');
     } else {
         if (!fs.existsSync(ri.rom)) { cp.spawnSync('make', [], { cwd: aimDir }); }
         const session = new D.LunaDebugSession();
@@ -792,6 +804,10 @@ try { fs.unlinkSync(tmpOM); } catch {}
     }
     try { fs.unlinkSync(tmpD); } catch {}
 
-    console.log(`\n${pass} passed, ${fail} failed`);
+    console.log(`\n${pass} passed, ${fail} failed, ${skip} skipped`);
+    if (skip && process.env.COOPER_REQUIRE_TOOLS) {
+        console.error(`COOPER_REQUIRE_TOOLS is set but ${skip} group(s) skipped (missing tools) — failing.`);
+        process.exit(1);
+    }
     process.exit(fail ? 1 : 0);
 })();

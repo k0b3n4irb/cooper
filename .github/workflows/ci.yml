@@ -1,0 +1,90 @@
+# Cooper CI — build/package on every push, plus the full two-tier test suite
+# against a real OpenSNES SDK build and the pinned luna binary.
+#
+# The Node tier (test/run.js) asserts against reality (real SDK examples, real
+# cc65816 errors, real luna runs). COOPER_REQUIRE_TOOLS=1 turns any tool-gated
+# SKIP into a failure, so a green run means those paths actually executed.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run compile
+      - run: npx @vscode/vsce package --no-dependencies
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cooper-vsix
+          path: '*.vsix'
+
+  test:
+    name: Tests (Node + integration, real SDK + luna)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # The SDK ref the suite runs against. Bump deliberately; the compiler
+      # submodule pins inside that ref are what Cooper's debug-info relies on.
+      OPENSNES_REF: main
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: cooper
+      # The test suites expect the SDK dev tree as a SIBLING of the extension
+      # (test/run.js OPENSNES env; .vscode-test.mjs resolves ../opensnes).
+      - uses: actions/checkout@v4
+        with:
+          repository: k0b3n4irb/opensnes
+          ref: ${{ env.OPENSNES_REF }}
+          submodules: recursive
+          path: opensnes
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cooper/package-lock.json
+      - name: Install system deps (toolchain build + clang loop-check + xvfb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake clang xvfb
+      - name: Build the OpenSNES SDK (compiler + tools + lib + examples)
+        working-directory: opensnes
+        run: make -j"$(nproc)"
+      - name: Install the pinned luna binary
+        working-directory: opensnes
+        run: scripts/install-luna.sh
+      - name: npm ci
+        working-directory: cooper
+        run: npm ci
+      - name: Node tier (tool-gated skips are failures)
+        working-directory: cooper
+        env:
+          OPENSNES: ${{ github.workspace }}/opensnes
+          COOPER_REQUIRE_TOOLS: '1'
+        run: npm test
+      - name: Cache VS Code test build
+        uses: actions/cache@v4
+        with:
+          path: cooper/.vscode-test
+          key: vscode-test-1.126.0
+      - name: Integration tier (real Extension Development Host)
+        working-directory: cooper
+        env:
+          OPENSNES: ${{ github.workspace }}/opensnes
+        run: xvfb-run -a npm run test:integration
