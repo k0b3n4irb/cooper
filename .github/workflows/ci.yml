@@ -66,9 +66,24 @@ jobs:
       - name: Build the OpenSNES SDK (compiler + tools + lib + examples)
         working-directory: opensnes
         run: make -j"$(nproc)"
-      - name: Install the pinned luna binary
+      - name: Install luna (Cooper's own pin — the SDK's can lag)
         working-directory: opensnes
-        run: scripts/install-luna.sh
+        env:
+          # install-luna.sh downloads via `gh`, which needs a token in Actions
+          GH_TOKEN: ${{ github.token }}
+          LUNA_REF: v1.7.0
+        run: |
+          # Cooper needs luna's v1.6+ MCP surface (bp registry, savestates,
+          # disasm, mem traces). The SDK's own pin (tools/luna-test/luna.version)
+          # can lag on the remote, so fetch OUR pinned release and hand it to
+          # install-luna.sh through its documented LUNA_BIN override.
+          gh release download "$LUNA_REF" -R k0b3n4irb/luna \
+            --pattern "luna-${LUNA_REF}-linux-x86_64.tar.gz" -O /tmp/luna.tar.gz
+          mkdir -p /tmp/luna-bin
+          tar -xzf /tmp/luna.tar.gz -C /tmp/luna-bin
+          LUNA_BIN="$(find /tmp/luna-bin -type f -name luna | head -1)"
+          chmod +x "$LUNA_BIN"
+          LUNA_BIN="$LUNA_BIN" scripts/install-luna.sh
       - name: npm ci
         working-directory: cooper
         run: npm ci
