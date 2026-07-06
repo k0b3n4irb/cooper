@@ -4,6 +4,20 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.26.0] — 2026-07-06
+
+### Changed — native multi-breakpoint continue (luna v1.7.0)
+
+- **All your breakpoints are honored in a single Continue** — function
+  breakpoints, source-line breakpoints and data watchpoints together, at full
+  emulation speed. Cooper now mirrors them into luna's native breakpoint
+  registry (`bp_add`, luna ≥ 1.6) and runs one `run_until_break`. Gone: the
+  "luna watches one address per run — only the first data breakpoint is honored"
+  warning, and the slow chunked scan used when you had several breakpoints
+  (which could overshoot the exact instruction).
+- Watchpoint stops now print what fired in the Debug Console:
+  `watchpoint: write $002100 = 143 (PC $00836B)`.
+
 ## [0.25.0] — 2026-07-06
 
 ### Added — the Cooper log (diagnosability)

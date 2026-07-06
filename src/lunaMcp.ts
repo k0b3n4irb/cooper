@@ -22,6 +22,17 @@ export interface MemBreakResult {
     value?: number;
 }
 
+/** `run_until_break` outcome (luna ≥ v1.6.0 breakpoint registry). */
+export interface BreakHit {
+    steps: number;
+    hit: boolean;
+    bp_id?: number;
+    kind?: 'exec' | 'read' | 'write';
+    pc?: number;
+    addr?: number;
+    value?: number;
+}
+
 /** CPU register snapshot (subset of luna's `state.cpu`). */
 export interface CpuState {
     a: number; x: number; y: number; sp: number;
@@ -205,6 +216,39 @@ export class LunaMcp {
     /** Run until an instruction READS the 24-bit bus address `addr`. */
     runUntilMemRead(addr: number, maxSteps: number): Promise<MemBreakResult> {
         return this.callTool('run_until_mem_read', { addr, max_steps: maxSteps }) as Promise<MemBreakResult>;
+    }
+
+    // --- breakpoint registry (luna ≥ v1.6.0; grounded in luna-mcp-server lib.rs) ---
+
+    /** Register a breakpoint: `exec` halts BEFORE the instruction at 24-bit PB:PC
+     *  `addr` executes; `mem` is a watchpoint over `addr..=hi` (default a single
+     *  address), firing on reads/writes as configured. Returns the registry id. */
+    bpAdd(opts: { kind: 'exec' | 'mem'; addr: number; hi?: number; onRead?: boolean; onWrite?: boolean }): Promise<{ id: number }> {
+        return this.callTool('bp_add', {
+            kind: opts.kind,
+            addr: opts.addr,
+            ...(opts.hi !== undefined ? { hi: opts.hi } : {}),
+            ...(opts.onRead !== undefined ? { on_read: opts.onRead } : {}),
+            ...(opts.onWrite !== undefined ? { on_write: opts.onWrite } : {}),
+        }) as Promise<{ id: number }>;
+    }
+
+    /** Remove every registered breakpoint and watchpoint. */
+    bpClearAll(): Promise<unknown> {
+        return this.callTool('bp_clear_all', {});
+    }
+
+    /** List the registered breakpoints/watchpoints (ordered by id). */
+    bpList(): Promise<{ breakpoints: { id: number; kind: 'exec' | 'mem'; lo: number; hi: number; on_read: boolean; on_write: boolean }[] }> {
+        return this.callTool('bp_list', {}) as Promise<{ breakpoints: { id: number; kind: 'exec' | 'mem'; lo: number; hi: number; on_read: boolean; on_write: boolean }[] }>;
+    }
+
+    /** Run at full speed until ANY registered breakpoint fires or `maxSteps`
+     *  elapse. Exec BPs halt before their instruction (the run's first
+     *  instruction is exempt, so resuming from a BP doesn't re-trigger it);
+     *  watchpoints halt after the access and report its pc/addr/value. */
+    runUntilBreak(maxSteps: number): Promise<BreakHit> {
+        return this.callTool('run_until_break', { max_steps: maxSteps }) as Promise<BreakHit>;
     }
 
     /** Read `count` bytes from the CPU bus at `bank:offset` (returns the byte array). */

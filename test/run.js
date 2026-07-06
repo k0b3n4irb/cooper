@@ -595,6 +595,34 @@ try { fs.unlinkSync(tmpOM); } catch {}
             const target = (cpuB.pb << 16) | cpuB.pc;
             const hit = await m.runUntilPc(target, 50);
             check('run_until_pc(current) hit', hit.hit === true);
+
+            // --- D-045: native multi-breakpoint continue (bp registry, luna ≥1.6) ---
+            const initAddr = S.symbolToAddr(sym, 'InitHardware');
+            const mainAddr = S.symbolToAddr(sym, 'main');
+            check('symbols for the 2-bp test resolve', initAddr !== undefined && mainAddr !== undefined);
+            await m.reset();
+            await m.bpClearAll();
+            const b1 = await m.bpAdd({ kind: 'exec', addr: initAddr });
+            const b2 = await m.bpAdd({ kind: 'exec', addr: mainAddr });
+            check('bp_add returns distinct ids', b1.id !== b2.id);
+            const list = await m.bpList();
+            check('bp_list shows both exec breakpoints', list.breakpoints.length === 2
+                && list.breakpoints.every((b) => b.kind === 'exec'));
+            const h1 = await m.runUntilBreak(5000000);
+            check('run_until_break hits one of the two BPs',
+                h1.hit === true && (h1.pc === initAddr || h1.pc === mainAddr));
+            const h2 = await m.runUntilBreak(5000000);
+            check('second continue hits the OTHER breakpoint (multi-bp in one run)',
+                h2.hit === true && h2.pc !== h1.pc && (h2.pc === initAddr || h2.pc === mainAddr));
+            // mixed kind: a write watchpoint over INIDISP $2100 alongside exec BPs
+            await m.bpClearAll();
+            await m.bpAdd({ kind: 'mem', addr: 0x002100, onWrite: true });
+            await m.reset();
+            const h3 = await m.runUntilBreak(5000000);
+            check('watchpoint via registry fires with pc/addr/value',
+                h3.hit === true && h3.kind === 'write' && h3.addr === 0x002100
+                && typeof h3.pc === 'number' && typeof h3.value === 'number');
+            await m.bpClearAll();
         } catch (e) {
             check('MCP end-to-end threw: ' + String((e && e.message) || e), false);
         } finally {

@@ -874,6 +874,29 @@ rationale and the docs that grounded it. Newest last.
 - **C7 complete:** context (AGENTS.md) + luna MCP (drive/verify) + OpenSNES MCP
   (query the SDK) → write C → build → run in luna → observe → self-correct.
 
+### D-045 — Native multi-breakpoint continue via luna's bp registry (2026-07-06)
+- **Decision:** the debug adapter mirrors ALL its breakpoints (function + source-line
+  PCs + data watchpoints) into **luna's native breakpoint registry** (`bp_add` /
+  `bp_clear_all`) and a continue is **one `run_until_break`** at full emulation
+  speed. Replaces the D-016-era fallbacks (one `run_until_*` target per run; the
+  chunked single-step scan for >1 PC bp — exact but slow and overshoot-prone; the
+  "only the first data breakpoint is honored" warning).
+- **Grounding:** luna **v1.7.0** (source AND the pinned binary
+  `../opensnes/tools/luna-test/bin/luna` — verified by a **live `tools/list`**:
+  39 tools). Schemas from `crates/luna-mcp-server/src/lib.rs`: `bp_add {kind:
+  'exec'|'mem', addr, symbol?, hi?, on_read?=false, on_write?=true} → {id}`;
+  `run_until_break {max_steps} → {steps, hit, bp_id?, kind?: exec|read|write, pc?,
+  addr?, value?}`. Exec BPs halt BEFORE their instruction and the run's first
+  instruction is exempt (resume-friendly); watchpoints halt AFTER the access.
+- **Semantics kept:** watch is still **bank-exact** (no mirror folding —
+  `breakpoints.rs` matches the raw 24-bit range), so the D-016 bank caveat stands.
+- **Verified:** Node tier drives the real binary — two exec BPs hit across two
+  continues (multi-bp in one run), `bp_list` reflects the registry, and a mixed
+  `mem` watchpoint on `$2100` reports `{kind:'write', pc, addr, value}`. The DAP
+  suite's symbol-breakpoint continue now goes through the new path.
+- **Alternative rejected:** keeping `run_until_pc`/`run_until_mem_*` (still used
+  for step-over's call-skip, where a single exact target is the right tool).
+
 ---
 
 ### Known limitations (Component #1)

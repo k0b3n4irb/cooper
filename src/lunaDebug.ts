@@ -3,12 +3,12 @@
 // `vscode` module), so the whole session is Node-testable headlessly; only the
 // inline-factory registration in extension.ts touches `vscode`.
 //
-// MVP (P2.1b), ASM/symbol level — grounded in D-016/D-018:
-//  - breakpoints = FUNCTION breakpoints: a symbol name → addr (`.sym`) →
-//    `run_until_pc` (no line↔PC nor disassembler yet, so source/instruction
-//    breakpoints wait for G0/P7).
-//  - one thread (the 65816); stack = 1 frame (PC → nearest symbol).
-//  - Registers scope from `state.cpu`; step = `step{1}`.
+// Breakpoints: function + source-line breakpoints resolve to PCs (`.sym` +
+// `@cline` map) and are mirrored — together with data watchpoints — into luna's
+// native breakpoint registry (`bp_add`, luna ≥ v1.6.0); a continue is ONE
+// `run_until_break` at full speed, all breakpoints honoured (D-045; the old
+// one-condition-per-run chunked scan from D-016 is gone).
+// One thread (the 65816); Registers scope from `state.cpu`; step = `step{1}`.
 
 import {
     LoggingDebugSession, InitializedEvent, StoppedEvent, TerminatedEvent,
@@ -509,38 +509,45 @@ export class LunaDebugSession extends LoggingDebugSession {
         await this.runToBreakpoints(response);
     }
 
+    /** Mirror the DAP breakpoints (PC + data) into luna's breakpoint registry
+     *  (luna ≥ v1.6.0), so ONE `run_until_break` honours all of them natively. */
+    private async syncLunaBreakpoints(): Promise<void> {
+        await this.mcp.bpClearAll();
+        for (const pc of this.pcBreakpoints()) {
+            await this.mcp.bpAdd({ kind: 'exec', addr: pc });
+        }
+        for (const d of this.dataBreakpoints) {
+            await this.mcp.bpAdd({
+                kind: 'mem',
+                addr: d.addr,
+                onRead: d.access === 'read' || d.access === 'readWrite',
+                onWrite: d.access !== 'read',
+            });
+        }
+    }
+
     /**
-     * Run to the first breakpoint. luna watches ONE condition per run (D-016), so:
-     *  - a single data (memory-watch) breakpoint → `run_until_mem_*` (exact);
-     *  - a single PC breakpoint → `run_until_pc` (exact);
-     *  - multiple PC breakpoints → chunked single-step scan (may overshoot);
-     *  - mixing kinds / >1 data bp → only the first data bp is honored (warned).
+     * Run at full speed to the first breakpoint that fires — PC breakpoints and
+     * data watchpoints together, natively (`bp_add` registry + `run_until_break`).
+     * Exec breakpoints halt BEFORE their instruction and the run's first
+     * instruction is exempt, so resuming from a breakpoint doesn't re-trigger it.
      */
     private async runToBreakpoints(response: DebugProtocol.Response): Promise<void> {
         response.body = { ...(response.body ?? {}), allThreadsContinued: true };
         this.sendResponse(response);
 
-        const pcs = this.pcBreakpoints();
         let reason = 'pause';
         try {
-            if (this.dataBreakpoints.length >= 1) {
-                if (this.dataBreakpoints.length > 1 || pcs.length > 0) {
-                    this.sendEvent(new OutputEvent('luna watches one address per run — only the first data breakpoint is honored this continue.\n', 'console'));
-                }
-                const d = this.dataBreakpoints[0];
-                const r = d.access === 'read'
-                    ? await this.mcp.runUntilMemRead(d.addr, this.maxSteps)
-                    : await this.mcp.runUntilMemWrite(d.addr, this.maxSteps);  // write | readWrite
+            if (this.pcBreakpoints().length || this.dataBreakpoints.length) {
+                await this.syncLunaBreakpoints();
+                const r = await this.mcp.runUntilBreak(this.maxSteps);
                 if (r.hit) {
-                    reason = 'data breakpoint';
-                }
-            } else if (pcs.length === 1) {
-                if ((await this.mcp.runUntilPc(pcs[0], this.maxSteps)).hit) {
-                    reason = 'breakpoint';
-                }
-            } else if (pcs.length > 1) {
-                if (await this.scanForBreakpoints()) {
-                    reason = 'breakpoint';
+                    reason = r.kind === 'exec' ? 'breakpoint' : 'data breakpoint';
+                    if (r.kind !== 'exec') {
+                        const at = r.addr !== undefined ? `$${r.addr.toString(16).toUpperCase().padStart(6, '0')}` : '?';
+                        const val = r.value !== undefined ? ` = ${r.value}` : '';
+                        this.sendEvent(new OutputEvent(`watchpoint: ${r.kind} ${at}${val} (PC $${(r.pc ?? 0).toString(16).toUpperCase().padStart(6, '0')})\n`, 'console'));
+                    }
                 }
             } else {
                 // No breakpoints: advance a bounded budget, then pause.
@@ -552,22 +559,6 @@ export class LunaDebugSession extends LoggingDebugSession {
             return;
         }
         this.sendEvent(new StoppedEvent(reason, THREAD_ID));
-    }
-
-    /** Chunked single-step scan for >1 breakpoint (may overshoot — D-016 gap). */
-    private async scanForBreakpoints(): Promise<boolean> {
-        const set = new Set(this.pcBreakpoints());
-        let steps = 0;
-        const chunk = 2000;
-        while (steps < this.maxSteps) {
-            await this.mcp.step(Math.min(chunk, this.maxSteps - steps));
-            steps += chunk;
-            const cpu = await this.mcp.cpu();
-            if (set.has(((cpu.pb << 16) | cpu.pc) >>> 0)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     protected async nextRequest(response: DebugProtocol.NextResponse): Promise<void> {

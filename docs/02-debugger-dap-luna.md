@@ -362,16 +362,29 @@ addr→symbole)**, insuffisant pour source-level. **G0 pour ajouter ligne↔PC**
 trivial (couper au **1er espace** ; ne **pas** découper les noms sur `:`/`@`/`.`).
 
 ### 10.5 Les 4 manques (ergonomie — **non-bloquants** pour le MVP ASM)
-1. **Pas de multi-breakpoint « continue »** : 1 cible par appel `run_until_*` → l'adapter
-   gère sa propre table (step par paquets + check), ou 1 bp à la fois.
+
+> **MÀJ 2026-07-06 (luna v1.7.0, binaire épinglé synchronisé — catalogue 17 → 39
+> outils) :** les manques 1, 3 et 4 sont **résolus**. Registre natif de breakpoints
+> `bp_add`/`bp_remove`/`bp_clear_all`/`bp_list` + **`run_until_break`** (multi-bp +
+> watchpoints en un run, stop-reason riche `{bp_id, kind, pc, addr, value}`) —
+> l'adapter les utilise depuis D-045. `peek_cgram` est MCP-enregistré ;
+> `save_state`/`load_state`, `disasm_cpu`/`disasm_spc`, traces CPU/mémoire et
+> `load_symbols`/`resolve_symbol` (ingestion `.sym` côté luna) existent aussi.
+> Toujours vrai : pas de `peek_oam` brut (seulement `render_sprite_sheet`), pas
+> d'event async (le 2 reste), et le caveat bank-exact ci-dessous.
+
+1. ~~Pas de multi-breakpoint « continue »~~ **Résolu (v1.6.0)** : `bp_add` +
+   `run_until_break` — l'ancienne table adapter (step par paquets + check) est retirée.
 2. **Pas d'event async / pause interruptible** : `max_steps` est **obligatoire** (pas de run
    illimité) → « pause » = step chunké borné.
-3. **Pas de peek bulk CGRAM/OAM** : `peek_cgram` existe (luna-api) mais **non-enregistré**
-   MCP ; pas de `peek_oam` (OAM = excerpts dans `state`). N'impacte que les *viewers
-   mémoire*, pas le stepping.
-4. **`run_until_pc` ne rend que `hit:bool`** (pas de stop-reason riche).
-- **Caveat watch** : la surveillance mémoire est **bank-exact, non mirror-folded** —
-  surveiller la **banque exacte d'exécution** (`$80:2100` FastROM vs `$00:2100` LoROM) ;
+3. ~~Pas de peek bulk CGRAM/OAM~~ **Partiellement résolu (v1.6.0)** : `peek_cgram` est
+   MCP-enregistré ; toujours pas de `peek_oam` brut (OAM = `state.ppu.oam_full` +
+   `render_sprite_sheet`).
+4. ~~`run_until_pc` ne rend que `hit:bool`~~ **Résolu** : `run_until_break` rend
+   `{steps, hit, bp_id, kind, pc, addr, value}`.
+- **Caveat watch (toujours vrai en v1.7.0)** : la surveillance mémoire est **bank-exact,
+  non mirror-folded** (`breakpoints.rs` : plage 24-bit inclusive brute) — surveiller la
+  **banque exacte d'exécution** (`$80:2100` FastROM vs `$00:2100` LoROM) ;
   l'adapter doit étendre les miroirs.
 
 ### 10.6 Verdict & séquençage
