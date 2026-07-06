@@ -386,6 +386,24 @@ check('mem-trace html shows kind + value + vblank', mthtml.includes('write') && 
 check('mem-trace html empty state', MT.renderMemTraceHtml('x', 0, [], 'csp').includes('No access'));
 check('mem-trace html is static (no scripts)', !mthtml.includes('<script'));
 try { fs.unlinkSync(tmpMt); } catch {}
+
+// --- onboarding helpers (pure + against the real SDK) ---
+console.log('\n=== onboarding: arch mapping + debug-info detection ===');
+const tmpOb = path.join(os.tmpdir(), `cooper_onboarding_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'onboarding.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpOb });
+const OB = require(tmpOb);
+check('releaseArchTag linux/arm64', OB.releaseArchTag('linux', 'arm64') === 'linux_arm64');
+check('releaseArchTag win32/x64 → windows_x86_64', OB.releaseArchTag('win32', 'x64') === 'windows_x86_64');
+check('releaseArchTag darwin/x64 has no prebuilt (null)', OB.releaseArchTag('darwin', 'x64') === null);
+check('releaseArchTag unknown platform is null', OB.releaseArchTag('freebsd', 'x64') === null);
+const devCc = path.join(OPENSNES, 'compiler', 'scripts', 'cc65816');
+if (fs.existsSync(devCc)) {
+    check('dev-tree cc65816 carries the debug-info gate',
+        OB.sdkSupportsDebugInfo(fs.readFileSync(devCc, 'utf8')) === true);
+}
+check('a pre-0.26 wrapper (no CC65816_G) is detected as unsupported',
+    OB.sdkSupportsDebugInfo('#!/bin/bash\ncproc "$@"') === false);
+try { fs.unlinkSync(tmpOb); } catch {}
 check('dashboard escapes the project name (no HTML injection)',
     D2.renderDashboardHtml({ hasProject: true, projectName: '<img>', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N').includes('&lt;img&gt;'));
 try { fs.unlinkSync(tmpD2); } catch {}

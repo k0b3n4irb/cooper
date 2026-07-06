@@ -214,6 +214,7 @@ clangd**.
 | **`…/make/common.mk: No such file`** on build | Set `cooper.opensnesPath` to your OpenSNES release. |
 | **Run/Debug: "luna not found"** | Set `cooper.lunaPath` to the luna binary **or** its folder. |
 | **Debug does nothing** | Make sure the ROM is built (Build first). A stale `launch.json` `program` self-heals as of 0.12.1; you can also delete the `program` line entirely. |
+| **"your OpenSNES release predates the Cooper debug info"** | Your SDK is < 0.26: debugging works but at the symbol level (no `main.c` lines, no typed locals). Download the latest release — the warning's button takes you there. |
 | **VARIABLES is empty while paused** | Click the frame in **CALL STACK** to select it; expand **Registers**. |
 | **`#include <snes.h>` shows errors** | Run **Cooper: Configure clangd**, then restart the clangd server. |
 | **Something silently does nothing** | Run **Cooper: Show Log** (or View → Output → *Cooper*): every build, luna run, MCP call, timeout and error is logged there. Include it when reporting a bug. |

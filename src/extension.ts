@@ -9,6 +9,7 @@ import { LunaDebugSession } from './lunaDebug';
 import { LunaMcp, DisasmLine } from './lunaMcp';
 import { renderDisasmHtml } from './disasmView';
 import { renderMemTraceHtml, TracedEvent } from './memTraceView';
+import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
 import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
@@ -39,6 +40,22 @@ function log(msg: string): void {
 function fail(msg: string): void {
     log(`ERROR: ${msg}`);
     void vscode.window.showErrorMessage(`Cooper: ${msg}`);
+}
+
+/** A missing-tool error with a way OUT: a download button for this machine's
+ *  prebuilt release (arch-aware) + a jump to the setting. */
+function failWithDownload(kind: 'sdk' | 'luna', msg: string): void {
+    log(`ERROR: ${msg}`);
+    const tag = releaseArchTag(process.platform, process.arch);
+    const dl = tag ? `Download (${tag.replace('_', ' ')})` : 'Open releases';
+    const setting = kind === 'sdk' ? 'cooper.opensnesPath' : 'cooper.lunaPath';
+    void vscode.window.showErrorMessage(`Cooper: ${msg}`, dl, 'Open Settings').then((pick) => {
+        if (pick === dl) {
+            void vscode.env.openExternal(vscode.Uri.parse(kind === 'sdk' ? OPENSNES_RELEASES_URL : LUNA_RELEASES_URL));
+        } else if (pick === 'Open Settings') {
+            void vscode.commands.executeCommand('workbench.action.openSettings', setting);
+        }
+    });
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -538,7 +555,7 @@ async function runBuild(target?: string): Promise<void> {
     }
     const sdk = sdkPathFor(projectDir);
     if (!sdk) {
-        void vscode.window.showErrorMessage('Cooper: set cooper.opensnesPath — the OpenSNES SDK could not be located, so the build can\'t override the Makefile\'s OPENSNES.');
+        failWithDownload('sdk', 'the OpenSNES SDK could not be located — download the prebuilt release for your machine and point cooper.opensnesPath at it.');
         return;
     }
     const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectDir))
@@ -578,7 +595,7 @@ async function generatePreviewPng(context: vscode.ExtensionContext): Promise<str
     const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
     const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
     if (!luna) {
-        void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath (the binary or its folder), or cooper.opensnesPath.');
+        failWithDownload('luna', 'could not find the luna binary — download the prebuilt release for your machine and point cooper.lunaPath at it.');
         return null;
     }
     const storageDir = context.globalStorageUri.fsPath;
@@ -839,7 +856,7 @@ async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> 
     const sdk = info.projectDir ? detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: info.projectDir }) : null;
     const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
     if (!luna) {
-        fail('set cooper.lunaPath to view the PPU.');
+        failWithDownload('luna', 'could not find the luna binary (needed to view the PPU) — download it and set cooper.lunaPath.');
         return undefined;
     }
     const steps = Math.min(cfg.get<number>('preview.steps') ?? 200000, 500000);
@@ -933,6 +950,37 @@ async function showVram(): Promise<void> {
 // Debugger (P2.1b) — inline DAP adapter over luna MCP + the WLA .sym.
 // ---------------------------------------------------------------------------
 
+let warnedNoDebugInfo = false;
+
+/** Warn (once per session) when the SDK's cc65816 predates the Cooper debug
+ *  info (< 0.26, no CC65816_G gate): the debugger still works, but at the
+ *  symbol level — no main.c lines, no typed locals. */
+function warnIfNoDebugInfo(sdkPath: string): void {
+    if (warnedNoDebugInfo) {
+        return;
+    }
+    for (const rel of [['bin', 'cc65816'], ['compiler', 'scripts', 'cc65816']]) {
+        const p = path.join(sdkPath, ...rel);
+        try {
+            if (fs.existsSync(p)) {
+                if (!sdkSupportsDebugInfo(fs.readFileSync(p, 'utf8'))) {
+                    warnedNoDebugInfo = true;
+                    log(`debug: ${p} has no CC65816_G gate — SDK < 0.26, source-level C debug unavailable`);
+                    void vscode.window.showWarningMessage(
+                        'Cooper: your OpenSNES release predates the Cooper debug info (< 0.26). Debugging works at the symbol level only — update the SDK for main.c breakpoints and typed locals.',
+                        'Open releases',
+                    ).then((pick) => {
+                        if (pick === 'Open releases') {
+                            void vscode.env.openExternal(vscode.Uri.parse(OPENSNES_RELEASES_URL));
+                        }
+                    });
+                }
+                return;
+            }
+        } catch { /* unreadable wrapper: skip the check */ }
+    }
+}
+
 class LunaDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
     createDebugAdapterDescriptor(): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
         // In-process: no separate adapter binary, no TCP port (D-018).
@@ -993,13 +1041,17 @@ class LunaConfigProvider implements vscode.DebugConfigurationProvider {
                 return undefined;
             }
         } else if (!fs.existsSync(romPath)) {
-            void vscode.window.showErrorMessage(`Cooper: ${path.basename(romPath)} isn't built, and the SDK couldn't be located to build it (set cooper.opensnesPath).`);
+            failWithDownload('sdk', `${path.basename(romPath)} isn't built, and the SDK couldn't be located to build it.`);
             return undefined;
+        }
+
+        if (sdk?.path) {
+            warnIfNoDebugInfo(sdk.path);
         }
 
         const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
         if (!luna) {
-            void vscode.window.showErrorMessage('Cooper: could not find the luna binary. Set cooper.lunaPath (the binary or its folder), or cooper.opensnesPath.');
+            failWithDownload('luna', 'could not find the luna binary — download the prebuilt release and set cooper.lunaPath.');
             return undefined;
         }
         config.lunaPath = luna;

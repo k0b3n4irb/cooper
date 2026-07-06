@@ -1,9 +1,40 @@
 # Cooper — current snapshot
 
-_Last updated 2026-06-27._ The full plan (all phases, dependencies, open
+_Last updated 2026-07-06._ The full plan (all phases, dependencies, open
 decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
+
+**P0+P1+P2 hardening & luna v1.7.0 dividends** (0.25.0 → 0.30.0, 2026-07-06,
+after the full project review in /tmp/cooper-review-2026-07-06.md):
+- **CI** (.github/workflows/ci.yml): build+package job + the full two-tier suite
+  vs a real SDK build + pinned luna; tool-gated test skips are counted and fail
+  CI (COOPER_REQUIRE_TOOLS=1). NOTE: no git remote yet — CI runs on first push.
+- **Cooper output channel** (Show Log): every make/luna/MCP spawn, timeout and
+  error logged; LunaMcp takes onLog (stays pure); luna stderr captured.
+- **UX**: cooper.debug/breakOnSymbol/showLog in the palette; dashboard has a
+  real "Refresh status" (preview survives via a ready-handshake); preview has a
+  30s timeout like the viewers.
+- **luna v1.7.0 catalogue exploited** (17→39 MCP tools; pinned binary already
+  synced by the SDK): D-045 native multi-bp continue (bp_add/run_until_break —
+  the chunked scan and the "first data bp only" warning are GONE); D-046 debug
+  snapshots (save/load_state, ROM-hash-guarded, globalStorage/snapshots/);
+  D-047 symbol-annotated disassembly viewer (disasm_cpu + load_symbols at
+  launch); D-048 one-frame memory trace with function attribution
+  (enable/take_mem_trace; luna's nmi/irq context markers must be filtered;
+  bank-exact caveat stands).
+- **Onboarding** (D-049): arch-aware Download buttons on every SDK/luna-missing
+  error; once-per-session warning when the SDK lacks CC65816_G (< 0.26 → symbol
+  level only).
+- **Vitrine**: real screenshots (shmup_1942 preview, breakout VRAM sheet);
+  README status table fixed (C6/C7 were still "planned"). 263 Node + 8
+  integration tests.
+
+Watch: luna still has NO raw peek_oam (render_sprite_sheet only), NO async stop
+events, and mem watch is bank-exact. User decision 2026-07-06: NOT publishing to
+Marketplace/OpenVSX yet — more features first.
+
+## Previously shipped
 
 **AI helper (C7) part 3 — OpenSNES MCP server (C7 COMPLETE)** (v0.24.0). Cooper
 ships a hand-rolled JSON-RPC stdio MCP server (dist/opensnes-mcp.js, no new dep —

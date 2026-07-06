@@ -948,6 +948,22 @@ rationale and the docs that grounded it. Newest last.
   `InitHardware` via the `.sym`. Pure renderer tested (escaping, vblank tag,
   empty state, no scripts).
 
+### D-049 — Guided onboarding: arch-aware downloads + SDK debug-info check (2026-07-06)
+- **Decision:** every "SDK/luna not found" error now carries a **Download
+  (linux arm64)** button (host-arch detected, opens the right releases page) +
+  **Open Settings**. At debug launch, Cooper reads the SDK's `cc65816` wrapper
+  and warns **once per session** when it predates the Cooper debug info (no
+  `CC65816_G` gate → OpenSNES < 0.26): the debugger silently falling back to
+  symbol level was indistinguishable from a bug for the user.
+- **Grounding:** the OpenSNES release CI publishes per-arch zips
+  (`linux_x86_64`, `linux_arm64`, `windows_x86_64`, `darwin_arm64`) on `v*`
+  tags; the shipped ≥0.26 wrapper carries `CC65816_G` (verified in
+  `~/bin/opensnes/bin/cc65816` L89–91 and the dev tree
+  `compiler/scripts/cc65816`). Pure helpers in `onboarding.ts`
+  (`releaseArchTag`, `sdkSupportsDebugInfo`), Node-tested against both wrappers.
+- Memory: users install by **downloading prebuilt per-arch releases** — never
+  tell them to clone/compile ([[opensnes-onboarding-download-prebuilt]]).
+
 ---
 
 ### Known limitations (Component #1)

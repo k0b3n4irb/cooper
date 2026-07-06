@@ -4,6 +4,21 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.30.0] — 2026-07-06
+
+### Added — guided onboarding
+
+- **"SDK/luna not found" errors now offer the way out**: a
+  **Download (your arch)** button that opens the right prebuilt release for
+  your machine (linux x86_64/arm64, Windows x86_64, macOS arm64) plus a jump to
+  the setting.
+- **SDK version check at debug launch** — if your OpenSNES release predates the
+  Cooper debug info (< 0.26), Cooper tells you once (with a download button)
+  instead of silently falling back to symbol-level debugging.
+- Real screenshots in the guide and walkthrough (a shmup_1942 frame rendered by
+  luna; breakout's decoded VRAM tile sheet), and the README status table caught
+  up with reality (asset editors + AI are shipped).
+
 ## [0.29.0] — 2026-07-06
 
 ### Added — "who accesses this address?"
