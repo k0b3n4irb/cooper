@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.28.0] — 2026-07-06
+
+### Added — disassembly at the stop
+
+- **Cooper: Show Disassembly (at the stop)** — the 65816 instructions at the
+  current PC, disassembled by luna itself (correct M/X immediate widths from the
+  live flags) and **annotated with your symbols** (`main`, `label+0xNN`), the
+  current instruction highlighted.
+- The debugger now loads your `.sym` **into luna** at launch, so luna-side
+  disassembly and traces know your labels too.
+
 ## [0.27.0] — 2026-07-06
 
 ### Added — debug snapshots (luna savestates)

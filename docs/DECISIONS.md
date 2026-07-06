@@ -910,6 +910,26 @@ rationale and the docs that grounded it. Newest last.
 - **Verified:** Node tier round-trip against the real binary — save, drift 5000
   steps, load, exact CPU tuple (pc/pb/a/x/y/sp) restored.
 
+### D-047 — Disassembly viewer via luna `disasm_cpu` (2026-07-06)
+- **Decision:** `Cooper: Show Disassembly (at the stop)` renders luna's own
+  disassembly (64 lines from the live PC, M/X widths from the live flags) in a
+  static webview (`enableScripts: false`, PC row highlighted). Cooper does NOT
+  ship a 65816 disassembler — luna is the single engine (architecture rule), and
+  its output is symbol-annotated because the debug adapter now `load_symbols`the
+  ROM's `.sym` into luna at launch (also unlocks `symbol:` args + annotated traces).
+- **Grounding:** `disasm_cpu {addr?, lines?=16, m8?, x8?} → {lines:[{addr, bytes,
+  text, is_pc, symbol?}]}`; `load_symbols {path} → {count}` (lib.rs; pinned binary
+  verified). Pure renderer `disasmView.ts` (Node-tested); DAP customRequest
+  `cooperDisasm`.
+- **Alternative rejected:** DAP-native `disassembleRequest` + VS Code's built-in
+  disassembly view — it requires `supportsDisassembleRequest` plus instruction
+  stepping granularity plumbing, and the built-in view is geared to
+  instruction-stepping sessions; the webview is the cheapest correct slice and
+  can migrate later.
+- **Verified:** real-binary Node test — 8 lines at the live PC, exactly one
+  `is_pc`, symbol annotations present after `load_symbols`; renderer escapes
+  text and carries no scripts.
+
 ---
 
 ### Known limitations (Component #1)

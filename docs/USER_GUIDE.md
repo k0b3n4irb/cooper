@@ -160,6 +160,9 @@ The jewel. Workflow:
    machine (CPU, memory, PPU…). **Cooper: Restore Debug Snapshot…** jumps back to
    it — reproduce a bug as many times as you need without replaying the game.
    (A snapshot only loads against the same ROM build.)
+   **Disassembly** — **Cooper: Show Disassembly** opens the 65816 instructions at
+   the stop, disassembled by luna itself and annotated with your symbols
+   (`main`, `enemies_update+0x12`…), the current PC highlighted.
 6. **See the PPU at the stop** — sidebar → **PPU VIEWERS**:
 
 | Palette (CGRAM) | Sprites (OAM) | Tiles (VRAM) |

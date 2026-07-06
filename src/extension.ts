@@ -6,7 +6,8 @@ import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, findProjectDir } from './clangdConfig';
 import { resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile } from './build';
 import { LunaDebugSession } from './lunaDebug';
-import { LunaMcp } from './lunaMcp';
+import { LunaMcp, DisasmLine } from './lunaMcp';
+import { renderDisasmHtml } from './disasmView';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
 import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
@@ -64,6 +65,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.configureAI', () => configureAI()),
         vscode.commands.registerCommand('cooper.saveSnapshot', () => saveSnapshot(context)),
         vscode.commands.registerCommand('cooper.restoreSnapshot', () => restoreSnapshot(context)),
+        vscode.commands.registerCommand('cooper.showDisasm', () => showDisasm()),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
@@ -683,6 +685,23 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
 }
 
 let lastPreviewDataUri: string | undefined;
+
+// ---------------------------------------------------------------------------
+// Disassembly viewer — luna disasm_cpu at the current stop (symbol-annotated).
+// ---------------------------------------------------------------------------
+
+async function showDisasm(): Promise<void> {
+    const session = activeLunaSession();
+    if (!session) {
+        return;
+    }
+    try {
+        const r = await session.customRequest('cooperDisasm', { lines: 64 }) as { lines: DisasmLine[] };
+        showViewer('cooperDisasm', 'Disassembly', (w) => renderDisasmHtml(r.lines, w.cspSource));
+    } catch (e) {
+        fail(`could not disassemble: ${String(e)}`);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Debug snapshots — luna save/load_state at a debug stop (D-046). Blobs are

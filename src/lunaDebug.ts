@@ -230,6 +230,11 @@ export class LunaDebugSession extends LoggingDebugSession {
         if (fs.existsSync(symPath)) {
             this.sym = parseSym(fs.readFileSync(symPath, 'utf8'));
             this.sendEvent(new OutputEvent(`Loaded symbols: ${path.basename(symPath)} (${this.sym.labels.length} labels)\n`, 'console'));
+            // Also load it into luna itself, so disassembly/traces annotate symbols
+            // and address-taking tools accept `symbol:` (best-effort, luna ≥ 1.6).
+            try {
+                await this.mcp.loadSymbols(symPath);
+            } catch { /* older luna: Cooper-side resolution still works */ }
             // Source-level: join the .sym addr-to-line with the `; @cline` markers
             // in the generated asm (built with wla -i / wlalink -A + patched cproc).
             if (this.sym.hasLineInfo) {
@@ -706,6 +711,17 @@ export class LunaDebugSession extends LoggingDebugSession {
                 this.sendResponse(response);
             } catch (e) {
                 this.sendErrorResponse(response, 3007, `vram read failed: ${(e as Error).message}`);
+            }
+            return;
+        }
+        if (command === 'cooperDisasm') {
+            const a = (args ?? {}) as { addr?: number; lines?: number };
+            try {
+                const r = await this.mcp.disasmCpu({ addr: a.addr, lines: a.lines ?? 48 });
+                response.body = { lines: r.lines };
+                this.sendResponse(response);
+            } catch (e) {
+                this.sendErrorResponse(response, 3010, `disasm failed: ${(e as Error).message}`);
             }
             return;
         }

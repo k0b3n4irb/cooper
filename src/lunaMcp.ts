@@ -22,6 +22,15 @@ export interface MemBreakResult {
     value?: number;
 }
 
+/** One disassembled instruction (luna `disasm_cpu`/`disasm_spc`). */
+export interface DisasmLine {
+    addr: number;
+    bytes: number[];
+    text: string;
+    is_pc: boolean;
+    symbol?: string | null;
+}
+
 /** `run_until_break` outcome (luna ≥ v1.6.0 breakpoint registry). */
 export interface BreakHit {
     steps: number;
@@ -249,6 +258,24 @@ export class LunaMcp {
      *  watchpoints halt after the access and report its pc/addr/value. */
     runUntilBreak(maxSteps: number): Promise<BreakHit> {
         return this.callTool('run_until_break', { max_steps: maxSteps }) as Promise<BreakHit>;
+    }
+
+    // --- disassembly & symbols (luna ≥ v1.6.0) ---
+
+    /** Disassemble CPU instructions. Defaults: start at the live PC, 16 lines,
+     *  M/X widths from the live flags. `is_pc` marks the live-PC line; `symbol`
+     *  annotates when a `.sym` is loaded (see `loadSymbols`). */
+    disasmCpu(opts: { addr?: number; lines?: number } = {}): Promise<{ lines: DisasmLine[] }> {
+        return this.callTool('disasm_cpu', {
+            ...(opts.addr !== undefined ? { addr: opts.addr } : {}),
+            ...(opts.lines !== undefined ? { lines: opts.lines } : {}),
+        }) as Promise<{ lines: DisasmLine[] }>;
+    }
+
+    /** Load a WLA-DX `.sym` into luna so disasm/traces annotate symbols and
+     *  address-taking tools accept `symbol:`. Returns the label count. */
+    loadSymbols(symPath: string): Promise<{ count: number }> {
+        return this.callTool('load_symbols', { path: symPath }) as Promise<{ count: number }>;
     }
 
     // --- savestates (luna ≥ v1.6.0) ---

@@ -353,6 +353,23 @@ check('dashboard reflects status (luna ready, ROM built)', dash.includes('ready'
 check('dashboard has a preview image slot', dash.includes('id="preview"'));
 check('dashboard empty state when no project',
     D2.renderDashboardHtml({ hasProject: false, projectName: '', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N').includes('Open an OpenSNES project'));
+
+// --- disassembly viewer HTML (pure) ---
+console.log('\n=== disassembly viewer HTML (pure) ===');
+const tmpDs = path.join(os.tmpdir(), `cooper_disasm_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'disasmView.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpDs });
+const DS = require(tmpDs);
+check('formatDisasmAddr renders $BB:AAAA', DS.formatDisasmAddr(0x00C46E) === '$00:C46E');
+const dhtml = DS.renderDisasmHtml([
+    { addr: 0x00C46E, bytes: [0xA9, 0x12], text: 'LDA #$12', is_pc: true, symbol: 'main' },
+    { addr: 0x00C470, bytes: [0x60], text: 'RTS <x>', is_pc: false, symbol: null },
+], 'vscode-csp');
+check('disasm html highlights the PC row', dhtml.includes('<tr class="pc">'));
+check('disasm html shows the symbol column', dhtml.includes('>main</td>'));
+check('disasm html escapes instruction text', dhtml.includes('RTS &lt;x&gt;'));
+check('disasm html title carries the live PC', dhtml.includes('PC $00:C46E'));
+check('disasm html is static (CSP, no scripts)', dhtml.includes("default-src 'none'") && !dhtml.includes('<script'));
+try { fs.unlinkSync(tmpDs); } catch {}
 check('dashboard escapes the project name (no HTML injection)',
     D2.renderDashboardHtml({ hasProject: true, projectName: '<img>', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N').includes('&lt;img&gt;'));
 try { fs.unlinkSync(tmpD2); } catch {}
@@ -635,6 +652,19 @@ try { fs.unlinkSync(tmpOM); } catch {}
             const tuple = (c) => [c.pc, c.pb, c.a, c.x, c.y, c.sp].join(',');
             check('load_state restores the exact CPU state',
                 tuple(restored) === tuple(snapCpu) && tuple(drifted) !== tuple(snapCpu));
+
+            // --- D-047: symbol-annotated disassembly at the live PC ---
+            const symPath = ri.rom.replace(/\.(sfc|smc)$/i, '.sym');
+            const ls = await m.loadSymbols(symPath);
+            check('load_symbols ingests the .sym into luna', ls.count > 0);
+            const dis = await m.disasmCpu({ lines: 8 });
+            check('disasm_cpu returns the requested lines', dis.lines.length === 8);
+            check('disasm marks the live PC on the first line',
+                dis.lines[0].is_pc === true && dis.lines.filter((l) => l.is_pc).length === 1);
+            check('disasm lines carry text + bytes',
+                dis.lines.every((l) => typeof l.text === 'string' && l.text.length > 0 && Array.isArray(l.bytes)));
+            check('disasm is symbol-annotated after load_symbols',
+                dis.lines.some((l) => typeof l.symbol === 'string' && l.symbol.length > 0));
         } catch (e) {
             check('MCP end-to-end threw: ' + String((e && e.message) || e), false);
         } finally {
