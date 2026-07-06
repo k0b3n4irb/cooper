@@ -156,7 +156,11 @@ The jewel. Workflow:
    - **WATCH**: type a symbol or address (`frame_count`, `$7E0030`) to read it.
    - **Data breakpoint**: in WATCH, right-click → *Break on Value Change* → stops
      at the instruction that writes that address.
-5. **See the PPU at the stop** — sidebar → **PPU VIEWERS**:
+5. **Snapshots** — at any stop, **Cooper: Save Debug Snapshot** captures the whole
+   machine (CPU, memory, PPU…). **Cooper: Restore Debug Snapshot…** jumps back to
+   it — reproduce a bug as many times as you need without replaying the game.
+   (A snapshot only loads against the same ROM build.)
+6. **See the PPU at the stop** — sidebar → **PPU VIEWERS**:
 
 | Palette (CGRAM) | Sprites (OAM) | Tiles (VRAM) |
 |---|---|---|

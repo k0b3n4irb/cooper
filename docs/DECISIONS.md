@@ -897,6 +897,19 @@ rationale and the docs that grounded it. Newest last.
 - **Alternative rejected:** keeping `run_until_pc`/`run_until_mem_*` (still used
   for step-over's call-skip, where a single exact target is the right tool).
 
+### D-046 — Debug snapshots via luna save/load_state (2026-07-06)
+- **Decision:** surface luna's savestates in the debugger — `Cooper: Save Debug
+  Snapshot` / `Restore Debug Snapshot…` at a stop, via DAP customRequests
+  (`cooperSaveState`/`cooperLoadState`). Restore emits a `stopped('restore')` so
+  the UI re-reads registers/variables at the restored point. Blobs are stored as
+  files under `globalStorage/snapshots/` (they can be hundreds of KB — too big
+  for workspaceState) and are **ROM-hash-guarded by luna itself** (a state only
+  loads against its own ROM; the restore error explains that).
+- **Grounding:** `save_state {} → {state_base64, bytes}` / `load_state
+  {state_base64} → {ok}` (luna-mcp-server lib.rs, pinned binary verified live).
+- **Verified:** Node tier round-trip against the real binary — save, drift 5000
+  steps, load, exact CPU tuple (pc/pb/a/x/y/sp) restored.
+
 ---
 
 ### Known limitations (Component #1)

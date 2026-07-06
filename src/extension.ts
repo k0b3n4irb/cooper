@@ -62,6 +62,8 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
         vscode.commands.registerCommand('cooper.configureAI', () => configureAI()),
+        vscode.commands.registerCommand('cooper.saveSnapshot', () => saveSnapshot(context)),
+        vscode.commands.registerCommand('cooper.restoreSnapshot', () => restoreSnapshot(context)),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
@@ -681,6 +683,78 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
 }
 
 let lastPreviewDataUri: string | undefined;
+
+// ---------------------------------------------------------------------------
+// Debug snapshots — luna save/load_state at a debug stop (D-046). Blobs are
+// ROM-hash-guarded by luna, stored under globalStorage/snapshots/.
+// ---------------------------------------------------------------------------
+
+/** The paused luna debug session, or undefined (with a toast). */
+function activeLunaSession(): vscode.DebugSession | undefined {
+    const s = vscode.debug.activeDebugSession;
+    if (!s || s.type !== 'luna') {
+        fail('start a Luna debug session first (snapshots capture the paused machine).');
+        return undefined;
+    }
+    return s;
+}
+
+function snapshotsDir(context: vscode.ExtensionContext): string {
+    const dir = path.join(context.globalStorageUri.fsPath, 'snapshots');
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+}
+
+async function saveSnapshot(context: vscode.ExtensionContext): Promise<void> {
+    const session = activeLunaSession();
+    if (!session) {
+        return;
+    }
+    const name = await vscode.window.showInputBox({
+        prompt: 'Snapshot name',
+        value: `snapshot-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}`,
+        validateInput: (v) => (/^[\w.-]+$/.test(v) ? undefined : 'letters, digits, . _ - only'),
+    });
+    if (!name) {
+        return;
+    }
+    try {
+        const r = await session.customRequest('cooperSaveState') as { stateBase64: string; bytes: number };
+        const file = path.join(snapshotsDir(context), `${name}.lunastate`);
+        fs.writeFileSync(file, r.stateBase64, 'utf8');
+        log(`snapshot: saved ${name} (${r.bytes} bytes) → ${file}`);
+        void vscode.window.showInformationMessage(`Cooper: snapshot "${name}" saved (${Math.round(r.bytes / 1024)} KB).`);
+    } catch (e) {
+        fail(`could not save the snapshot: ${String(e)}`);
+    }
+}
+
+async function restoreSnapshot(context: vscode.ExtensionContext): Promise<void> {
+    const session = activeLunaSession();
+    if (!session) {
+        return;
+    }
+    const dir = snapshotsDir(context);
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.lunastate')).sort().reverse();
+    if (!files.length) {
+        fail('no snapshots yet — use "Cooper: Save Debug Snapshot" at a stop first.');
+        return;
+    }
+    const picked = await vscode.window.showQuickPick(files.map((f) => f.replace(/\.lunastate$/, '')), {
+        placeHolder: 'Restore which snapshot? (a snapshot only loads against its own ROM)',
+    });
+    if (!picked) {
+        return;
+    }
+    try {
+        const stateBase64 = fs.readFileSync(path.join(dir, `${picked}.lunastate`), 'utf8');
+        await session.customRequest('cooperLoadState', { stateBase64 });
+        log(`snapshot: restored ${picked}`);
+        void vscode.window.showInformationMessage(`Cooper: snapshot "${picked}" restored.`);
+    } catch (e) {
+        fail(`could not restore "${picked}": ${String(e)} (snapshots only load against the same ROM build)`);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Palette viewer (P2.2c) — a webview of the live CGRAM at a debug stop.

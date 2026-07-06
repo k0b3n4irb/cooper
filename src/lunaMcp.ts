@@ -251,6 +251,18 @@ export class LunaMcp {
         return this.callTool('run_until_break', { max_steps: maxSteps }) as Promise<BreakHit>;
     }
 
+    // --- savestates (luna ≥ v1.6.0) ---
+
+    /** Serialize the whole machine to a versioned, ROM-hash-guarded blob (base64). */
+    saveState(): Promise<{ state_base64: string; bytes: number }> {
+        return this.callTool('save_state', {}) as Promise<{ state_base64: string; bytes: number }>;
+    }
+
+    /** Restore a `save_state` blob. Rejected if the version or ROM hash mismatch. */
+    loadState(stateBase64: string): Promise<unknown> {
+        return this.callTool('load_state', { state_base64: stateBase64 });
+    }
+
     /** Read `count` bytes from the CPU bus at `bank:offset` (returns the byte array). */
     async peekMemory(bank: number, offset: number, count: number): Promise<number[]> {
         const r = await this.callTool('peek_memory', { bank, offset, count }) as { bytes?: number[] };

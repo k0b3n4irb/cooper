@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.27.0] — 2026-07-06
+
+### Added — debug snapshots (luna savestates)
+
+- **Cooper: Save Debug Snapshot** captures the whole paused machine (CPU, memory,
+  PPU…) to a named snapshot; **Cooper: Restore Debug Snapshot…** jumps straight
+  back to it and refreshes the debugger UI at that point — reproduce a bug as
+  many times as you need without replaying. Snapshots are ROM-hash-guarded by
+  luna (they only load against the same ROM build) and stored per-machine under
+  the extension's global storage.
+
 ## [0.26.0] — 2026-07-06
 
 ### Changed — native multi-breakpoint continue (luna v1.7.0)

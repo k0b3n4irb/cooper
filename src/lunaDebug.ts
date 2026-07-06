@@ -709,6 +709,29 @@ export class LunaDebugSession extends LoggingDebugSession {
             }
             return;
         }
+        if (command === 'cooperSaveState') {
+            try {
+                const s = await this.mcp.saveState();
+                response.body = { stateBase64: s.state_base64, bytes: s.bytes };
+                this.sendResponse(response);
+            } catch (e) {
+                this.sendErrorResponse(response, 3008, `save_state failed: ${(e as Error).message}`);
+            }
+            return;
+        }
+        if (command === 'cooperLoadState') {
+            const a = (args ?? {}) as { stateBase64?: string };
+            try {
+                await this.mcp.loadState(a.stateBase64 ?? '');
+                this.sendResponse(response);
+                // The machine jumped to the snapshot: stop so the UI re-reads
+                // registers/variables/stack at the restored point.
+                this.sendEvent(new StoppedEvent('restore', THREAD_ID));
+            } catch (e) {
+                this.sendErrorResponse(response, 3009, `load_state failed: ${(e as Error).message}`);
+            }
+            return;
+        }
         super.customRequest(command, response, args);
     }
 

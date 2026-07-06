@@ -623,6 +623,18 @@ try { fs.unlinkSync(tmpOM); } catch {}
                 h3.hit === true && h3.kind === 'write' && h3.addr === 0x002100
                 && typeof h3.pc === 'number' && typeof h3.value === 'number');
             await m.bpClearAll();
+
+            // --- D-046: save/load state round-trip (luna ≥1.6 savestates) ---
+            const snapCpu = await m.cpu();
+            const snap = await m.saveState();
+            check('save_state returns a base64 blob with a size', snap.state_base64.length > 0 && snap.bytes > 0);
+            await m.step(5000); // drift away from the snapshot
+            const drifted = await m.cpu();
+            await m.loadState(snap.state_base64);
+            const restored = await m.cpu();
+            const tuple = (c) => [c.pc, c.pb, c.a, c.x, c.y, c.sp].join(',');
+            check('load_state restores the exact CPU state',
+                tuple(restored) === tuple(snapCpu) && tuple(drifted) !== tuple(snapCpu));
         } catch (e) {
             check('MCP end-to-end threw: ' + String((e && e.message) || e), false);
         } finally {
