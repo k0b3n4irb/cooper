@@ -4,6 +4,32 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.25.0] — 2026-07-06
+
+### Added — the Cooper log (diagnosability)
+
+- New **Cooper** output channel (**Cooper: Show Log** / View → Output → Cooper):
+  every `make` invocation, luna spawn, MCP call, timeout and surfaced error is
+  logged with timestamps — "nothing happens" is now always diagnosable. luna's
+  stderr is captured into the log too (both the debugger's emulator and the
+  transient viewer runs).
+- **Cooper: Debug (luna)** and **Cooper: Toggle Breakpoint on Function…** are now
+  in the Command Palette (they existed but weren't contributed). The breakpoint
+  command picks the function from your project's symbols when invoked from the
+  palette.
+- CI (GitHub Actions): build + package on every push, plus the full two-tier
+  suite against a real SDK build and the pinned luna. Tool-gated test skips are
+  now counted and fail the run in CI (`COOPER_REQUIRE_TOOLS=1`).
+
+### Fixed
+
+- **Preview timeout** — a wedged luna preview now errors after 30 s instead of
+  spinning forever (same guard the PPU viewers got in 0.24.2).
+- **Dashboard "Refresh"** — the button under the preview (which re-renders the
+  frame) is now labelled **Update preview**; a real **Refresh status** button
+  re-reads the SDK/luna/ROM status without re-running anything, and the preview
+  image survives the refresh.
+
 ## [0.24.2] — 2026-07-05
 
 ### Fixed — PPU viewers never hang silently; safer startup

@@ -168,7 +168,7 @@ export function stepStops(mode: StepMode, start: StepPoint, cur: { src?: CSource
 }
 
 export class LunaDebugSession extends LoggingDebugSession {
-    private mcp = new LunaMcp();
+    private mcp: LunaMcp;
     private sym: SymTable | null = null;
     private cmap: CLineMap | null = null;     // PC ↔ C source (source-level debug)
     private locals = new Map<string, LocalVar[]>(); // function name → its C locals (-g builds)
@@ -189,8 +189,9 @@ export class LunaDebugSession extends LoggingDebugSession {
         return [...new Set([...this.breakpoints, ...this.sourceBreakpoints])];
     }
 
-    constructor() {
+    constructor(onLog?: (line: string) => void) {
         super('luna-debug.txt');
+        this.mcp = new LunaMcp({ onLog });
         this.setDebuggerLinesStartAt1(true);
         this.setDebuggerColumnsStartAt1(true);
     }

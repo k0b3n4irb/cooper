@@ -23,9 +23,29 @@ const execFileAsync = promisify(execFile);
 
 const MAKE_TASK_TYPE = 'cooper-make';
 
+// The "Cooper" output channel — the support log. Every subprocess (make, luna,
+// MCP), every timeout and every surfaced error lands here so "nothing happens"
+// is always diagnosable (View → Output → Cooper, or `Cooper: Show Log`).
+let output: vscode.OutputChannel | undefined;
+
+/** Append a timestamped line to the Cooper log. */
+function log(msg: string): void {
+    output?.appendLine(`[${new Date().toISOString().slice(11, 19)}] ${msg}`);
+}
+
+/** Log an error and toast it to the user. `msg` without the "Cooper: " prefix. */
+function fail(msg: string): void {
+    log(`ERROR: ${msg}`);
+    void vscode.window.showErrorMessage(`Cooper: ${msg}`);
+}
+
 export function activate(context: vscode.ExtensionContext): void {
+    output = vscode.window.createOutputChannel('Cooper');
+    log(`Cooper activated (v${(context.extension.packageJSON as { version?: string }).version ?? '?'})`);
     const tree = new CooperTreeProvider();
     context.subscriptions.push(
+        output,
+        vscode.commands.registerCommand('cooper.showLog', () => output?.show(true)),
         vscode.commands.registerCommand('cooper.configureClangd', () => configureClangd()),
         vscode.commands.registerCommand('cooper.build', () => runBuild()),
         vscode.commands.registerCommand('cooper.preview', () => previewFrame(context)),
@@ -37,7 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.openWalkthrough', () =>
             vscode.commands.executeCommand('workbench.action.openWalkthrough', 'opensnes.cooper#cooper.gettingStarted', false)),
         vscode.commands.registerCommand('cooper.debug', () => startLunaDebug(tree.current())),
-        vscode.commands.registerCommand('cooper.breakOnSymbol', (name: string) => breakOnSymbol(name)),
+        vscode.commands.registerCommand('cooper.breakOnSymbol', (name?: string) => breakOnSymbol(name)),
         vscode.commands.registerCommand('cooper.editPalette', (uri?: vscode.Uri) => editPalette(uri)),
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
@@ -181,7 +201,22 @@ function startLunaDebug(info: ProjectInfo): void {
 
 /** Toggle a function breakpoint on a symbol (clicking a symbol in the tree).
  *  Clicking again removes it — and it never adds duplicates. */
-function breakOnSymbol(name: string): void {
+async function breakOnSymbol(name?: string): Promise<void> {
+    if (!name) {
+        // Palette invocation (no tree argument): pick among the project's functions.
+        const info = await resolveProjectInfo();
+        if (!info.functions.length) {
+            fail('no project functions found (open an OpenSNES project with a built .sym).');
+            return;
+        }
+        const picked = await vscode.window.showQuickPick(info.functions.map((f) => f.name), {
+            placeHolder: 'Toggle a breakpoint on which function?',
+        });
+        if (!picked) {
+            return;
+        }
+        name = picked;
+    }
     const existing = vscode.debug.breakpoints.find(
         (b): b is vscode.FunctionBreakpoint => b instanceof vscode.FunctionBreakpoint && b.functionName === name,
     );
@@ -455,10 +490,12 @@ function runMakeAndWait(
     const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectDir))
         ?? vscode.workspace.workspaceFolders?.[0] ?? vscode.TaskScope.Workspace;
     const task = makeTask(target, folder, projectDir, sdkPath, debug);
+    log(`make: ${debug ? 'debug (-g)' : 'release'} build in ${projectDir} (target ${target ?? 'all'})`);
     return new Promise<boolean>((resolve) => {
         const disp = vscode.tasks.onDidEndTaskProcess((e) => {
             if (e.execution.task === task) {
                 disp.dispose();
+                log(`make: exited ${e.exitCode ?? '?'}`);
                 resolve(e.exitCode === 0);
             }
         });
@@ -501,6 +538,7 @@ async function runBuild(target?: string): Promise<void> {
     const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectDir))
         ?? vscode.workspace.workspaceFolders?.[0]
         ?? vscode.TaskScope.Workspace;
+    log(`make: release build in ${projectDir} (target ${target ?? 'all'})`);
     await vscode.tasks.executeTask(makeTask(target, folder, projectDir, sdk));
 }
 
@@ -544,15 +582,20 @@ async function generatePreviewPng(context: vscode.ExtensionContext): Promise<str
         steps: cfg.get<number>('preview.steps'),
         forceDisplay: cfg.get<boolean>('preview.forceDisplay'),
     });
+    log(`preview: ${luna} ${args.join(' ')} (cwd ${projectDir})`);
     return vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `Cooper: rendering ${romName} in luna…` },
         async (): Promise<string | null> => {
+            const t0 = Date.now();
             try {
-                await execFileAsync(luna, args, { cwd: projectDir });
+                // timeout: a wedged luna must surface an error, never a stuck spinner
+                await execFileAsync(luna, args, { cwd: projectDir, timeout: 30000 });
             } catch (err: unknown) {
-                void vscode.window.showErrorMessage(`Cooper: luna preview failed: ${(err as { stderr?: string }).stderr?.trim() || String(err)}`);
+                const e = err as { stderr?: string; killed?: boolean };
+                fail(`luna preview failed${e.killed ? ' (timed out after 30s)' : ''}: ${e.stderr?.trim() || String(err)}`);
                 return null;
             }
+            log(`preview: rendered in ${Date.now() - t0}ms → ${png}`);
             return fs.existsSync(png) ? png : null;
         },
     );
@@ -614,8 +657,21 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
             case 'run': {
                 const png = await generatePreviewPng(context);
                 if (png) {
-                    const data = fs.readFileSync(png).toString('base64');
-                    void panel.webview.postMessage({ type: 'preview', dataUri: `data:image/png;base64,${data}` });
+                    lastPreviewDataUri = `data:image/png;base64,${fs.readFileSync(png).toString('base64')}`;
+                    void panel.webview.postMessage({ type: 'preview', dataUri: lastPreviewDataUri });
+                }
+                break;
+            }
+            case 'refresh': {
+                // Re-render the dashboard with fresh state (SDK/luna/ROM dots); the
+                // new document posts 'ready' and gets the cached preview back.
+                void vscode.commands.executeCommand('cooper.refresh');
+                panel.webview.html = renderDashboardHtml(await dashboardState(), panel.webview.cspSource, nonce());
+                break;
+            }
+            case 'ready': {
+                if (lastPreviewDataUri) {
+                    void panel.webview.postMessage({ type: 'preview', dataUri: lastPreviewDataUri });
                 }
                 break;
             }
@@ -623,6 +679,8 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
     });
     panel.webview.html = renderDashboardHtml(await dashboardState(), panel.webview.cspSource, nonce());
 }
+
+let lastPreviewDataUri: string | undefined;
 
 // ---------------------------------------------------------------------------
 // Palette viewer (P2.2c) — a webview of the live CGRAM at a debug stop.
@@ -646,7 +704,7 @@ async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> 
                 : [];
             return { cgram: ppu.cgram ?? [], oam: ppu.oam ?? [], vram };
         } catch (e) {
-            void vscode.window.showErrorMessage(`Cooper: could not read the PPU state: ${String(e)}`);
+            fail(`could not read the PPU state: ${String(e)}`);
             return undefined;
         }
     }
@@ -654,21 +712,23 @@ async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> 
     const info = await resolveProjectInfo();
     const rom = info.projectDir && info.romName ? path.join(info.projectDir, info.romName) : undefined;
     if (!rom || !fs.existsSync(rom)) {
-        void vscode.window.showErrorMessage('Cooper: build the ROM first (or start a Debug session) to view the PPU.');
+        fail('build the ROM first (or start a Debug session) to view the PPU.');
         return undefined;
     }
     const cfg = vscode.workspace.getConfiguration('cooper');
     const sdk = info.projectDir ? detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: info.projectDir }) : null;
     const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
     if (!luna) {
-        void vscode.window.showErrorMessage('Cooper: set cooper.lunaPath to view the PPU.');
+        fail('set cooper.lunaPath to view the PPU.');
         return undefined;
     }
     const steps = Math.min(cfg.get<number>('preview.steps') ?? 200000, 500000);
+    log(`ppu viewer: no debug session — transient luna run (${rom}, ${steps} steps)`);
     return vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'Cooper: reading the PPU from luna…', cancellable: false },
         async () => {
-            const mcp = new LunaMcp();
+            const t0 = Date.now();
+            const mcp = new LunaMcp({ onLog: log });
             try {
                 // Hard overall timeout so a stuck luna handshake can never hang the
                 // viewer silently (the old behaviour the user hit).
@@ -681,9 +741,10 @@ async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> 
                     const vram = needVram ? await mcp.peekVram(0, 0x4000) : [];
                     return { cgram: ppu.cgram ?? [], oam: ppu.oam_full ?? [], vram };
                 })(), 25000, `luna at ${luna}`);
+                log(`ppu viewer: snapshot read in ${Date.now() - t0}ms`);
                 return snap;
             } catch (e) {
-                void vscode.window.showErrorMessage(`Cooper: could not read the PPU from luna — ${(e as Error).message}`);
+                fail(`could not read the PPU from luna — ${(e as Error).message}`);
                 return undefined;
             } finally {
                 mcp.dispose();
@@ -755,7 +816,7 @@ async function showVram(): Promise<void> {
 class LunaDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
     createDebugAdapterDescriptor(): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
         // In-process: no separate adapter binary, no TCP port (D-018).
-        return new vscode.DebugAdapterInlineImplementation(new LunaDebugSession());
+        return new vscode.DebugAdapterInlineImplementation(new LunaDebugSession(log));
     }
 }
 

@@ -36,20 +36,38 @@ export class LunaMcp {
     private nextId = 1;
     private readonly pending = new Map<number, Pending>();
     private readonly defaultTimeout: number;
+    private readonly onLog: (line: string) => void;
     serverInfo: { name?: string; version?: string } = {};
 
-    constructor(opts: { timeoutMs?: number } = {}) {
+    constructor(opts: { timeoutMs?: number; onLog?: (line: string) => void } = {}) {
         this.defaultTimeout = opts.timeoutMs ?? 30000;
+        this.onLog = opts.onLog ?? (() => undefined);
     }
 
     /** Spawn `luna mcp` and complete the MCP initialize handshake. */
     async connect(lunaPath: string, cwd?: string): Promise<void> {
-        const proc = spawn(lunaPath, ['mcp'], { cwd, stdio: ['pipe', 'pipe', 'ignore'] });
+        this.onLog(`luna mcp: spawning ${lunaPath} (cwd ${cwd ?? process.cwd()})`);
+        const proc = spawn(lunaPath, ['mcp'], { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
         this.proc = proc;
         proc.stdout!.setEncoding('utf8');
         proc.stdout!.on('data', (chunk: string) => this.onData(chunk));
-        proc.on('exit', () => this.failAll(new Error('luna mcp exited')));
-        proc.on('error', (e) => this.failAll(e));
+        // Always drain stderr (an unread pipe can block the child); surface it in the log.
+        proc.stderr!.setEncoding('utf8');
+        proc.stderr!.on('data', (chunk: string) => {
+            for (const line of chunk.split('\n')) {
+                if (line.trim()) {
+                    this.onLog(`luna mcp stderr: ${line}`);
+                }
+            }
+        });
+        proc.on('exit', (code, signal) => {
+            this.onLog(`luna mcp: exited (code ${code ?? '-'}, signal ${signal ?? '-'})`);
+            this.failAll(new Error('luna mcp exited'));
+        });
+        proc.on('error', (e) => {
+            this.onLog(`luna mcp: spawn error — ${e.message}`);
+            this.failAll(e);
+        });
 
         const init = await this.request('initialize', {
             protocolVersion: PROTOCOL_VERSION,
@@ -111,6 +129,7 @@ export class LunaMcp {
         return new Promise<unknown>((resolve, reject) => {
             const timer = setTimeout(() => {
                 if (this.pending.delete(id)) {
+                    this.onLog(`luna mcp: ${method} timed out after ${timeoutMs ?? this.defaultTimeout}ms`);
                     reject(new Error(`MCP ${method} timed out after ${timeoutMs ?? this.defaultTimeout}ms`));
                 }
             }, timeoutMs ?? this.defaultTimeout);

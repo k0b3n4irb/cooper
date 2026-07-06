@@ -75,7 +75,7 @@ export function renderDashboardHtml(s: DashboardState, cspSource: string, nonce:
       <div class="panel-t">Last preview · 256×224</div>
       <img id="preview" style="display:none" alt="preview"/>
       <div class="ph" id="preview-empty">Click <b>&nbsp;Run&nbsp;</b> to render a frame</div>
-      <div style="margin-top:10px"><button class="btn alt" data-cmd="run">↻ Refresh</button></div>
+      <div style="margin-top:10px"><button class="btn alt" data-cmd="run">↻ Update preview</button></div>
     </div>
     <div class="cards">
       <div class="card" data-cmd="palette"><div class="card-t">🎨 Palette</div><div class="card-s">CGRAM · 256 colours</div></div>
@@ -83,7 +83,8 @@ export function renderDashboardHtml(s: DashboardState, cspSource: string, nonce:
       <div class="card" data-cmd="vram"><div class="card-t">🧱 Tiles</div><div class="card-s">VRAM · tile sheet</div></div>
     </div>
   </div>
-  <div class="status">SDK ${dot(!!s.sdkName, s.sdkName ?? 'not set')} · luna ${dot(s.lunaFound, s.lunaFound ? 'ready' : 'not found')} · ROM ${dot(s.romBuilt, s.romBuilt ? 'built' : 'not built')}</div>`;
+  <div class="status">SDK ${dot(!!s.sdkName, s.sdkName ?? 'not set')} · luna ${dot(s.lunaFound, s.lunaFound ? 'ready' : 'not found')} · ROM ${dot(s.romBuilt, s.romBuilt ? 'built' : 'not built')}
+    <button class="btn alt" data-cmd="refresh" style="margin-left:10px;padding:3px 10px;font-size:11px">↻ Refresh status</button></div>`;
 
     const script = `<script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
@@ -98,6 +99,7 @@ export function renderDashboardHtml(s: DashboardState, cspSource: string, nonce:
         document.getElementById('preview-empty').style.display = 'none';
       }
     });
+    vscode.postMessage({ command: 'ready' });
   </script>`;
 
     return head + body + script + '</body></html>';

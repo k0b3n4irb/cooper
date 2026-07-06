@@ -204,6 +204,7 @@ clangd**.
 | **Debug does nothing** | Make sure the ROM is built (Build first). A stale `launch.json` `program` self-heals as of 0.12.1; you can also delete the `program` line entirely. |
 | **VARIABLES is empty while paused** | Click the frame in **CALL STACK** to select it; expand **Registers**. |
 | **`#include <snes.h>` shows errors** | Run **Cooper: Configure clangd**, then restart the clangd server. |
+| **Something silently does nothing** | Run **Cooper: Show Log** (or View → Output → *Cooper*): every build, luna run, MCP call, timeout and error is logged there. Include it when reporting a bug. |
 
 ---
 
