@@ -117,6 +117,96 @@ Phases follow `docs/01` §13, ordered by value/risk. Each is built with the
 - **Q5** debugger-first vs assets-first overall ordering (P2 vs P4).
 - ✅ **Q6** debug-info form — resolved: extend the WLA `.sym` (`docs/03`).
 
+## The GAME-environment road (agreed 2026-07-06, ordered easy → hard)
+
+C1–C7 make Cooper a *development* environment; this phase makes it a **game**
+development environment. Standing rule (user, 2026-07-06): **when a slice needs
+a luna or OpenSNES feature that doesn't exist, file an issue on that project**
+— confirm the gap live first (run the binary / read the source at the pinned
+ref), then link the issue here. Grounding below verified 2026-07-06 vs luna
+v1.7.0 + OpenSNES v0.28.0.
+
+### G1 — Run in luna-gui 🎮 (easy)
+Play the game in a native window, one click. `luna-gui <rom>` takes the ROM as
+argv[1] (verified `luna-gui/src/main.rs:1527`); SDK ≥0.28 ships/detects it
+(`opensnes doctor`). Plan: resolve `luna-gui` next to the luna binary (same
+dir), `Cooper: Play` command + dashboard button, spawn as sibling process, log
+in the Cooper channel. Upstream: none.
+
+### G2 — Viewer selectors + CodeLens (easy)
+Old polish leftovers: VRAM viewer bpp/offset/sub-palette selectors; CodeLens
+"▶ Debug here · 👁 watch" above C functions (GUI mockup #3). Pure Cooper.
+Upstream: none.
+
+### G3 — Watch mode: save → rebuild → refreshed preview (easy-medium)
+The edit→see loop. Plan: `cooper.watch` toggle; FileSystemWatcher on
+`*.c/*.asm/res/**` → debounce → `make` → refresh the preview panel (and PPU
+viewers if open). Headless is enough for v1. v2 (live reload into a RUNNING
+luna-gui) needs upstream: **luna issue — reload the loaded ROM in place (or a
+`--watch` flag)**; the GUI today reloads only via its file dialog
+(`main.rs:369`).
+
+### G4 — Memory map: WRAM/VRAM occupancy (medium)
+"Where did my memory go?" Plan: WRAM view from the `.sym` labels/sections
+(pure parse, Cooper already holds the `.sym`); VRAM occupancy from luna
+`state.ppu` (exposes memory-occupancy stats); render as a bank-map webview.
+Upstream: none expected.
+
+### G5 — Input record/replay (medium)
+Reproduce gameplay without replaying by hand. Grounded: luna CLI already
+**replays** input scripts (`--input "frame:mask,…"`, `parsers.rs:13`); MCP has
+`set_joypad` + savestates. Plan v1: Cooper "replay this input script from this
+snapshot" (headless, deterministic). v2 (record while playing in luna-gui):
+**luna issue — record joypad input to the `frame:mask` script format** (GUI
+play → export). Cooper then gets a one-click "record a repro".
+
+### G6 — ROM validation + flashcart deploy (medium, peripheral)
+Ship to real hardware. Plan: header/checksum validation first (pure, cheap);
+then FXPak/SD2SNES deploy via the existing **usb2snes/QUsb2Snes** protocol
+(off-the-shelf client, don't reinvent). Upstream: none (third-party protocol).
+
+### G7 — Frame profiler 📊 (medium-hard, differentiator)
+"Where do my scanlines go?" Nobody has this in SNES homebrew. Plan:
+`enable_cpu_trace`/`take_cpu_trace` over one frame (verified in v1.7.0,
+symbol-annotated once `load_symbols` ran) → aggregate PC samples per function
+via the `.sym` → table + per-scanline budget bar (events carry `line`/`mclk`).
+Watch the trace-ring cap (`max_events`) — if one frame overflows it:
+**luna issue — larger/streaming trace ring or per-frame aggregation**.
+
+### G8 — Sprite workshop: animation + metasprites (hard)
+From pixel painter to sprite atelier. Plan: (a) animation preview in the tile
+editor (frame strip over the existing sprite-cell grid, play at N fps — pure
+webview); (b) metasprite composer (assemble cells into a big sprite, export as
+C tables). Ground the table format in `snes/sprite.h` (`oamSet*`) FIRST — if
+the lib has no metasprite/animation helper: **OpenSNES issue — metasprite
+table + animation player API** (Cooper emits what the lib consumes; never a
+Cooper-only format).
+
+### G9 — Gameplay regression tests (hard)
+"Record this sequence as a test." Builds on G5. Plan: snapshot + input script +
+expected screenshot/WRAM assertions (exactly the SDK's own luna-test baseline
+patterns); a `cooper.recordTest` flow writing a `tests/` folder the user's
+Makefile can run. Upstream: **OpenSNES issue — expose the luna-test harness
+patterns for USER projects** (today they are SDK-internal devtools).
+
+### G10 — Audio 🎵 (hard overall, but v1 is cheap)
+The biggest objective hole — a game is half sound. Grounded: the SDK chain
+EXISTS (`smconv`, `SOUNDBANK_SRC` (.it) → soundbank in `common.mk`, four
+`examples/audio/snesmod_*`). Cooper's role is UX, not a tracker (garde-fou):
+- **v1 audition (cheap):** run the ROM in headless luna → `drain_audio` →
+  encode `.wav` → play it in a webview. "Hear your game" with zero upstream
+  need.
+- **v2 tracker round-trip:** `.it` files open in the user's tracker (OpenMPT /
+  Schism / Furnace — off-the-shelf); file-watch → `make` regenerates the
+  soundbank (rides G3).
+- **v3 per-entry SFX audition:** needs a minimal player ROM —
+  **OpenSNES issue — soundbank-audition example/template** (play entry N of a
+  soundbank), which Cooper then drives via luna.
+
+**Sequence: G1 → G2 → G3 → G4 → G5 → G6 → G7 → G8 → G9 → G10** (G10's v1 can
+jump the queue anytime — it's small). File upstream issues the moment a
+slice's grounding confirms the gap live, not before.
+
 ## Distribution (later)
 
 `.vsix` via `@vscode/vsce`; OpenVSX via `ovsx`; optional VSCodium standalone
