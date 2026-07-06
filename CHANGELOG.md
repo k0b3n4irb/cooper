@@ -4,6 +4,21 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.31.0] — 2026-07-06
+
+### Added — Cooper: New Project…
+
+- **From nothing to a built ROM in one command.** Pick a real SDK example as
+  the starting point (`text/hello_world` starred as the minimal starter, or a
+  full game like `games/breakout`), a name and a folder: Cooper copies the
+  example out of the SDK tree (build artifacts excluded), rewrites its Makefile
+  for standalone life (`OPENSNES ?=` your SDK — plain `make` works in a
+  terminal too), renames the ROM, writes `.clangd`, **runs the first build**,
+  and opens the project ready for Run/Debug.
+- The dashboard's empty state and the Get Started walkthrough now offer it.
+- Because the starters are the SDK's own examples, they are always current with
+  your installed SDK — Cooper embeds no templates that could go stale.
+
 ## [0.30.0] — 2026-07-06
 
 ### Added — guided onboarding

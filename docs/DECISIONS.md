@@ -964,6 +964,30 @@ rationale and the docs that grounded it. Newest last.
 - Memory: users install by **downloading prebuilt per-arch releases** — never
   tell them to clone/compile ([[opensnes-onboarding-download-prebuilt]]).
 
+### D-050 — New Project = copy an SDK example out-of-tree (2026-07-06)
+- **Decision:** `Cooper: New Project…` scaffolds by **copying a real SDK example**
+  out of the SDK tree (quick-pick over `<sdk>/examples`, `text/hello_world`
+  starred as the minimal starter), rewriting its Makefile (`OPENSNES ?= <sdk>`
+  absolute — plain `make` works in a terminal and `detectSdk` parses this form —
+  plus `TARGET`/`ROM_NAME` from the project name), writing `.clangd`, running the
+  **first build before opening** the folder (the open restarts the extension
+  host), then offering Open / Open in New Window. Cooper embeds **no game
+  templates**: the SDK's examples are the always-current starting points — zero
+  drift when the SDK API changes (cf. the `oamSetVisible` removal), pure thin
+  client of the contract.
+- **Grounding:** the out-of-tree pattern = Cooper's verified standalone fixture;
+  build artifacts to exclude mirror `make clean` in `make/common.mk` (`.o`,
+  `.wrap.asm`, `.c.asm`, `linkfile`, `project_*.{asm,inc}`, `.sfc/.sym`…, +
+  Cooper's `.dbg`). Caught in verification: `examples/` has a **build-all
+  orchestrator Makefile** at its root (no `common.mk`) — the walk must not stop
+  there.
+- **Alternative rejected:** Cooper-embedded templates (drift + maintenance) and
+  `<sdk>/templates/` (runtime boot files — crt0/hdr/memmap — not projects).
+- **Verified:** Node tier — real corpus listed (>10, nested categories), real
+  hello_world Makefile rewritten, scaffold to tmp copies no artifacts, and the
+  scaffolded project **builds with plain `make`** (no OPENSNES on the command
+  line) against the real SDK.
+
 ---
 
 ### Known limitations (Component #1)

@@ -86,6 +86,16 @@ server`) — one click, no terminal.
 
 ---
 
+### Your first project — `Cooper: New Project…`
+
+No project yet? Don't copy files around: run **Cooper: New Project…** (also
+offered on the dashboard when no project is open). Pick a **real SDK example**
+as the starting point (`text/hello_world` is the recommended minimal one — or
+start straight from a game like `games/breakout`), a name, and a folder. Cooper
+copies the example **out of the SDK tree**, wires its Makefile to your SDK
+(plain `make` works in a terminal too), configures C IntelliSense, **runs the
+first build**, and opens the project — ready for **Run** (§6) and **Debug** (§7).
+
 ## 3. The Cooper sidebar
 
 Click the **Cooper** icon (a gamepad) in the activity bar. Everything is one click —

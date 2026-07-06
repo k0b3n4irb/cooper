@@ -10,6 +10,7 @@ import { LunaMcp, DisasmLine } from './lunaMcp';
 import { renderDisasmHtml } from './disasmView';
 import { renderMemTraceHtml, TracedEvent } from './memTraceView';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
+import { listExamples, scaffoldProject, validateProjectName } from './newProject';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
 import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
@@ -85,6 +86,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.restoreSnapshot', () => restoreSnapshot(context)),
         vscode.commands.registerCommand('cooper.showDisasm', () => showDisasm()),
         vscode.commands.registerCommand('cooper.traceMemory', () => traceMemory()),
+        vscode.commands.registerCommand('cooper.newProject', () => newProject()),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
@@ -673,6 +675,7 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
     panel.webview.onDidReceiveMessage(async (m: { command?: string }) => {
         switch (m.command) {
             case 'build': await runBuild(); break;
+            case 'new': await newProject(); break;
             case 'debug': startLunaDebug((await resolveProjectInfo())); break;
             case 'palette': await showPalette(); break;
             case 'oam': await showOam(); break;
@@ -719,6 +722,94 @@ async function showDisasm(): Promise<void> {
         showViewer('cooperDisasm', 'Disassembly', (w) => renderDisasmHtml(r.lines, w.cspSource));
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// New Project — copy an SDK example out-of-tree, rewrite its Makefile, build,
+// open. Cooper embeds no templates: the SDK's examples ARE the starters (D-050).
+// ---------------------------------------------------------------------------
+
+async function newProject(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const sdk = detectSdk({
+        configured: cfg.get<string>('opensnesPath')?.trim() || undefined,
+        projectDir: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
+    });
+    if (!sdk) {
+        failWithDownload('sdk', 'the OpenSNES SDK is needed to create a project — download it, set cooper.opensnesPath, then retry.');
+        return;
+    }
+    const examples = listExamples(sdk.path);
+    if (!examples.length) {
+        fail(`no examples found under ${sdk.path}/examples — is cooper.opensnesPath a full SDK?`);
+        return;
+    }
+    const MINIMAL = 'text/hello_world';
+    const picked = await vscode.window.showQuickPick(
+        examples.map((e) => ({
+            label: e.id === MINIMAL ? `$(star) ${e.id}` : e.id,
+            description: e.id === MINIMAL ? 'minimal starter (recommended)' : undefined,
+            id: e.id, dir: e.dir,
+        })).sort((a, b) => (a.id === MINIMAL ? -1 : b.id === MINIMAL ? 1 : 0)),
+        { placeHolder: 'Start from which SDK example?', matchOnDescription: true },
+    );
+    if (!picked) {
+        return;
+    }
+    const name = await vscode.window.showInputBox({
+        prompt: 'Project name (folder + ROM name)',
+        value: path.basename(picked.id).replace(/_/g, '-'),
+        validateInput: validateProjectName,
+    });
+    if (!name) {
+        return;
+    }
+    const parent = await vscode.window.showOpenDialog({
+        canSelectFiles: false, canSelectFolders: true, canSelectMany: false,
+        openLabel: 'Create the project here',
+        title: `The "${name}" folder will be created inside…`,
+    });
+    if (!parent?.[0]) {
+        return;
+    }
+    const dest = path.join(parent[0].fsPath, name);
+    if (fs.existsSync(dest)) {
+        fail(`${dest} already exists — pick another name or folder.`);
+        return;
+    }
+
+    try {
+        const copied = scaffoldProject(picked.dir, dest, name, sdk.path);
+        fs.writeFileSync(path.join(dest, '.clangd'), renderClangd(sdk.path));
+        log(`new project: ${picked.id} → ${dest} (${copied} files, SDK ${sdk.path})`);
+    } catch (e) {
+        fail(`could not create the project: ${(e as Error).message}`);
+        return;
+    }
+
+    // First build, before opening — so the new window starts with a ROM ready
+    // to Run/Debug (opening the folder restarts the extension host).
+    const built = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Cooper: first build of ${name}…` },
+        async () => {
+            try {
+                await execFileAsync('make', [`OPENSNES=${sdk.path}`], { cwd: dest, timeout: 120000 });
+                return true;
+            } catch (e) {
+                log(`new project: first build failed — ${String((e as { stderr?: string }).stderr ?? e)}`);
+                return false;
+            }
+        },
+    );
+    const pick = await vscode.window.showInformationMessage(
+        built
+            ? `Cooper: "${name}" created and built — open it and press Run.`
+            : `Cooper: "${name}" created (the first build failed — open it and see the Build output).`,
+        'Open Project', 'Open in New Window',
+    );
+    if (pick) {
+        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dest), pick === 'Open in New Window');
     }
 }
 

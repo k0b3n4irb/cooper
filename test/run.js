@@ -351,8 +351,10 @@ check('dashboard script gated by a nonce (CSP)', dash.includes("script-src 'nonc
 check('dashboard allows data: images for the preview', dash.includes('img-src vscode-csp data:'));
 check('dashboard reflects status (luna ready, ROM built)', dash.includes('ready') && dash.includes('built'));
 check('dashboard has a preview image slot', dash.includes('id="preview"'));
-check('dashboard empty state when no project',
-    D2.renderDashboardHtml({ hasProject: false, projectName: '', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N').includes('Open an OpenSNES project'));
+const dashEmpty = D2.renderDashboardHtml({ hasProject: false, projectName: '', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N');
+check('dashboard empty state when no project', dashEmpty.includes('Open an OpenSNES project'));
+check('dashboard empty state offers New Project (nonce-gated script)',
+    dashEmpty.includes('id="new-project"') && dashEmpty.includes('nonce="N"'));
 
 // --- disassembly viewer HTML (pure) ---
 console.log('\n=== disassembly viewer HTML (pure) ===');
@@ -386,6 +388,42 @@ check('mem-trace html shows kind + value + vblank', mthtml.includes('write') && 
 check('mem-trace html empty state', MT.renderMemTraceHtml('x', 0, [], 'csp').includes('No access'));
 check('mem-trace html is static (no scripts)', !mthtml.includes('<script'));
 try { fs.unlinkSync(tmpMt); } catch {}
+
+// --- New Project (D-050): SDK-example scaffolding, closing the loop with make ---
+console.log('\n=== New Project: list, rewrite, scaffold → real make ===');
+const tmpNp = path.join(os.tmpdir(), `cooper_newproject_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'newProject.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpNp });
+const NP = require(tmpNp);
+const examples = NP.listExamples(OPENSNES);
+check('listExamples finds a real corpus (>10)', examples.length > 10);
+check('listExamples includes text/hello_world', examples.some((e) => e.id === 'text/hello_world'));
+check('listExamples reaches nested categories (graphics/*/*)', examples.some((e) => e.id.split('/').length === 3));
+check('validateProjectName accepts my-game, rejects "a b"',
+    NP.validateProjectName('my-game') === undefined && NP.validateProjectName('a b') !== undefined);
+check('isBuildArtifact: .o/.sfc/.wrap.asm/linkfile yes, main.c/data.asm no',
+    NP.isBuildArtifact('main.c.o') && NP.isBuildArtifact('x.sfc') && NP.isBuildArtifact('crt0.wrap.asm')
+    && NP.isBuildArtifact('linkfile') && !NP.isBuildArtifact('main.c') && !NP.isBuildArtifact('data.asm'));
+const helloMk = fs.readFileSync(path.join(OPENSNES, 'examples', 'text', 'hello_world', 'Makefile'), 'utf8');
+const rewritten = NP.rewriteMakefile(helloMk, 'my-game', OPENSNES);
+check('rewriteMakefile pins OPENSNES ?= <sdk>', rewritten.includes(`OPENSNES ?= ${OPENSNES}`)
+    && !rewritten.includes('$(shell cd'));
+check('rewriteMakefile renames TARGET', /TARGET\s*:?=\s*my-game\.sfc/.test(rewritten));
+check('rewriteMakefile uppercases ROM_NAME (≤21)', /ROM_NAME\s*:?=\s*MY-GAME$/m.test(rewritten));
+// close the loop: scaffold out-of-tree, then the SDK's own make builds it
+const npDest = path.join(os.tmpdir(), `cooper_np_${process.pid}`, 'my-game');
+try {
+    const copied = NP.scaffoldProject(path.join(OPENSNES, 'examples', 'text', 'hello_world'), npDest, 'my-game', OPENSNES);
+    check('scaffold copies sources', copied >= 2 && fs.existsSync(path.join(npDest, 'main.c')));
+    check('scaffold copies no build artifacts',
+        !fs.readdirSync(npDest).some((f) => NP.isBuildArtifact(f)));
+    const npMake = cp.spawnSync('make', [], { cwd: npDest, encoding: 'utf8', timeout: 120000 });
+    check('scaffolded project builds with plain make (OPENSNES ?= works)',
+        npMake.status === 0 && fs.existsSync(path.join(npDest, 'my-game.sfc')));
+    if (npMake.status !== 0) { console.log((npMake.stderr || npMake.stdout || '').split('\n').slice(-8).join('\n')); }
+} finally {
+    try { fs.rmSync(path.dirname(npDest), { recursive: true, force: true }); } catch {}
+}
+try { fs.unlinkSync(tmpNp); } catch {}
 
 // --- onboarding helpers (pure + against the real SDK) ---
 console.log('\n=== onboarding: arch mapping + debug-info detection ===');

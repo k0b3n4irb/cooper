@@ -58,7 +58,13 @@ export function renderDashboardHtml(s: DashboardState, cspSource: string, nonce:
 </style></head><body>`;
 
     if (!s.hasProject) {
-        return head + '<h1>COOPER</h1><div class="empty">Open an OpenSNES project (a folder with a Makefile) to get started.</div></body></html>';
+        const emptyScript = `<script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    document.getElementById('new-project').addEventListener('click', () => vscode.postMessage({ command: 'new' }));
+  </script>`;
+        return head + `<h1>COOPER</h1><div class="empty">Open an OpenSNES project (a folder with a Makefile) —<br>
+or start one from an SDK example:<br><br>
+<button class="btn" id="new-project">✨ New Project…</button></div>` + emptyScript + '</body></html>';
     }
 
     const dot = (ok: boolean, label: string) => `<span class="${ok ? 'ok' : 'warn'}">${label}</span>`;
