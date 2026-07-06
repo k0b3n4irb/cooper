@@ -5,6 +5,16 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Cooper: New Project (0.31.0, D-050)** — first-mile onboarding: quick-pick a
+real SDK example (hello_world starred), copy it out-of-tree (artifact exclusion
+mirrors make clean), rewrite Makefile (OPENSNES ?= abs; TARGET/ROM_NAME), write
+.clangd, first build BEFORE opening, dashboard-empty-state + walkthrough entry
+points. No embedded templates (SDK examples = always-current starters).
+Gotchas found in verify: examples/ root has an orchestrator Makefile (walk must
+not stop there); vsce secret-scan caught .env → .vscodeignore'd. Next candidates
+agreed with user: Run in luna-gui (native window, unblocked by luna v1.7.0),
+CodeLens (mockup #3), viewer selectors, frame profiler.
+
 **P0+P1+P2 hardening & luna v1.7.0 dividends** (0.25.0 → 0.30.0, 2026-07-06,
 after the full project review in /tmp/cooper-review-2026-07-06.md):
 - **CI** (.github/workflows/ci.yml): build+package job + the full two-tier suite
