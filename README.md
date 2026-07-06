@@ -23,17 +23,20 @@ The design is captured in [`docs/`](docs/):
 
 ## Status
 
-Early. Built one component at a time, each grounded in up-to-date docs and
-verified before landing.
+All headline capabilities are shipped. Built one component at a time, each
+grounded in up-to-date docs and verified before landing.
 
 | Component | Status |
 |---|---|
 | **#1 — WLA-DX 65816 syntax highlighting** | ✅ shipped |
 | **#2 — C language support (clangd)** | ✅ shipped |
 | **#3 — Build & preview (make task + luna screenshot)** | ✅ shipped |
-| **#4 — Debugger (DAP ↔ luna), ASM/symbol level** | ✅ shipped (MVP) |
-| #5 — Asset editors (palette → tiles → map) | planned |
-| #6 — AI SDK-aware (context → MCP → luna loop) | planned |
+| **#4 — Debugger (DAP ↔ luna)** | ✅ shipped — **source-level C**: breakpoints in `main.c`, typed locals + struct expansion, C-line stepping, data watchpoints, snapshots, disassembly, memory trace |
+| **#5 — Asset editors (palette · tiles/sprites · tilemap viewer)** | ✅ shipped — hardware-exact (BGR555, sprite sizes, `vhopppcc` attributes) |
+| **#6 — AI SDK-aware (AGENTS.md context · luna MCP · OpenSNES MCP)** | ✅ shipped |
+
+Not yet on the Marketplace — install the `.vsix` (see the
+[User Guide](docs/USER_GUIDE.md)).
 
 ## Component #1 — WLA-DX 65816 assembly highlighting
 
