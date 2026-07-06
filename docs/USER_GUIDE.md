@@ -76,8 +76,11 @@ elsewhere as *user releases*. Point Cooper at them once:
 
 ## 2. Install Cooper
 
-Install the `.vsix` (`code --install-extension cooper-x.y.z.vsix`) or from the
-Marketplace **(coming)**. Cooper bundles the **clangd** extension; when it prompts
+Download the latest `cooper-x.y.z.vsix` from
+<https://github.com/k0b3n4irb/cooper/releases/latest> and install it
+(`code --install-extension cooper-x.y.z.vsix`, or in VS Code: Extensions →
+`…` menu → *Install from VSIX…*). Marketplace **(coming)**. Cooper bundles the
+**clangd** extension; when it prompts
 *"clangd is not installed"*, click **Install** (or run `clangd: Download language
 server`) — one click, no terminal.
 

@@ -35,7 +35,8 @@ grounded in up-to-date docs and verified before landing.
 | **#5 — Asset editors (palette · tiles/sprites · tilemap viewer)** | ✅ shipped — hardware-exact (BGR555, sprite sizes, `vhopppcc` attributes) |
 | **#6 — AI SDK-aware (AGENTS.md context · luna MCP · OpenSNES MCP)** | ✅ shipped |
 
-Not yet on the Marketplace — install the `.vsix` (see the
+Not yet on the Marketplace — download the `.vsix` from the
+[releases](https://github.com/k0b3n4irb/cooper/releases/latest) (see the
 [User Guide](docs/USER_GUIDE.md)).
 
 ## Component #1 — WLA-DX 65816 assembly highlighting

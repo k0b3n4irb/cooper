@@ -1,0 +1,49 @@
+# Cooper release — push a `v*` tag and the .vsix is packaged and published as a
+# GitHub release (the .vsix itself is never committed: *.vsix is gitignored).
+# The tag must match package.json's version; release notes come from the
+# CHANGELOG section of that version.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Package & publish the .vsix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run compile
+      - name: Tag must match package.json
+        run: |
+          V=$(node -p "require('./package.json').version")
+          if [ "v$V" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package.json v$V" >&2
+            exit 1
+          fi
+      - run: npx @vscode/vsce package --no-dependencies
+      - name: Release notes from the CHANGELOG section
+        run: |
+          node -e '
+            const fs = require("fs");
+            const v = require("./package.json").version;
+            const md = fs.readFileSync("CHANGELOG.md", "utf8");
+            const sec = md.split(/^## /m).find((s) => s.startsWith(`[${v}]`));
+            fs.writeFileSync("RELEASE_NOTES.md", sec ? `## ${sec.trim()}\n` : "See CHANGELOG.md");
+          '
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" ./*.vsix \
+            --title "Cooper $GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md
