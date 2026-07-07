@@ -5,6 +5,14 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Play (luna-gui) (0.32.0, D-051, G1 of the game-environment road)** — Cooper:
+Play spawns the built ROM in luna-gui detached (sidebar/dashboard/palette).
+resolveLunaGuiPath: lunaPath folder → sibling of luna → PATH → download toast.
+Verified live: breakout 60 fps + audio. NOT CI-testable (GUI needs a display) —
+resolution logic is. Next per roadmap: G2 (viewer selectors + CodeLens), G3
+(watch mode). Reminder: pushing to main while a CI run is in_progress cancels
+it (concurrency cancel-in-progress) — batch pushes or expect a re-run.
+
 **Cooper: New Project (0.31.0, D-050)** — first-mile onboarding: quick-pick a
 real SDK example (hello_world starred), copy it out-of-tree (artifact exclusion
 mirrors make clean), rewrite Makefile (OPENSNES ?= abs; TARGET/ROM_NAME), write
