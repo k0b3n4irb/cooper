@@ -11,11 +11,11 @@ import { renderDisasmHtml } from './disasmView';
 import { renderMemTraceHtml, TracedEvent } from './memTraceView';
 import { wramMap, renderMemoryMapHtml } from './memoryMap';
 import * as os from 'os';
-import { parseInputScript, formatInputScript, parseInputFile } from './inputScript';
+import { parseInputScript, formatInputScript, parseInputFile, canonicalScript } from './inputScript';
 import { checkRom, renderRomCheckHtml } from './romCheck';
 import { renderProfileHtml, FrameProfile } from './profiler';
 import { encodeWav, nonSilentRatio } from './wav';
-import { GameplayTest, TestResult, TESTS_DIR, serializeTest, parseTest, replayAndCapture, runGameplayTest, canonicalScript, renderTestResultsHtml } from './gameplayTest';
+import { ManifestTest, MANIFEST_REL, upsertManifestTest, parseMakeTestOutput, renderHarnessResultsHtml } from './manifestTest';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { listExamples, scaffoldProject, validateProjectName } from './newProject';
 import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
@@ -793,32 +793,56 @@ async function showDisasm(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Gameplay tests (G9 v1) — record an input script + framebuffer baseline,
-// replay deterministically, fail on divergence. Cooper-side .cooper-tests/
-// until the SDK owns a `make test` format (opensnes#98).
+// Gameplay tests (G9) — thin client of the SDK's `make test` harness
+// (opensnes#98): Cooper writes `test/manifest.toml` entries and runs make; the
+// committed manifest + baselines are the contract (also runs in the user's CI).
 // ---------------------------------------------------------------------------
 
-/** Open a transient luna on the built ROM, run `body`, always dispose. */
-async function withTransientLuna<T>(rom: string, body: (mcp: LunaMcp) => Promise<T>): Promise<T | null> {
-    const cfg = vscode.workspace.getConfiguration('cooper');
-    const projectDir = path.dirname(rom);
-    const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
-    const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
-    if (!luna) {
-        failWithDownload('luna', 'could not find the luna binary.');
+/** Run a make target with the SDK's OPENSNES override; resolve {code, out}. */
+async function runMakeTarget(projectDir: string, target: string): Promise<{ code: number; out: string } | null> {
+    const sdk = sdkPathFor(projectDir);
+    if (!sdk) {
+        failWithDownload('sdk', 'the OpenSNES SDK is needed to run tests — set cooper.opensnesPath.');
         return null;
     }
-    const mcp = new LunaMcp({ onLog: log });
+    log(`make ${target}: ${projectDir}`);
     try {
-        await mcp.connect(luna, projectDir);
-        await mcp.loadRom(rom);
-        return await body(mcp);
+        const { stdout, stderr } = await execFileAsync('make', [target, `OPENSNES=${sdk}`], { cwd: projectDir, timeout: 300000 });
+        return { code: 0, out: stdout + stderr };
     } catch (e) {
-        fail(`luna run failed: ${(e as Error).message}`);
+        // make exits non-zero on a failing test — that's data, not an error.
+        const err = e as { code?: number; stdout?: string; stderr?: string };
+        if (typeof err.stdout === 'string' || typeof err.stderr === 'string') {
+            return { code: typeof err.code === 'number' ? err.code : 1, out: (err.stdout ?? '') + (err.stderr ?? '') };
+        }
+        fail(`make ${target} failed: ${(e as Error).message}`);
         return null;
-    } finally {
-        mcp.dispose();
     }
+}
+
+/** Write/replace a `[tests.<name>]` block in test/manifest.toml. */
+function writeManifestTest(projectDir: string, t: ManifestTest): void {
+    const manifestPath = path.join(projectDir, MANIFEST_REL);
+    fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+    const existing = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath, 'utf8') : '';
+    fs.writeFileSync(manifestPath, upsertManifestTest(existing, t));
+}
+
+/** Shared record flow: build the manifest entry, capture the baseline, open it. */
+async function recordManifestTest(projectDir: string, t: ManifestTest): Promise<void> {
+    writeManifestTest(projectDir, t);
+    const res = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Cooper: capturing baseline for "${t.name}"…` },
+        () => runMakeTarget(projectDir, 'test-update'),
+    );
+    if (!res) {
+        return;
+    }
+    log(`gameplay test: recorded ${t.name}${t.input ? ` (${t.input})` : ''}`);
+    const doc = await vscode.workspace.openTextDocument(path.join(projectDir, MANIFEST_REL));
+    await vscode.window.showTextDocument(doc);
+    void vscode.window.showInformationMessage(
+        `Cooper: test "${t.name}" recorded in test/manifest.toml (baseline captured). Run it with "Run Gameplay Tests" or commit it — CI runs \`make test\`.`);
 }
 
 async function recordGameplayTest(): Promise<void> {
@@ -826,6 +850,7 @@ async function recordGameplayTest(): Promise<void> {
     if (!rom) {
         return;
     }
+    const projectDir = path.dirname(rom);
     const name = await vscode.window.showInputBox({
         prompt: 'Test name',
         validateInput: (v) => (/^[\w-]+$/.test(v) ? undefined : 'letters, digits, _ - only'),
@@ -834,33 +859,36 @@ async function recordGameplayTest(): Promise<void> {
         return;
     }
     const script = await vscode.window.showInputBox({
-        prompt: 'Input script to replay from power-on (frame:buttons checkpoints)',
+        prompt: 'Input script (frame:buttons) — leave empty for a visual boot test',
         placeHolder: '10:Right, 200:0',
         validateInput: (v) => {
+            if (!v.trim()) {
+                return undefined;
+            }
             try {
-                return parseInputScript(v).length ? undefined : 'at least one checkpoint';
+                parseInputScript(v);
+                return undefined;
             } catch (e) {
                 return (e as Error).message;
             }
         },
     });
-    if (!script) {
+    if (script === undefined) {
         return;
     }
-    const test: GameplayTest = { name, script: canonicalScript(script), settleFrames: 2 };
-    const png = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Cooper: recording baseline for "${name}"…` },
-        () => withTransientLuna(rom, (mcp) => replayAndCapture(mcp, parseInputScript(test.script), test.settleFrames)),
-    );
-    if (!png || !png.length) {
-        return;
+    const input = script.trim() ? canonicalScript(script) : undefined;
+    let asserts: string[] | undefined;
+    if (input) {
+        const a = await vscode.window.showInputBox({
+            prompt: 'Assertions — the oracle for input tests (symbol = little-endian hex, comma-separated). Recommended.',
+            placeHolder: 'target_x = F700, lives = 03',
+        });
+        if (a === undefined) {
+            return;
+        }
+        asserts = a.split(',').map((s) => s.trim()).filter(Boolean);
     }
-    const dir = path.join(path.dirname(rom), TESTS_DIR);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, `${name}.json`), serializeTest(test));
-    fs.writeFileSync(path.join(dir, `${name}.png`), png);
-    log(`gameplay test: recorded ${name} (${test.script})`);
-    void vscode.window.showInformationMessage(`Cooper: test "${name}" recorded — run it anytime with "Run Gameplay Tests".`);
+    await recordManifestTest(projectDir, { name, input, asserts });
 }
 
 async function runGameplayTests(): Promise<void> {
@@ -868,39 +896,22 @@ async function runGameplayTests(): Promise<void> {
     if (!rom) {
         return;
     }
-    const dir = path.join(path.dirname(rom), TESTS_DIR);
-    const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort() : [];
-    if (!files.length) {
-        fail(`no gameplay tests in ${TESTS_DIR}/ — record one first.`);
+    const projectDir = path.dirname(rom);
+    if (!fs.existsSync(path.join(projectDir, MANIFEST_REL))) {
+        fail(`no ${MANIFEST_REL} — record a test first ("Cooper: Record Gameplay Test…").`);
         return;
     }
-    const results = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Cooper: running ${files.length} gameplay test(s)…` },
-        () => withTransientLuna(rom, async (mcp) => {
-            const out: TestResult[] = [];
-            for (const f of files) {
-                try {
-                    const test = parseTest(fs.readFileSync(path.join(dir, f), 'utf8'));
-                    const baseline = fs.readFileSync(path.join(dir, `${test.name}.png`));
-                    const r = await runGameplayTest(mcp, test, baseline);
-                    out.push({
-                        name: test.name, pass: r.pass,
-                        detail: r.pass ? test.script : `framebuffer diverged from the baseline (${test.script})`,
-                        ...(r.pass ? {} : { actualPngB64: r.actual.toString('base64'), baselinePngB64: baseline.toString('base64') }),
-                    });
-                } catch (e) {
-                    out.push({ name: f, pass: false, detail: String(e) });
-                }
-            }
-            return out;
-        }),
+    const res = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Cooper: running gameplay tests (make test)…' },
+        () => runMakeTarget(projectDir, 'test'),
     );
-    if (!results) {
+    if (!res) {
         return;
     }
+    const results = parseMakeTestOutput(res.out);
     const passed = results.filter((r) => r.pass).length;
-    log(`gameplay tests: ${passed}/${results.length} passed`);
-    showViewer('cooperGameplayTests', 'Gameplay Tests', (w) => renderTestResultsHtml(results, w.cspSource));
+    log(`gameplay tests: ${passed}/${results.length} passed (make exit ${res.code})`);
+    showViewer('cooperGameplayTests', 'Gameplay Tests', (w) => renderHarnessResultsHtml(results, w.cspSource));
 }
 
 // ---------------------------------------------------------------------------
@@ -1179,25 +1190,21 @@ async function importRecording(context: vscode.ExtensionContext): Promise<void> 
         }
         const name = await vscode.window.showInputBox({
             prompt: 'Test name for this recording',
-            value: path.basename(file, '.input'),
+            value: path.basename(file, '.input').replace(/[^\w-]/g, '_'),
             validateInput: (v) => (/^[\w-]+$/.test(v) ? undefined : 'letters, digits, _ - only'),
         });
         if (!name) {
             return;
         }
-        const test: GameplayTest = { name, script, settleFrames: 2 };
-        const png = await vscode.window.withProgress(
-            { location: vscode.ProgressLocation.Notification, title: `Cooper: recording baseline for "${name}"…` },
-            () => withTransientLuna(rom, (mcp) => replayAndCapture(mcp, checkpoints, test.settleFrames)),
-        );
-        if (!png || !png.length) {
+        const a = await vscode.window.showInputBox({
+            prompt: 'Assertions (symbol = little-endian hex, comma-separated) — the oracle for this test. Recommended.',
+            placeHolder: 'target_x = F700',
+        });
+        if (a === undefined) {
             return;
         }
-        const tdir = path.join(path.dirname(rom), TESTS_DIR);
-        fs.mkdirSync(tdir, { recursive: true });
-        fs.writeFileSync(path.join(tdir, `${name}.json`), serializeTest(test));
-        fs.writeFileSync(path.join(tdir, `${name}.png`), png);
-        void vscode.window.showInformationMessage(`Cooper: recording saved as gameplay test "${name}".`);
+        const asserts = a.split(',').map((s) => s.trim()).filter(Boolean);
+        await recordManifestTest(path.dirname(rom), { name, input: script, asserts });
     }
 }
 

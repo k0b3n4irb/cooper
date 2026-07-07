@@ -69,6 +69,11 @@ export function formatInputScript(checkpoints: InputCheckpoint[]): string {
     return checkpoints.map((c) => `${c.frame}:0x${c.mask.toString(16).toUpperCase().padStart(4, '0')}`).join(',');
 }
 
+/** Canonicalize a user-entered script for storage (validate + canonical hex). */
+export function canonicalScript(script: string): string {
+    return formatInputScript(parseInputScript(script));
+}
+
 /**
  * Parse a luna-gui `.input` recording FILE (issue #83): `#` comment lines
  * (including the commented `# player 2` line, which is not `--input`-replayable)

@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.44.0] — 2026-07-07
+
+### Changed — gameplay tests now use the SDK `make test` harness
+
+- With OpenSNES ≥ 0.29, gameplay tests are **committed and CI-runnable**:
+  **Cooper: Record Gameplay Test…** writes a `[tests.<name>]` block into
+  **`test/manifest.toml`** (input script + `symbol = hex` assertions) and
+  captures the baseline; **Run Gameplay Tests** runs `make test`. The same
+  tests run in your own CI. Cooper's private `.cooper-tests/` format is retired
+  (input tests now use robust WRAM symbol assertions instead of whole-frame
+  comparison). Importing a recording saves to the manifest too.
+
 ## [0.43.0] — 2026-07-07
 
 ### Added — import a recording (record a repro in one loop)

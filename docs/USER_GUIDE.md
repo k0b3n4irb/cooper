@@ -152,14 +152,16 @@ Tune it with `cooper.preview.steps` (how long to run before the screenshot) and
 
 ### Gameplay regression tests
 
-Record a bug repro once, keep it green forever:
+Record a bug repro once, keep it green forever — as **committed** tests that
+also run in your CI (`make test`, OpenSNES ≥ 0.29):
 
-1. **Cooper: Record Gameplay Test…** — name + an input script
-   (`10:Right, 200:0`). Cooper replays it from power-on and saves the resulting
-   frame as the **baseline** (in `.cooper-tests/`, commit it with your game).
-2. **Cooper: Run Gameplay Tests** — every test replays deterministically; any
-   framebuffer divergence fails, with **expected vs actual** shown side by
-   side. Refactor your engine, run the tests, ship with confidence.
+1. **Cooper: Record Gameplay Test…** — a name, an optional input script
+   (`10:Right, 200:0`; empty = a visual boot test), and for input tests the
+   **assertions** that are the oracle (`target_x = F700` — a symbol's expected
+   little-endian bytes). Cooper writes a `[tests.<name>]` block into
+   **`test/manifest.toml`**, captures the baseline, and opens the manifest.
+2. **Cooper: Run Gameplay Tests** — runs `make test` and shows the pass/fail.
+   Commit `test/` with your game: the exact same tests run in CI.
 
 ### Hear your game
 

@@ -1159,6 +1159,29 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-063 — Gameplay tests migrate onto the SDK `make test` harness (opensnes#98, 2026-07-07)
+- **Context:** OpenSNES **v0.29.0** (PR #101, tested Cooper-side before merge)
+  shipped a user-project test harness: `test/manifest.toml` declares
+  `[tests.<name>]` blocks (`steps`, optional `input` = luna `frame:mask`,
+  optional `assert = ["symbol = LE-hex"]`); `make test` / `make test-update`
+  run/rebaseline via the pinned luna (fbhash for visual boot tests; WRAM
+  symbol asserts as the oracle for input tests; screenshots to `test/actual/`).
+- **Decision:** Cooper **retires its own `.cooper-tests/` format** (deleted
+  `gameplayTest.ts`) and becomes a **thin client of `make test`**:
+  `Record Gameplay Test…` writes/updates a `[tests.<name>]` block (pure
+  `upsertManifestTest`) then runs `make test-update` and opens the manifest;
+  `Run Gameplay Tests` shells `make test` and renders the parsed PASS/FAIL
+  (`parseMakeTestOutput`). Import "Save as a gameplay test" writes the same
+  manifest. **One committed, CI-runnable format** — the same tests run in the
+  user's own `make test`. Net oracle upgrade for input tests: WRAM symbol
+  asserts beat Cooper's old whole-framebuffer byte-compare.
+- **Verified:** pure upsert idempotence (replace, never duplicate; boundaries
+  preserved) + output parsing; and a **real end-to-end** on a scaffolded
+  out-of-tree project — `make test-update` writes baselines, `make test` passes
+  both a boot and an input test, and an injected regression (right bound
+  247→200) makes `walk_right` FAIL while `boot` stays green, non-zero exit
+  parsed. 344 Node + 10 integration.
+
 ### D-062 — Import luna-gui recordings (luna#83 dividend, 2026-07-07)
 - **Context:** luna **v1.8.0** shipped input recording (#83, PR #86 — tested
   Cooper-side before merge): the GUI's "record input" writes

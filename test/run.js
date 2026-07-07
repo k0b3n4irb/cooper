@@ -994,43 +994,61 @@ try { fs.unlinkSync(tmpOM); } catch {}
     }
     try { fs.unlinkSync(tmpM); } catch {}
 
-    // --- G9 v1: gameplay regression test — record, replay (pass), corrupt (fail) ---
-    console.log('\n=== gameplay tests: record / replay / diverge ===');
-    const tmpGt = path.join(os.tmpdir(), `cooper_gameplaytest_${process.pid}.cjs`);
-    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'gameplayTest.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpGt });
-    const GT = require(tmpGt);
-    const IS2 = GT; // canonicalScript re-exported semantics
-    check('test format round-trips', GT.parseTest(GT.serializeTest({ name: 't1', script: '10:0x0100', settleFrames: 2 })).name === 't1');
-    check('bad test json throws', (() => { try { GT.parseTest('{"name":"x"}'); return false; } catch { return true; } })());
-    {
-        const lunaBinG = B.resolveLunaPath({ sdkPath: OPENSNES });
-        if (!lunaBinG) {
-            skipped('luna binary not available');
-        } else {
-            const mG = new LunaMcp({ timeoutMs: 30000 });
-            try {
-                await mG.connect(lunaBinG, aimDir);
-                await mG.loadRom(ri.rom);
-                const test = { name: 'walk-right', script: IS2.canonicalScript('10:Right, 200:0'), settleFrames: 2 };
-                const baseline = await GT.replayAndCapture(mG, require(path.join(os.tmpdir(), `cooper_inputscript_${process.pid}.cjs`)).parseInputScript(test.script), test.settleFrames);
-                check('baseline captured (PNG bytes)', baseline.length > 500 && baseline.slice(1, 4).toString() === 'PNG');
-                const r1 = await GT.runGameplayTest(mG, test, baseline);
-                check('deterministic replay: identical framebuffer → PASS', r1.pass === true);
-                const tampered = Buffer.from(baseline); tampered[tampered.length - 20] ^= 0xFF;
-                const r2 = await GT.runGameplayTest(mG, test, tampered);
-                check('divergence from the baseline → FAIL', r2.pass === false);
-                const html = GT.renderTestResultsHtml([
-                    { name: 'walk-right', pass: false, detail: 'diverged', actualPngB64: r2.actual.toString('base64'), baselinePngB64: tampered.toString('base64') },
-                ], 'csp');
-                check('results html shows expected vs actual, no scripts',
-                    html.includes('expected') && html.includes('actual') && !html.includes('<script'));
-            } catch (e) {
-                check('gameplay-test e2e threw: ' + String((e && e.message) || e), false);
-            } finally {
-                mG.dispose();
-            }
+    // --- G9 (opensnes#98): gameplay tests via the SDK `make test` harness ---
+    console.log('\n=== gameplay tests: manifest + make test ===');
+    const tmpMt2 = path.join(os.tmpdir(), `cooper_manifesttest_${process.pid}.cjs`);
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'manifestTest.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpMt2 });
+    const MT2 = require(tmpMt2);
+    // pure: upsert idempotence + output parsing
+    let man = MT2.upsertManifestTest('', { name: 'boot', steps: 3000000 });
+    man = MT2.upsertManifestTest(man, { name: 'walk', steps: 3000000, input: '10:0x0100,200:0x0000', asserts: ['target_x = F700'] });
+    check('manifest upsert: 2 named blocks', MT2.manifestTestNames(man).join(',') === 'boot,walk');
+    check('manifest upsert: input + assert rendered', man.includes('input = "10:0x0100,200:0x0000"') && man.includes('assert = ["target_x = F700"]'));
+    const man2 = MT2.upsertManifestTest(man, { name: 'walk', steps: 3000000, input: '10:0x0100,200:0x0000', asserts: ['target_x = C800'] });
+    check('manifest upsert replaces, never duplicates', MT2.manifestTestNames(man2).join(',') === 'boot,walk' && man2.includes('C800') && !man2.includes('F700'));
+    check('formatAssert little-endian', MT2.formatAssert('target_x', [0x86, 0x00]) === 'target_x = 8600');
+    check('parseMakeTestOutput reads PASS/FAIL lines',
+        (() => { const r = MT2.parseMakeTestOutput('  PASS  boot\n  FAIL  walk: bad\nTESTS: 1/2 ok'); return r.length === 2 && r[0].pass && !r[1].pass && r[1].detail === 'bad'; })());
+
+    // real: scaffold an out-of-tree project on the SDK harness, make test-update → make test
+    const harness = path.join(OPENSNES, 'tools', 'luna-test', 'project_test.py');
+    const lunaBinH = B.resolveLunaPath({ sdkPath: OPENSNES });
+    if (!fs.existsSync(harness) || !lunaBinH) {
+        skipped('SDK make-test harness or luna not available');
+    } else {
+        const tmpNp2 = path.join(os.tmpdir(), `cooper_np2_${process.pid}.cjs`);
+        esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'newProject.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpNp2 });
+        const NP2 = require(tmpNp2);
+        const proj = path.join(os.tmpdir(), `cooper_mt_${process.pid}`, 'game');
+        try {
+            NP2.scaffoldProject(aimDir, proj, 'game', OPENSNES);
+            cp.spawnSync('make', [], { cwd: proj, timeout: 180000 });
+            fs.mkdirSync(path.join(proj, 'test'), { recursive: true });
+            // a boot visual test + an input test asserting the clamped target_x
+            let m = MT2.upsertManifestTest('', { name: 'boot', steps: 3000000 });
+            m = MT2.upsertManifestTest(m, { name: 'walk_right', steps: 3000000, input: '10:0x0100,200:0x0000', asserts: ['target_x = F700'] });
+            fs.writeFileSync(path.join(proj, 'test', 'manifest.toml'), m);
+            const up = cp.spawnSync('make', ['test-update'], { cwd: proj, encoding: 'utf8', timeout: 180000 });
+            check('make test-update writes baselines', up.status === 0 && fs.existsSync(path.join(proj, 'test', 'baselines.json')));
+            const run1 = cp.spawnSync('make', ['test'], { cwd: proj, encoding: 'utf8', timeout: 180000 });
+            const res1 = MT2.parseMakeTestOutput(run1.stdout || '');
+            check('make test: both tests PASS on the fresh baseline',
+                run1.status === 0 && res1.length === 2 && res1.every((r) => r.pass));
+            // inject a real regression: the right bound never reaches 247
+            const mainC = path.join(proj, 'main.c');
+            fs.writeFileSync(mainC, fs.readFileSync(mainC, 'utf8').replace('target_x < 247', 'target_x < 200'));
+            cp.spawnSync('make', [], { cwd: proj, timeout: 180000 });
+            const run2 = cp.spawnSync('make', ['test'], { cwd: proj, encoding: 'utf8', timeout: 180000 });
+            const res2 = MT2.parseMakeTestOutput(run2.stdout || '');
+            check('make test: the injected regression FAILS walk_right, boot stays green',
+                run2.status !== 0 && res2.find((r) => r.name === 'walk_right' && !r.pass) && res2.find((r) => r.name === 'boot' && r.pass));
+        } catch (e) {
+            check('make-test e2e threw: ' + String((e && e.message) || e), false);
+        } finally {
+            try { fs.rmSync(path.dirname(proj), { recursive: true, force: true }); } catch {}
         }
     }
+    try { fs.unlinkSync(tmpMt2); } catch {}
 
     // --- G10 v1: hear the game — real music example renders non-silent audio ---
     console.log('\n=== audition: real snesmod_music audio ===');
