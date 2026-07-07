@@ -68,3 +68,19 @@ export function parseInputScript(script: string): InputCheckpoint[] {
 export function formatInputScript(checkpoints: InputCheckpoint[]): string {
     return checkpoints.map((c) => `${c.frame}:0x${c.mask.toString(16).toUpperCase().padStart(4, '0')}`).join(',');
 }
+
+/**
+ * Parse a luna-gui `.input` recording FILE (issue #83): `#` comment lines
+ * (including the commented `# player 2` line, which is not `--input`-replayable)
+ * are dropped; the remaining Player-1 checkpoint lines are joined and parsed.
+ * Same result as `parseInputScript` on the P1 script, so a recording round-trips
+ * straight into Cooper's replay + gameplay-test paths.
+ */
+export function parseInputFile(text: string): InputCheckpoint[] {
+    const script = text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('#'))
+        .join(',');
+    return parseInputScript(script);
+}

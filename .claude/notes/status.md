@@ -5,6 +5,21 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**Upstream dividends wave — the 3 issues Cooper filed are MERGED & released**
+(2026-07-07). Tested each develop branch Cooper-side BEFORE opening the PRs
+(luna#86 → v1.8.0, opensnes#101 → v0.29.0; both CI-green, verified in logs).
+Proven: record→export→deterministic-replay + Cooper-parser compat; debug-info
+intact on the new qbe pin (705f79ac); `make test` harness catches a real
+injected regression; Cooper 339 Node + 10 integration vs both develop builds.
+- **Cooper 0.43.0 (D-062):** `Cooper: Import Recording…` — auto-find the newest
+  `~/.local/luna/recordings/*.input`, parse (pure `parseInputFile`, strips `#`
+  incl. commented P2), Replay now / Save as gameplay test. CI bumped to
+  OpenSNES v0.29.0. Import is pure text + existing replay → no luna>=1.8 runtime
+  dep in Cooper (recording happens in luna-gui).
+- **NEXT in this wave:** migrate `.cooper-tests/` → SDK `test/manifest.toml`
+  (opensnes#98 harness); metasprite/anim composer emitting `anim.h` AnimClip
+  tables (opensnes#97). Both SDK formats verified present in v0.29.0.
+
 **🏁 THE GAME-ENVIRONMENT ROAD IS COMPLETE (G1→G10, 0.32.0 → 0.42.0,
 2026-07-07).** Final slice: G9 gameplay regression tests (record input script +
 framebuffer baseline into .cooper-tests/, deterministic power-on replay, BYTE

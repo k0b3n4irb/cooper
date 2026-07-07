@@ -1159,6 +1159,28 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-062 — Import luna-gui recordings (luna#83 dividend, 2026-07-07)
+- **Context:** luna **v1.8.0** shipped input recording (#83, PR #86 — tested
+  Cooper-side before merge): the GUI's "record input" writes
+  `~/.local/luna/recordings/<rom>_NNN.input` — a `#`-commented header + the
+  Player-1 `frame:mask` script (P2 written commented-out, not
+  `--input`-replayable). The MCP surface is `start_input_capture` /
+  `take_input_capture` (+ `input_capture_to_script`).
+- **Decision:** `Cooper: Import Recording…` **auto-discovers** the newest
+  `.input` under `~/.local/luna/recordings/` (else a file picker), parses it
+  with the pure `parseInputFile` (strips `#` lines — including the commented P2
+  line — and joins the P1 checkpoints), then offers **Replay now** (existing
+  `cooperReplay`) or **Save as a gameplay test** (existing capture path). This
+  closes the loop: play in luna-gui → record → import → replay/test.
+- **No new luna dependency in Cooper's runtime:** import is pure text + the
+  existing replay, so it works against any luna ≥ 1.7. Recording itself happens
+  in luna-gui (v1.8.0). CI bumped to **OpenSNES v0.29.0** (anim module, the
+  user-project test harness, the DW/DL fix — all verified before that PR).
+- **Verified:** a real luna-gui-format `.input` file (comment header + P1 line
+  + commented P2) parses to exactly its P1 checkpoints and round-trips to the
+  canonical CLI form; comments-only → empty. The live record→export→replay
+  determinism was proven against the v1.8.0 binary during PR testing.
+
 ### D-061 — Gameplay regression tests v1 (G9, 2026-07-07)
 - **Decision:** `Cooper: Record Gameplay Test…` captures {input script,
   settle frames, framebuffer baseline PNG} into the project's

@@ -43,7 +43,7 @@ jobs:
       # releases; the compiler submodule pins and the luna pin inside that ref
       # are what Cooper's debug-info + debugger tests rely on (luna ≥ 1.6 since
       # SDK 0.28.0).
-      OPENSNES_REF: v0.28.0
+      OPENSNES_REF: v0.29.0
     steps:
       - uses: actions/checkout@v4
         with:

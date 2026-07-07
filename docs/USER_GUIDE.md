@@ -222,6 +222,10 @@ The jewel. Workflow:
    next one) and Cooper replays them **deterministically from power-on**, then
    pauses the debugger at the end. Reproduce a gameplay bug forever with the
    same inputs; the canonical script also works with `luna run --input`.
+   **Record a repro** — hit **Play** (luna-gui), toggle its *record input*, play
+   until the bug, stop. Then **Cooper: Import Recording…** picks up the newest
+   `.input` file and lets you **replay it** or **save it as a gameplay test** —
+   the whole "reproduce this bug" loop without typing a script.
    **Who writes this address?** — **Cooper: Trace Memory Accesses (one frame)…**:
    give it a symbol or address (`frame_count`, `$7E0030`) and it records every
    read/write to it over the next frame, each attributed to the function that did

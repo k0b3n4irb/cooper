@@ -509,6 +509,23 @@ check('missing colon throws', (() => { try { IS.parseInputScript('120'); return 
 check('maskToButtons round-trips', IS.maskToButtons(0x1080) === 'Start+A' && IS.maskToButtons(0) === '(released)');
 check('formatInputScript emits luna-CLI canonical hex',
     IS.formatInputScript(IS.parseInputScript('120:Start,300:A+Right')) === '120:0x1000,300:0x0180');
+// luna#83: a real luna-gui .input recording FILE (comment header + P1 line +
+// commented P2 line) parses to exactly the P1 checkpoints.
+const recFile = [
+    '# luna input recording (issue #83) — player 1 frame:mask checkpoints.',
+    '# Frames are absolute from power-on.',
+    '#   luna state -n <instr> --input @mario_000.input "mario.sfc"',
+    '10:0x0100,40:0x1080,70:0x0000',
+    '# player 2 (NOT replayable via --input; use API/MCP set_joypad):',
+    '# 15:0x0100',
+].join('\n');
+check('parseInputFile strips # comments incl. the P2 line → P1 checkpoints',
+    JSON.stringify(IS.parseInputFile(recFile))
+    === JSON.stringify([{ frame: 10, mask: 0x0100 }, { frame: 40, mask: 0x1080 }, { frame: 70, mask: 0x0000 }]));
+check('parseInputFile round-trips to the luna-CLI canonical form',
+    IS.formatInputScript(IS.parseInputFile(recFile)) === '10:0x0100,40:0x1080,70:0x0000');
+check('parseInputFile on a comments-only file → empty (nothing to replay)',
+    IS.parseInputFile('# just comments\n#more').length === 0);
 try { fs.unlinkSync(tmpIs); } catch {}
 
 // --- G4: memory map — WRAM ramsections + VRAM heatmap (pure, real .sym) ---

@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.43.0] — 2026-07-07
+
+### Added — import a recording (record a repro in one loop)
+
+- **Cooper: Import Recording…** — luna v1.8.0's GUI can now *record* your play
+  to a `.input` file; Cooper auto-finds the newest one (or browse) and lets you
+  **replay it** at a debug stop or **save it as a gameplay test**. Play until
+  the bug, import, done — no script to type.
+- CI now builds against **OpenSNES v0.29.0** (the merged animation module,
+  user-project `make test` harness, and DW/DL compiler fix — all verified
+  before those upstream PRs landed).
+
 ## [0.42.0] — 2026-07-07
 
 ### Added — gameplay regression tests

@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.42.0",
+  "version": "0.43.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -228,6 +228,11 @@
       {
         "command": "cooper.runGameplayTests",
         "title": "Run Gameplay Tests",
+        "category": "Cooper"
+      },
+      {
+        "command": "cooper.importRecording",
+        "title": "Import Recording (luna-gui .input)…",
         "category": "Cooper"
       }
     ],

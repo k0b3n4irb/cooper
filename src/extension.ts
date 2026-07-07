@@ -10,7 +10,8 @@ import { LunaMcp, DisasmLine } from './lunaMcp';
 import { renderDisasmHtml } from './disasmView';
 import { renderMemTraceHtml, TracedEvent } from './memTraceView';
 import { wramMap, renderMemoryMapHtml } from './memoryMap';
-import { parseInputScript, formatInputScript } from './inputScript';
+import * as os from 'os';
+import { parseInputScript, formatInputScript, parseInputFile } from './inputScript';
 import { checkRom, renderRomCheckHtml } from './romCheck';
 import { renderProfileHtml, FrameProfile } from './profiler';
 import { encodeWav, nonSilentRatio } from './wav';
@@ -100,6 +101,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.watch', () => toggleWatch(context)),
         vscode.commands.registerCommand('cooper.showMemoryMap', () => showMemoryMap()),
         vscode.commands.registerCommand('cooper.replayInputs', () => replayInputs(context)),
+        vscode.commands.registerCommand('cooper.importRecording', () => importRecording(context)),
         vscode.commands.registerCommand('cooper.validateRom', () => validateRom()),
         vscode.commands.registerCommand('cooper.deployRom', () => deployRom()),
         vscode.commands.registerCommand('cooper.profileFrame', () => profileFrame()),
@@ -1092,6 +1094,110 @@ async function replayInputs(context: vscode.ExtensionContext): Promise<void> {
         void vscode.window.showInformationMessage(`Cooper: replayed to frame ${r.frames} — the debugger is paused there. (luna CLI form: --input "${canonical}")`);
     } catch (e) {
         fail(`replay failed: ${String(e)}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Import recording (luna#83 dividend) — luna-gui records a play session to
+// ~/.local/luna/recordings/<rom>_NNN.input; Cooper imports that file and turns
+// it into a replay or a gameplay test — "record a repro" in one loop.
+// ---------------------------------------------------------------------------
+
+/** luna-gui's recordings directory (mirrors its own `recordings_dir`). */
+function lunaRecordingsDir(): string {
+    const home = process.env.HOME || os.homedir();
+    return home ? path.join(home, '.local', 'luna', 'recordings') : 'recordings';
+}
+
+async function importRecording(context: vscode.ExtensionContext): Promise<void> {
+    // Auto-discover recent recordings (newest first), else let the user browse.
+    const dir = lunaRecordingsDir();
+    let files: { path: string; label: string; mtime: number }[] = [];
+    try {
+        files = fs.readdirSync(dir)
+            .filter((f) => f.endsWith('.input'))
+            .map((f) => ({ path: path.join(dir, f), label: f, mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+            .sort((a, b) => b.mtime - a.mtime);
+    } catch { /* no recordings dir yet */ }
+
+    let file: string | undefined;
+    const BROWSE = '$(folder-opened) Browse for a .input file…';
+    const pick = await vscode.window.showQuickPick(
+        [...files.slice(0, 20).map((f) => f.label), BROWSE],
+        { placeHolder: files.length ? 'Import which luna-gui recording?' : 'No recordings found — browse for a .input file' },
+    );
+    if (!pick) {
+        return;
+    }
+    if (pick === BROWSE) {
+        const picked = await vscode.window.showOpenDialog({
+            canSelectMany: false, openLabel: 'Import', filters: { 'luna recordings': ['input'] },
+        });
+        file = picked?.[0]?.fsPath;
+    } else {
+        file = files.find((f) => f.label === pick)?.path;
+    }
+    if (!file) {
+        return;
+    }
+
+    let checkpoints;
+    try {
+        checkpoints = parseInputFile(fs.readFileSync(file, 'utf8'));
+    } catch (e) {
+        fail(`could not read the recording: ${(e as Error).message}`);
+        return;
+    }
+    if (!checkpoints.length) {
+        fail('that recording has no Player-1 input (nothing to replay).');
+        return;
+    }
+    const script = formatInputScript(checkpoints);
+    await context.workspaceState.update('cooper.lastReplayScript', script);
+    log(`import recording: ${file} → ${script}`);
+
+    const REPLAY = '$(debug-start) Replay it now (at a debug stop)';
+    const SAVE = '$(beaker) Save as a gameplay test';
+    const action = await vscode.window.showQuickPick([REPLAY, SAVE], {
+        placeHolder: `${checkpoints.length} checkpoints — what next?`,
+    });
+    if (action === REPLAY) {
+        const session = activeLunaSession();
+        if (!session) {
+            return;
+        }
+        try {
+            const r = await session.customRequest('cooperReplay', { script }) as { frames: number };
+            void vscode.window.showInformationMessage(`Cooper: replayed the recording to frame ${r.frames}.`);
+        } catch (e) {
+            fail(`replay failed: ${String(e)}`);
+        }
+    } else if (action === SAVE) {
+        const rom = await builtRomPath();
+        if (!rom) {
+            return;
+        }
+        const name = await vscode.window.showInputBox({
+            prompt: 'Test name for this recording',
+            value: path.basename(file, '.input'),
+            validateInput: (v) => (/^[\w-]+$/.test(v) ? undefined : 'letters, digits, _ - only'),
+        });
+        if (!name) {
+            return;
+        }
+        const test: GameplayTest = { name, script, settleFrames: 2 };
+        const png = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: `Cooper: recording baseline for "${name}"…` },
+            () => withTransientLuna(rom, (mcp) => replayAndCapture(mcp, checkpoints, test.settleFrames)),
+        );
+        if (!png || !png.length) {
+            return;
+        }
+        const tdir = path.join(path.dirname(rom), TESTS_DIR);
+        fs.mkdirSync(tdir, { recursive: true });
+        fs.writeFileSync(path.join(tdir, `${name}.json`), serializeTest(test));
+        fs.writeFileSync(path.join(tdir, `${name}.png`), png);
+        void vscode.window.showInformationMessage(`Cooper: recording saved as gameplay test "${name}".`);
     }
 }
 
