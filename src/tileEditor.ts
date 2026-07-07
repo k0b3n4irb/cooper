@@ -62,6 +62,15 @@ export function renderTileEditorHtml(
     <span id="pos" class="sub"></span>
   </div>
   <div id="wrap"><canvas id="c"></canvas></div>
+  <div class="bar">
+    <span class="sub">Animation:</span>
+    <label>from cell <input type="number" id="afrom" value="0" min="0" style="width:52px"></label>
+    <label>frames <input type="number" id="acount" value="2" min="1" max="16" style="width:44px"></label>
+    <label>fps <select id="afps"><option>4</option><option selected>8</option><option>12</option><option>15</option><option>30</option></select></label>
+    <button id="aplay">▶ play</button>
+    <canvas id="apreview" width="64" height="64" style="image-rendering:pixelated;border:1px solid var(--vscode-panel-border);vertical-align:middle"></canvas>
+    <span id="aframe" class="sub"></span>
+  </div>
   <div class="bar"><button id="undo">Undo</button> <button id="redo">Redo</button> <button id="save">Save to PNG</button> <span id="status" class="sub"></span></div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
@@ -126,7 +135,40 @@ export function renderTileEditorHtml(
   document.getElementById('save').onclick=()=>{ vscode.postMessage({type:'save', indices: idx}); document.getElementById('status').textContent='saving…'; };
   window.addEventListener('message',ev=>{ if(ev.data.type==='saved') document.getElementById('status').textContent='saved ✓'; });
   document.getElementById('cell').value=String(cell);
-  strip(); draw();
+
+  // --- animation preview (G8a): consecutive sprite cells as frames, played
+  // live on the pixels being edited. Cells are row-major over the sheet.
+  const ap = document.getElementById('apreview'), apx = ap.getContext('2d');
+  let aTimer = null, aStep = 0;
+  function cellOrigin(n){ const perRow = Math.max(1, Math.floor(W/cell)); return { x: (n%perRow)*cell, y: Math.floor(n/perRow)*cell }; }
+  function cellCount(){ return Math.max(1, Math.floor(W/cell)) * Math.max(1, Math.floor(H/cell)); }
+  function drawAnimFrame(){
+    const from = Math.min(+document.getElementById('afrom').value || 0, cellCount()-1);
+    const count = Math.max(1, Math.min(16, +document.getElementById('acount').value || 1));
+    const n = (from + (aStep % count)) % cellCount();
+    const o = cellOrigin(n), z = Math.max(1, Math.floor(64/cell));
+    ap.width = cell*z; ap.height = cell*z;
+    apx.clearRect(0,0,ap.width,ap.height);
+    for(let y=0;y<cell;y++)for(let x=0;x<cell;x++){
+      const sx=o.x+x, sy=o.y+y;
+      if(sx>=W||sy>=H) continue;
+      const v=idx[sy*W+sx];
+      if(v===0) continue;
+      apx.fillStyle=cssOf(pal[v]||0); apx.fillRect(x*z,y*z,z,z);
+    }
+    document.getElementById('aframe').textContent='cell '+n;
+  }
+  function aTick(){ drawAnimFrame(); aStep++; }
+  document.getElementById('aplay').onclick=()=>{
+    if(aTimer){ clearInterval(aTimer); aTimer=null; document.getElementById('aplay').textContent='▶ play'; return; }
+    const fps=+document.getElementById('afps').value||8;
+    aStep=0; aTick(); aTimer=setInterval(aTick, Math.round(1000/fps));
+    document.getElementById('aplay').textContent='⏸ pause';
+  };
+  document.getElementById('afps').onchange=()=>{ if(aTimer){ clearInterval(aTimer); aTimer=setInterval(aTick, Math.round(1000/(+document.getElementById('afps').value||8))); } };
+  for (const id of ['afrom','acount']) document.getElementById(id).onchange=drawAnimFrame;
+
+  strip(); draw(); drawAnimFrame();
 </script>
 </body>
 </html>`;

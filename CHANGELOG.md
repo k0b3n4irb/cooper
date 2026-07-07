@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.40.0] — 2026-07-07
+
+### Added — sprite animation preview
+
+- The **tile editor** plays your animation while you draw it: pick a starting
+  sprite cell, a frame count and an fps, press ▶ — consecutive cells loop in a
+  live preview that updates as you paint. (The metasprite composer is next,
+  once the SDK defines the table format —
+  [opensnes#97](https://github.com/k0b3n4irb/opensnes/issues/97).)
+
 ## [0.39.0] — 2026-07-07
 
 ### Added — frame profiler 📊

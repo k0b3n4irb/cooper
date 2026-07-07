@@ -309,6 +309,9 @@ Sprites**). A zoomable paint grid over the indexed image:
 - Pick a colour from the palette strip and **paint pixels** (click/drag).
 - Grey lines mark the **8×8 tiles**; blue lines mark the **sprite cell** (choose
   8 / 16 / 32 / 64 — the SNES square sizes). Index 0 is transparent.
+- **Animation preview**: pick a starting cell, a frame count and an fps, press
+  ▶ — consecutive sprite cells play as a loop, **live while you paint** (draw
+  frame 2 of the walk cycle and watch it move).
 - **Save to PNG** writes the pixels back; **Build** regenerates the `.pic`.
 
 ### Tilemaps

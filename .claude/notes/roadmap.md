@@ -178,10 +178,12 @@ Watch the trace-ring cap (`max_events`) — if one frame overflows it:
 From pixel painter to sprite atelier. Plan: (a) animation preview in the tile
 editor (frame strip over the existing sprite-cell grid, play at N fps — pure
 webview); (b) metasprite composer (assemble cells into a big sprite, export as
-C tables). Ground the table format in `snes/sprite.h` (`oamSet*`) FIRST — if
-the lib has no metasprite/animation helper: **OpenSNES issue — metasprite
-table + animation player API** (Cooper emits what the lib consumes; never a
-Cooper-only format).
+C tables). Grounded 2026-07-07: the lib has `oamDynamic*` + object `sprframe`
+but NO metasprite tables and NO declarative animation player (games hand-roll
+frame constants) → **OpenSNES issue
+[k0b3n4irb/opensnes#97](https://github.com/k0b3n4irb/opensnes/issues/97)**
+(filed; Cooper emits what the lib consumes; never a Cooper-only format).
+G8a (preview) ships SDK-independent now; G8b (composer) gates on #97.
 
 ### G9 — Gameplay regression tests (hard)
 "Record this sequence as a test." Builds on G5. Plan: snapshot + input script +

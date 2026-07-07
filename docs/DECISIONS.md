@@ -1129,6 +1129,22 @@ rationale and the docs that grounded it. Newest last.
   strip span) + a real traced frame: >1000 events, majority symbol-annotated,
   aggregates into named functions with total mclk in the physical frame range.
 
+### D-059 — Sprite animation preview; metasprites gated upstream (G8, 2026-07-07)
+- **Decision:** G8 splits on the garde-fou. **G8a (shipped):** an animation
+  preview in the tile editor — consecutive sprite cells (row-major, the
+  selected 8/16/32/64 cell size) play as frames at 4–30 fps in a small canvas,
+  **live on the pixels being edited** (paint a frame, watch the walk cycle
+  update). Pure visualization of the PNG the user already draws — Cooper emits
+  no format. **G8b (gated):** the metasprite composer + animation-table editor
+  need the LIBRARY to define the consuming format first — grounded live:
+  `sprite.h` has `oamDynamic*` and `object.h` a single `sprframe` per object,
+  but **no metasprite tables and no declarative animation player** (games
+  hand-roll frame constants, cf. likemario) → **issue k0b3n4irb/opensnes#97**
+  filed. Cooper will emit that format as C data once it exists; inventing a
+  Cooper-only struct would break on every SDK evolution.
+- **Verified:** editor renders the animation controls + preview canvas
+  (nonce-gated script), 326 Node + 10 integration.
+
 ---
 
 ### Known limitations (Component #1)

@@ -742,6 +742,9 @@ const teHtml = TE.renderTileEditorHtml({ width: 2, height: 2, indices: [0, 1, 2,
 check('tile editor gates its script by nonce (CSP)', teHtml.includes('nonce-TN123') && teHtml.includes('nonce="TN123"'));
 check('tile editor embeds the pixel indices', teHtml.includes('"indices":[0,1,2,3]') && teHtml.includes('tiles.png'));
 check('tile editor has a cell-size overlay + Save', /id="cell"/.test(teHtml) && /id="save"/.test(teHtml));
+check('tile editor has the animation preview (G8a: from/frames/fps/play/canvas)',
+    ['id="afrom"', 'id="acount"', 'id="afps"', 'id="aplay"', 'id="apreview"'].every((s) => teHtml.includes(s))
+    && teHtml.includes('drawAnimFrame'));
 check('tile editor has undo/redo (history)', /id="undo"/.test(teHtml) && /id="redo"/.test(teHtml) && /keydown/.test(teHtml));
 try { fs.unlinkSync(tmpTE); } catch {}
 
