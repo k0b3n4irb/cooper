@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.36.0] — 2026-07-07
+
+### Added — memory map
+
+- **Cooper: Show Memory Map** (also in the sidebar) — "where did my memory
+  go?": your **WRAM** blocks straight from the linker (exact sizes, mirror
+  aliases merged so nothing is double-counted, your variables listed inside
+  each block) plus a **VRAM occupancy heatmap** (1 KB per cell, hover for the
+  address). Works standalone or at a debug stop.
+
 ## [0.35.0] — 2026-07-07
 
 ### Added — watch mode (the edit→see loop)

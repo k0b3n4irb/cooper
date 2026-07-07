@@ -210,6 +210,12 @@ The **Tiles** viewer is interactive: pick the **bpp** (2/4/8), the 16 KB
 colours, exactly like the hardware). Changes are instant (rendered from the
 last snapshot); **↻ Re-read VRAM** re-reads the machine.
 
+**Memory Map** (sidebar → PPU VIEWERS, or `Cooper: Show Memory Map`) answers
+"where did my memory go?": your **WRAM** blocks with the linker's exact sizes
+(`.oam_buffer` 544 B, `.bss` 2 KB…, mirror aliases merged, your variables
+listed inside each block) and a **VRAM heatmap** (1 KB per cell) showing what
+the game actually uploaded. Works standalone or at a debug stop.
+
 ![VRAM tile sheet](images/vram.png)
 
 ### Source-level (C line) debugging

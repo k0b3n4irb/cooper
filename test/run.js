@@ -426,6 +426,32 @@ try {
 }
 try { fs.unlinkSync(tmpNp); } catch {}
 
+// --- G4: memory map — WRAM ramsections + VRAM heatmap (pure, real .sym) ---
+console.log('\n=== memory map: wramMap / vramHeat ===');
+const tmpMm = path.join(os.tmpdir(), `cooper_memmap_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'memoryMap.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpMm });
+const MM = require(tmpMm);
+check('canonicalWram folds mirrors: 00:0300 == 7e:0300; 7f → +64K; ROM addr → null',
+    MM.canonicalWram(0x000300) === 0x0300 && MM.canonicalWram(0x7E0300) === 0x0300
+    && MM.canonicalWram(0x7F0010) === 0x10010 && MM.canonicalWram(0x00C46E) === null);
+const mmap = MM.wramMap(sym); // sym = real aim_target.sym parsed earlier
+check('wramMap finds ramsection blocks with exact sizes', mmap.blocks.length >= 3
+    && mmap.blocks.every((b) => b.size > 0));
+const oamBlock = mmap.blocks.find((b) => b.names.includes('.oam_buffer'));
+check('mirror aliases merge into ONE block (.oam_buffer = .reserved_7e_mirror)',
+    !!oamBlock && oamBlock.names.includes('.reserved_7e_mirror') && oamBlock.size === 0x220);
+check('totals do not double-count mirrors',
+    mmap.totalReserved === mmap.blocks.reduce((n, b) => n + b.size, 0));
+check('labels attach to their block (oamMemory in .oam_buffer)',
+    !!oamBlock && oamBlock.labels.some((l) => l.name === 'oamMemory'));
+const heatT = MM.vramHeat([...new Array(1024).fill(7), ...new Array(0x10000 - 1024).fill(0)]);
+check('vramHeat: first 1KB bucket full, rest empty', heatT[0] === 1024 && heatT.slice(1).every((n) => n === 0));
+const mmHtml = MM.renderMemoryMapHtml(mmap, new Array(0x10000).fill(1), 'csp');
+check('memory-map html: WRAM total + 64 heat cells + no scripts',
+    mmHtml.includes('reserved of 128 KB') && (mmHtml.match(/class="cell"/g) || []).length === 64
+    && !mmHtml.includes('<script'));
+try { fs.unlinkSync(tmpMm); } catch {}
+
 // --- G3: watch-mode source filter (the anti-rebuild-loop predicate) ---
 console.log('\n=== watch mode: isWatchSource ===');
 check('sources trigger: main.c, data.asm, res/hero.png, music.it, level.tmj',

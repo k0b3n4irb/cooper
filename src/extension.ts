@@ -9,6 +9,7 @@ import { LunaDebugSession } from './lunaDebug';
 import { LunaMcp, DisasmLine } from './lunaMcp';
 import { renderDisasmHtml } from './disasmView';
 import { renderMemTraceHtml, TracedEvent } from './memTraceView';
+import { wramMap, renderMemoryMapHtml } from './memoryMap';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { listExamples, scaffoldProject, validateProjectName } from './newProject';
 import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
@@ -92,6 +93,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.newProject', () => newProject()),
         vscode.commands.registerCommand('cooper.debugHere', (name: string) => debugHere(name)),
         vscode.commands.registerCommand('cooper.watch', () => toggleWatch(context)),
+        vscode.commands.registerCommand('cooper.showMemoryMap', () => showMemoryMap()),
         { dispose: () => { watchState?.watcher.dispose(); watchState?.status.dispose(); } },
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.languages.registerCodeLensProvider({ language: 'c' }, codeLens),
@@ -774,6 +776,34 @@ async function showDisasm(): Promise<void> {
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Memory map (G4) — "where did my memory go?": WRAM ramsections from the .sym
+// + a VRAM occupancy heatmap from the live/transient snapshot.
+// ---------------------------------------------------------------------------
+
+async function showMemoryMap(): Promise<void> {
+    const info = await resolveProjectInfo();
+    const symPath = info.projectDir && info.romName
+        ? path.join(info.projectDir, info.romName.replace(/\.(sfc|smc)$/i, '') + '.sym')
+        : null;
+    if (!symPath || !fs.existsSync(symPath)) {
+        fail('no .sym found — build the project first (the memory map reads the linker\'s ramsections).');
+        return;
+    }
+    let sym;
+    try {
+        sym = parseSym(fs.readFileSync(symPath, 'utf8'));
+    } catch (e) {
+        fail(`could not parse ${path.basename(symPath)}: ${String(e)}`);
+        return;
+    }
+    const ppu = await ppuSnapshot(true); // live at a stop, else transient luna
+    const vram = ppu?.vram ?? [];
+    const map = wramMap(sym);
+    log(`memory map: ${map.blocks.length} WRAM blocks (${map.totalReserved} bytes), vram snapshot ${vram.length ? 'yes' : 'NO'}`);
+    showViewer('cooperMemoryMap', 'Memory Map', (w) => renderMemoryMapHtml(map, vram, w.cspSource));
 }
 
 // ---------------------------------------------------------------------------

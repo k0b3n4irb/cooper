@@ -5,6 +5,18 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**G1→G4 of the game-environment road (0.32.0 → 0.36.0, 2026-07-07)** — G1 Play
+(luna-gui native window, D-051); G2a interactive VRAM viewer (bpp/offset/
+sub-palette from a cached snapshot; peek_vram count is u16 → full 64KB = two
+32KB reads, D-052); G2b CodeLens '◉ break · ▶ debug here' on .c∩.sym functions
+(D-053; integration gotcha: a test opening main.c must run AFTER the .clangd
+auto-write test); G3 watch mode (isWatchSource anti-rebuild-loop predicate is
+load-bearing — make writes artifacts INTO the watched dir; quiet single-flight
+rebuild + dashboard preview refresh + status-bar eye, D-054); G4 memory map
+(WRAM ramsections with exact linker sizes, mirror aliases canonicalized/merged
+via canonicalWram; VRAM 64×1KB heatmap, D-055). All released via tags (CI +
+Release green, verified per version). Next: G5 input record/replay.
+
 **Play (luna-gui) (0.32.0, D-051, G1 of the game-environment road)** — Cooper:
 Play spawns the built ROM in luna-gui detached (sidebar/dashboard/palette).
 resolveLunaGuiPath: lunaPath folder → sibling of luna → PATH → download toast.

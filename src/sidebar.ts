@@ -114,6 +114,7 @@ export function buildTreeModel(p: ProjectInfo): TreeNode[] {
             action('debug', 'Debug', 'debug-alt', 'cooper.debug'),
         ]),
         cat('viewers', 'PPU VIEWERS', [
+            action('memmap', 'Memory Map (WRAM/VRAM)', 'graph', 'cooper.showMemoryMap'),
             action('palette', 'Palette (CGRAM)', 'symbol-color', 'cooper.showPalette'),
             action('oam', 'Sprites (OAM)', 'preview', 'cooper.showOam'),
             action('vram', 'Tiles (VRAM)', 'layout', 'cooper.showVram'),

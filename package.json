@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.35.0",
+  "version": "0.36.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -188,6 +188,11 @@
       {
         "command": "cooper.watch",
         "title": "Toggle Watch (rebuild + preview on save)",
+        "category": "Cooper"
+      },
+      {
+        "command": "cooper.showMemoryMap",
+        "title": "Show Memory Map (WRAM / VRAM)",
         "category": "Cooper"
       }
     ],

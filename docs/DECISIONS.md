@@ -1053,6 +1053,24 @@ rationale and the docs that grounded it. Newest last.
   doesn't; unrelated files don't) + real-host toggle on/off. luna-gui live
   reload stays G3-v2 (upstream luna issue, per the roadmap).
 
+### D-055 — Memory map: WRAM ramsections + VRAM heatmap (G4, 2026-07-07)
+- **Decision:** `Cooper: Show Memory Map` renders (a) **WRAM** from the `.sym`
+  `[ramsections]` — the linker's own name/addr/**exact size** blocks (not a
+  heuristic), with the labels inside each block as variable-level detail
+  (label size = gap to the next label, bounded by the block end); and (b) a
+  **VRAM occupancy heatmap** (64 × 1 KB cells) computed from the full snapshot
+  Cooper already fetches — richer than luna's single `vram_non_zero` counter.
+  Works at a debug stop or standalone (transient luna); static webview.
+- **Grounding (real aim_target.sym):** ramsections carry SIZE
+  (`7e:0300 0300 00000220 .oam_buffer`), and the linker emits **mirror
+  aliases** — `.reserved_7e_mirror` @ `00:0300` is the same physical memory as
+  `.oam_buffer` @ `7e:0300`. `canonicalWram` folds the system-bank low-RAM
+  mirror (banks $00–$3F/$80–$BF, offset <$2000) onto $7E and same-extent blocks
+  merge, so totals never double-count.
+- **Verified:** against the real `.sym` — aliases merge into one 0x220 block,
+  `oamMemory` attaches inside it, totals consistent; synthetic heatmap
+  bucketing; static render with 64 cells.
+
 ---
 
 ### Known limitations (Component #1)
