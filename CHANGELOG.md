@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.42.0] — 2026-07-07
+
+### Added — gameplay regression tests
+
+- **Cooper: Record Gameplay Test…** — an input script replayed from power-on,
+  its final frame saved as a baseline in `.cooper-tests/` (commit it with your
+  game). **Cooper: Run Gameplay Tests** replays every test deterministically
+  and fails on any framebuffer divergence, showing **expected vs actual** side
+  by side. Record a bug repro once, keep it green forever. (The committed
+  `make test` format is proposed upstream —
+  [opensnes#98](https://github.com/k0b3n4irb/opensnes/issues/98).)
+
 ## [0.41.0] — 2026-07-07
 
 ### Added — 🎵 hear your game

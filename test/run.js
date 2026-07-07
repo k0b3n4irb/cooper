@@ -977,6 +977,44 @@ try { fs.unlinkSync(tmpOM); } catch {}
     }
     try { fs.unlinkSync(tmpM); } catch {}
 
+    // --- G9 v1: gameplay regression test — record, replay (pass), corrupt (fail) ---
+    console.log('\n=== gameplay tests: record / replay / diverge ===');
+    const tmpGt = path.join(os.tmpdir(), `cooper_gameplaytest_${process.pid}.cjs`);
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'gameplayTest.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpGt });
+    const GT = require(tmpGt);
+    const IS2 = GT; // canonicalScript re-exported semantics
+    check('test format round-trips', GT.parseTest(GT.serializeTest({ name: 't1', script: '10:0x0100', settleFrames: 2 })).name === 't1');
+    check('bad test json throws', (() => { try { GT.parseTest('{"name":"x"}'); return false; } catch { return true; } })());
+    {
+        const lunaBinG = B.resolveLunaPath({ sdkPath: OPENSNES });
+        if (!lunaBinG) {
+            skipped('luna binary not available');
+        } else {
+            const mG = new LunaMcp({ timeoutMs: 30000 });
+            try {
+                await mG.connect(lunaBinG, aimDir);
+                await mG.loadRom(ri.rom);
+                const test = { name: 'walk-right', script: IS2.canonicalScript('10:Right, 200:0'), settleFrames: 2 };
+                const baseline = await GT.replayAndCapture(mG, require(path.join(os.tmpdir(), `cooper_inputscript_${process.pid}.cjs`)).parseInputScript(test.script), test.settleFrames);
+                check('baseline captured (PNG bytes)', baseline.length > 500 && baseline.slice(1, 4).toString() === 'PNG');
+                const r1 = await GT.runGameplayTest(mG, test, baseline);
+                check('deterministic replay: identical framebuffer → PASS', r1.pass === true);
+                const tampered = Buffer.from(baseline); tampered[tampered.length - 20] ^= 0xFF;
+                const r2 = await GT.runGameplayTest(mG, test, tampered);
+                check('divergence from the baseline → FAIL', r2.pass === false);
+                const html = GT.renderTestResultsHtml([
+                    { name: 'walk-right', pass: false, detail: 'diverged', actualPngB64: r2.actual.toString('base64'), baselinePngB64: tampered.toString('base64') },
+                ], 'csp');
+                check('results html shows expected vs actual, no scripts',
+                    html.includes('expected') && html.includes('actual') && !html.includes('<script'));
+            } catch (e) {
+                check('gameplay-test e2e threw: ' + String((e && e.message) || e), false);
+            } finally {
+                mG.dispose();
+            }
+        }
+    }
+
     // --- G10 v1: hear the game — real music example renders non-silent audio ---
     console.log('\n=== audition: real snesmod_music audio ===');
     const musicDir = path.join(OPENSNES, 'examples', 'audio', 'snesmod_music');

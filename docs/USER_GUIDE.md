@@ -150,6 +150,17 @@ binary — point `cooper.lunaPath` at that folder.
 Tune it with `cooper.preview.steps` (how long to run before the screenshot) and
 `cooper.preview.forceDisplay` (show VRAM even if the screen is still blanked).
 
+### Gameplay regression tests
+
+Record a bug repro once, keep it green forever:
+
+1. **Cooper: Record Gameplay Test…** — name + an input script
+   (`10:Right, 200:0`). Cooper replays it from power-on and saves the resulting
+   frame as the **baseline** (in `.cooper-tests/`, commit it with your game).
+2. **Cooper: Run Gameplay Tests** — every test replays deterministically; any
+   framebuffer divergence fails, with **expected vs actual** shown side by
+   side. Refactor your engine, run the tests, ship with confidence.
+
 ### Hear your game
 
 **Cooper: Hear the Game…** renders the first seconds of your ROM's **audio**

@@ -1159,6 +1159,22 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-061 — Gameplay regression tests v1 (G9, 2026-07-07)
+- **Decision:** `Cooper: Record Gameplay Test…` captures {input script,
+  settle frames, framebuffer baseline PNG} into the project's
+  **`.cooper-tests/`**; `Run Gameplay Tests` replays each from power-on in a
+  transient luna and compares **byte equality** — a cycle-accurate emulator +
+  power-on replay is deterministic, so no fuzzy diffing. Failures show
+  expected-vs-actual side by side. Format is Cooper-side ON PURPOSE: the
+  committed, CI-runnable `make test` format belongs to the SDK — **issue
+  k0b3n4irb/opensnes#98** filed (same ownership logic as #97); Cooper migrates
+  when it lands. Core is pure `gameplayTest.ts` (`replayAndCapture`/
+  `runGameplayTest` over an `McpLike`), so the whole loop is Node-tested
+  against the real binary.
+- **Verified:** baseline recorded on aim_target (`10:Right, 200:0`), re-run →
+  byte-identical PASS, tampered baseline → FAIL, results view renders
+  expected/actual.
+
 ---
 
 ### Known limitations (Component #1)

@@ -14,6 +14,7 @@ import { parseInputScript, formatInputScript } from './inputScript';
 import { checkRom, renderRomCheckHtml } from './romCheck';
 import { renderProfileHtml, FrameProfile } from './profiler';
 import { encodeWav, nonSilentRatio } from './wav';
+import { GameplayTest, TestResult, TESTS_DIR, serializeTest, parseTest, replayAndCapture, runGameplayTest, canonicalScript, renderTestResultsHtml } from './gameplayTest';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { listExamples, scaffoldProject, validateProjectName } from './newProject';
 import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
@@ -103,6 +104,8 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.deployRom', () => deployRom()),
         vscode.commands.registerCommand('cooper.profileFrame', () => profileFrame()),
         vscode.commands.registerCommand('cooper.audition', () => auditionGame(context)),
+        vscode.commands.registerCommand('cooper.recordGameplayTest', () => recordGameplayTest()),
+        vscode.commands.registerCommand('cooper.runGameplayTests', () => runGameplayTests()),
         { dispose: () => { watchState?.watcher.dispose(); watchState?.status.dispose(); } },
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.languages.registerCodeLensProvider({ language: 'c' }, codeLens),
@@ -785,6 +788,117 @@ async function showDisasm(): Promise<void> {
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Gameplay tests (G9 v1) — record an input script + framebuffer baseline,
+// replay deterministically, fail on divergence. Cooper-side .cooper-tests/
+// until the SDK owns a `make test` format (opensnes#98).
+// ---------------------------------------------------------------------------
+
+/** Open a transient luna on the built ROM, run `body`, always dispose. */
+async function withTransientLuna<T>(rom: string, body: (mcp: LunaMcp) => Promise<T>): Promise<T | null> {
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const projectDir = path.dirname(rom);
+    const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
+    const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
+    if (!luna) {
+        failWithDownload('luna', 'could not find the luna binary.');
+        return null;
+    }
+    const mcp = new LunaMcp({ onLog: log });
+    try {
+        await mcp.connect(luna, projectDir);
+        await mcp.loadRom(rom);
+        return await body(mcp);
+    } catch (e) {
+        fail(`luna run failed: ${(e as Error).message}`);
+        return null;
+    } finally {
+        mcp.dispose();
+    }
+}
+
+async function recordGameplayTest(): Promise<void> {
+    const rom = await builtRomPath();
+    if (!rom) {
+        return;
+    }
+    const name = await vscode.window.showInputBox({
+        prompt: 'Test name',
+        validateInput: (v) => (/^[\w-]+$/.test(v) ? undefined : 'letters, digits, _ - only'),
+    });
+    if (!name) {
+        return;
+    }
+    const script = await vscode.window.showInputBox({
+        prompt: 'Input script to replay from power-on (frame:buttons checkpoints)',
+        placeHolder: '10:Right, 200:0',
+        validateInput: (v) => {
+            try {
+                return parseInputScript(v).length ? undefined : 'at least one checkpoint';
+            } catch (e) {
+                return (e as Error).message;
+            }
+        },
+    });
+    if (!script) {
+        return;
+    }
+    const test: GameplayTest = { name, script: canonicalScript(script), settleFrames: 2 };
+    const png = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Cooper: recording baseline for "${name}"…` },
+        () => withTransientLuna(rom, (mcp) => replayAndCapture(mcp, parseInputScript(test.script), test.settleFrames)),
+    );
+    if (!png || !png.length) {
+        return;
+    }
+    const dir = path.join(path.dirname(rom), TESTS_DIR);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, `${name}.json`), serializeTest(test));
+    fs.writeFileSync(path.join(dir, `${name}.png`), png);
+    log(`gameplay test: recorded ${name} (${test.script})`);
+    void vscode.window.showInformationMessage(`Cooper: test "${name}" recorded — run it anytime with "Run Gameplay Tests".`);
+}
+
+async function runGameplayTests(): Promise<void> {
+    const rom = await builtRomPath();
+    if (!rom) {
+        return;
+    }
+    const dir = path.join(path.dirname(rom), TESTS_DIR);
+    const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort() : [];
+    if (!files.length) {
+        fail(`no gameplay tests in ${TESTS_DIR}/ — record one first.`);
+        return;
+    }
+    const results = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Cooper: running ${files.length} gameplay test(s)…` },
+        () => withTransientLuna(rom, async (mcp) => {
+            const out: TestResult[] = [];
+            for (const f of files) {
+                try {
+                    const test = parseTest(fs.readFileSync(path.join(dir, f), 'utf8'));
+                    const baseline = fs.readFileSync(path.join(dir, `${test.name}.png`));
+                    const r = await runGameplayTest(mcp, test, baseline);
+                    out.push({
+                        name: test.name, pass: r.pass,
+                        detail: r.pass ? test.script : `framebuffer diverged from the baseline (${test.script})`,
+                        ...(r.pass ? {} : { actualPngB64: r.actual.toString('base64'), baselinePngB64: baseline.toString('base64') }),
+                    });
+                } catch (e) {
+                    out.push({ name: f, pass: false, detail: String(e) });
+                }
+            }
+            return out;
+        }),
+    );
+    if (!results) {
+        return;
+    }
+    const passed = results.filter((r) => r.pass).length;
+    log(`gameplay tests: ${passed}/${results.length} passed`);
+    showViewer('cooperGameplayTests', 'Gameplay Tests', (w) => renderTestResultsHtml(results, w.cspSource));
 }
 
 // ---------------------------------------------------------------------------
