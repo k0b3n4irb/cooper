@@ -1091,6 +1091,25 @@ rationale and the docs that grounded it. Newest last.
   the debugger's own `evaluate`. (The example's init eats ~50 frames — a
   too-short hold plateaus at 227, which the first test run caught.)
 
+### D-057 — ROM validation + SD-card deploy (G6, 2026-07-07)
+- **Decision:** `Cooper: Validate ROM` re-derives the internal cartridge header
+  the hardware way — LoROM `$7FC0` / HiROM `$FFC0` auto-scored (complement pair
+  + map-mode byte + printable title), checksum recomputed (power-of-two sum, or
+  largest-power-of-two + mirrored remainder), plus copier-header, header-size
+  and reset-vector checks — and renders a pass/fail report. `Cooper: Deploy
+  ROM` validates then **copies to `cooper.deployPath`** (the flashcart SD mount
+  — the sneakernet workflow every flashcart supports), prompting and saving the
+  path on first use.
+- **usb2snes deferred deliberately:** a WebSocket deploy to FXPak via
+  QUsb2Snes is the natural v2, but there is **no hardware here to verify
+  against**, and the discipline is "run the thing against reality" — shipping
+  an unverifiable client would break it. Revisit with hardware in the loop.
+- **Verified:** the checksum algorithm was prototyped against 4 real
+  wlalink-built ROMs before writing the module; tests validate the corpus
+  clean (LoROM, titles read back), a flipped byte fails the computed checksum,
+  and a synthetic 512-byte copier header is detected while the header still
+  parses.
+
 ---
 
 ### Known limitations (Component #1)

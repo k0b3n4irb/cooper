@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.37.0",
+  "version": "0.38.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -198,6 +198,16 @@
       {
         "command": "cooper.replayInputs",
         "title": "Replay Inputs (frame:buttons script)…",
+        "category": "Cooper"
+      },
+      {
+        "command": "cooper.validateRom",
+        "title": "Validate ROM (header / checksum)",
+        "category": "Cooper"
+      },
+      {
+        "command": "cooper.deployRom",
+        "title": "Deploy ROM (copy to flashcart SD)…",
         "category": "Cooper"
       }
     ],
@@ -462,6 +472,12 @@
           "type": "boolean",
           "default": true,
           "description": "Show '◉ break · ▶ debug here' CodeLens above your project's C functions."
+        },
+        "cooper.deployPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "Where 'Deploy ROM' copies the built ROM (e.g. the flashcart SD card mount point)."
         }
       }
     }

@@ -426,6 +426,34 @@ try {
 }
 try { fs.unlinkSync(tmpNp); } catch {}
 
+// --- G6: ROM validation (pure, vs real wlalink-built ROMs) ---
+console.log('\n=== ROM check: header / checksum ===');
+const tmpRc = path.join(os.tmpdir(), `cooper_romcheck_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'romCheck.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpRc });
+const RC = require(tmpRc);
+const romsToCheck = ['basics/aim_target/aim_target.sfc', 'games/breakout/breakout.sfc', 'games/likemario/likemario.sfc']
+    .map((r) => path.join(OPENSNES, 'examples', r)).filter((p) => fs.existsSync(p));
+check('a real ROM corpus is available', romsToCheck.length >= 2);
+const reports = romsToCheck.map((p) => RC.checkRom(fs.readFileSync(p)));
+check('every SDK-built ROM validates clean (LoROM, all items OK)',
+    reports.every((r) => r.ok && r.mapping === 'LoROM'));
+check('titles read back ("AIM TARGET DEMO"…)',
+    reports.some((r) => r.title.trim() === 'AIM TARGET DEMO'));
+const aimBytes = new Uint8Array(fs.readFileSync(romsToCheck[0]));
+const corrupted = aimBytes.slice(); corrupted[0x1000] ^= 0xFF; // flip a byte → checksum mismatch
+const badReport = RC.checkRom(corrupted);
+check('a corrupted image fails the computed checksum',
+    !badReport.ok && badReport.items.some((i) => !i.ok && /checksum matches/.test(i.label)));
+const withCopier = new Uint8Array(512 + aimBytes.length); withCopier.set(aimBytes, 512);
+const copierReport = RC.checkRom(withCopier);
+check('a 512-byte copier header is detected (and the header still parses)',
+    copierReport.copierHeader && copierReport.title.trim() === 'AIM TARGET DEMO'
+    && copierReport.items.some((i) => !i.ok && /copier/.test(i.label)));
+const rcHtml = RC.renderRomCheckHtml('x.sfc', reports[0], 'csp');
+check('rom-check html renders the verdict, no scripts',
+    rcHtml.includes('ready for hardware') && !rcHtml.includes('<script'));
+try { fs.unlinkSync(tmpRc); } catch {}
+
 // --- G5 v1: input script parse/format (pure, luna --input semantics) ---
 console.log('\n=== input script: parse / buttons / format ===');
 const tmpIs = path.join(os.tmpdir(), `cooper_inputscript_${process.pid}.cjs`);

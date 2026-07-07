@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.38.0] — 2026-07-07
+
+### Added — ship to real hardware
+
+- **Cooper: Validate ROM** — the internal header checked the way the console
+  does: title, checksum ⊕ complement, checksum recomputed from the image, ROM
+  size, reset vector, and the 512-byte copier header flashcarts dislike.
+- **Cooper: Deploy ROM** — validates, then copies the `.sfc` to your
+  flashcart's SD card (`cooper.deployPath`, asked once). usb2snes/FXPak
+  over-the-wire deploy will come when it can be verified on hardware.
+
 ## [0.37.0] — 2026-07-07
 
 ### Added — deterministic input replay

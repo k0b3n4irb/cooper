@@ -11,6 +11,7 @@ import { renderDisasmHtml } from './disasmView';
 import { renderMemTraceHtml, TracedEvent } from './memTraceView';
 import { wramMap, renderMemoryMapHtml } from './memoryMap';
 import { parseInputScript, formatInputScript } from './inputScript';
+import { checkRom, renderRomCheckHtml } from './romCheck';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { listExamples, scaffoldProject, validateProjectName } from './newProject';
 import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
@@ -96,6 +97,8 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.watch', () => toggleWatch(context)),
         vscode.commands.registerCommand('cooper.showMemoryMap', () => showMemoryMap()),
         vscode.commands.registerCommand('cooper.replayInputs', () => replayInputs(context)),
+        vscode.commands.registerCommand('cooper.validateRom', () => validateRom()),
+        vscode.commands.registerCommand('cooper.deployRom', () => deployRom()),
         { dispose: () => { watchState?.watcher.dispose(); watchState?.status.dispose(); } },
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.languages.registerCodeLensProvider({ language: 'c' }, codeLens),
@@ -777,6 +780,72 @@ async function showDisasm(): Promise<void> {
         showViewer('cooperDisasm', 'Disassembly', (w) => renderDisasmHtml(r.lines, w.cspSource));
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ROM validation + deploy (G6) — check the internal header/checksum, then copy
+// the ROM to the flashcart's SD (cooper.deployPath). usb2snes later.
+// ---------------------------------------------------------------------------
+
+async function builtRomPath(): Promise<string | null> {
+    const info = await resolveProjectInfo();
+    const rom = info.projectDir && info.romName ? path.join(info.projectDir, info.romName) : null;
+    if (!rom || !fs.existsSync(rom)) {
+        fail('no built ROM found — Build first.');
+        return null;
+    }
+    return rom;
+}
+
+async function validateRom(): Promise<boolean> {
+    const rom = await builtRomPath();
+    if (!rom) {
+        return false;
+    }
+    const report = checkRom(fs.readFileSync(rom));
+    log(`validate: ${path.basename(rom)} → ${report.ok ? 'OK' : 'FAILED'} (${report.items.filter((i) => !i.ok).map((i) => i.label).join('; ') || 'all checks pass'})`);
+    showViewer('cooperRomCheck', 'ROM Check', (w) => renderRomCheckHtml(path.basename(rom), report, w.cspSource));
+    return report.ok;
+}
+
+async function deployRom(): Promise<void> {
+    const rom = await builtRomPath();
+    if (!rom) {
+        return;
+    }
+    const report = checkRom(fs.readFileSync(rom));
+    if (!report.ok) {
+        const pick = await vscode.window.showWarningMessage(
+            `Cooper: ${path.basename(rom)} fails validation (${report.items.filter((i) => !i.ok).map((i) => i.label).join(', ')}).`,
+            'Show Report', 'Deploy Anyway');
+        if (pick !== 'Deploy Anyway') {
+            if (pick === 'Show Report') {
+                await validateRom();
+            }
+            return;
+        }
+    }
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    let dest = cfg.get<string>('deployPath')?.trim();
+    if (!dest) {
+        const picked = await vscode.window.showOpenDialog({
+            canSelectFiles: false, canSelectFolders: true, canSelectMany: false,
+            openLabel: 'Deploy here', title: 'Where to copy the ROM (e.g. the flashcart SD card)?',
+        });
+        if (!picked?.[0]) {
+            return;
+        }
+        dest = picked[0].fsPath;
+        await cfg.update('deployPath', dest, vscode.ConfigurationTarget.Global);
+    }
+    try {
+        const target = fs.statSync(dest).isDirectory() ? path.join(dest, path.basename(rom)) : dest;
+        fs.copyFileSync(rom, target);
+        log(`deploy: ${rom} → ${target}`);
+        void vscode.window.showInformationMessage(`Cooper: deployed ${path.basename(rom)} → ${target}`);
+    } catch (e) {
+        fail(`deploy failed: ${(e as Error).message} (is the SD card mounted at ${dest}?)`);
     }
 }
 

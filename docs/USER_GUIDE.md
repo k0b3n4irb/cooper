@@ -238,6 +238,16 @@ highlighted line).
 
 ---
 
+## 7b. Ship to real hardware
+
+- **Cooper: Validate ROM** — checks the internal header the way the console
+  does: title, checksum + complement (recomputed from the image), ROM size,
+  reset vector, and the 512-byte copier header flashcarts dislike. Green
+  report = ready to flash.
+- **Cooper: Deploy ROM** — validates, then copies the `.sfc` to
+  `cooper.deployPath` (your flashcart's SD card mount — asked once, then
+  remembered). Eject, insert, play on the real thing.
+
 ## 8. C IntelliSense
 
 Open a `.c` file in an OpenSNES project and Cooper **writes a `.clangd`
