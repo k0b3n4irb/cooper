@@ -339,6 +339,16 @@ Sprites**). A zoomable paint grid over the indexed image:
   frame 2 of the walk cycle and watch it move).
 - **Save to PNG** writes the pixels back; **Build** regenerates the `.pic`.
 
+### Metasprites & animation
+
+**Right-click a sprite `.png` → Export Metasprite / Animation (C)…** builds a
+`MetaspriteItem[]` table for a multi-cell sprite (e.g. a 64×64 hero from a 2×2
+grid of 32×32 sub-sprites) with the **correct 8×8 OAM tile names computed from
+your sheet** — the thing the library asks the editor to get right (gfx4snes
+`-T` gets block indices wrong for 16/32px blocks). Add animation frames and
+Cooper also emits a `DECLARE_ANIM_CLIP` you drive with `animPlay`/`animTick`.
+The generated C opens in a new editor, ready to paste (or `#include`).
+
 ### Tilemaps
 
 **Right-click a `.map` → View Tilemap (assembled)** to see the background the way

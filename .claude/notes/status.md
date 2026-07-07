@@ -16,9 +16,18 @@ injected regression; Cooper 339 Node + 10 integration vs both develop builds.
   incl. commented P2), Replay now / Save as gameplay test. CI bumped to
   OpenSNES v0.29.0. Import is pure text + existing replay → no luna>=1.8 runtime
   dep in Cooper (recording happens in luna-gui).
-- **NEXT in this wave:** migrate `.cooper-tests/` → SDK `test/manifest.toml`
-  (opensnes#98 harness); metasprite/anim composer emitting `anim.h` AnimClip
-  tables (opensnes#97). Both SDK formats verified present in v0.29.0.
+- **Cooper 0.44.0 (D-063):** gameplay tests migrated onto the SDK `make test`
+  harness (opensnes#98) — `.cooper-tests/` retired, single committed/CI-runnable
+  `test/manifest.toml` format; real e2e catches an injected regression.
+- **Cooper 0.45.0 (D-064):** `Export Metasprite / Animation (C)…` — correct 8×8
+  OAM char-names from sheet geometry (opensnes#97; avoids gfx4snes -T #100),
+  optional DECLARE_ANIM_CLIP. Verified vs SDK worked values + emitted C compiles
+  against real headers. Gotcha: anim.h not in umbrella (needs <snes/anim.h>).
+- **Wave COMPLETE** — all 3 filed upstream issues (luna#83, opensnes#97/#98)
+  merged, released, AND consumed by Cooper (0.43→0.45), each CI-green.
+- **Still open / future:** visual metasprite composer for scattered layouts
+  (v1 is rectangular-grid); G10 v2/v3 (tracker round-trip, SFX player);
+  usb2snes deploy (needs hardware); luna-gui live reload (G3-v2).
 
 **🏁 THE GAME-ENVIRONMENT ROAD IS COMPLETE (G1→G10, 0.32.0 → 0.42.0,
 2026-07-07).** Final slice: G9 gameplay regression tests (record input script +

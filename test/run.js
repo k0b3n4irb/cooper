@@ -528,6 +528,46 @@ check('parseInputFile on a comments-only file → empty (nothing to replay)',
     IS.parseInputFile('# just comments\n#more').length === 0);
 try { fs.unlinkSync(tmpIs); } catch {}
 
+// --- G8b (opensnes#97): metasprite name computation + C emit (pure) ---
+console.log('\n=== metasprite: char-names + emit ===');
+const tmpMs = path.join(os.tmpdir(), `cooper_metasprite_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'metasprite.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpMs });
+const MS = require(tmpMs);
+// charName vs the SDK's own hand-authored .inc worked values (32px/128px sheet)
+check('charName matches SDK docs: (2,1)->72, (0,2)->128, (3,2)->140',
+    MS.charName(2, 1, 32, 128) === 72 && MS.charName(0, 2, 32, 128) === 128 && MS.charName(3, 2, 32, 128) === 140);
+check('charName 16px/128px: (1,0)->2, (0,1)->32', MS.charName(1, 0, 16, 128) === 2 && MS.charName(0, 1, 16, 128) === 32);
+const gm = MS.gridMetasprite({ sheetWidthPx: 128, cellPx: 32, startCol: 0, startRow: 0, cols: 2, rows: 2, pal: 0, prio: 2 });
+check('gridMetasprite emits CHAR-NAMES 0,4,64,68 (not block indices 0,1,2,3)',
+    gm.map((i) => i.tile).join(',') === '0,4,64,68');
+check('gridMetasprite dx/dy laid out by cell', gm.map((i) => `${i.dx}:${i.dy}`).join(',') === '0:0,32:0,0:32,32:32');
+const cEmit = MS.emitMetasprite('hero_frame0', gm);
+check('emitMetasprite: METASPR_ITEM + TERM + attr expr',
+    cEmit.includes('METASPR_ITEM(32, 32, 68, OBJ_PRIO(2))') && cEmit.includes('METASPR_TERM')
+    && cEmit.includes('static const MetaspriteItem hero_frame0[]'));
+check('attr expr renders flip + pal', MS.emitMetasprite('x', [{ dx: 0, dy: 0, tile: 0, attr: MS.OBJ_FLIPX | MS.objPal(2) | MS.objPrio(2) }]).includes('OBJ_FLIPX | OBJ_PAL(2) | OBJ_PRIO(2)'));
+check('emitAnimClip uniform → DECLARE_ANIM_CLIP',
+    MS.emitAnimClip('walk', { frames: [0, 2, 4], mode: 'ANIM_LOOP', speed: 8 }) === 'DECLARE_ANIM_CLIP(walk, ANIM_LOOP, 8, 0, 2, 4);\n');
+check('emitAnimClip per-frame durations → raw AnimClip',
+    (() => { const s = MS.emitAnimClip('boom', { frames: [4, 5, 6, 7], mode: 'ANIM_ONCE', durations: [2, 2, 3, 6] }); return s.includes('boom_frames[] = { 4, 5, 6, 7 }') && s.includes('boom_durations[] = { 2, 2, 3, 6 }') && s.includes('ANIM_ONCE'); })());
+// close the loop: the emitted C compiles against the REAL library headers
+if (cp.spawnSync('clang', ['--version']).status !== 0) {
+    skipped('clang not available');
+} else {
+    const msFlags = [...C.renderClangd(OPENSNES).matchAll(/- "([^"]+)"/g)].map((m) => m[1]);
+    const src = MS.emitMetasprite('hero_frame0', gm)
+        + MS.emitAnimClip('hero_anim', { frames: [0, 1, 2, 3], mode: 'ANIM_LOOP', speed: 8 })
+        + 'AnimPlayer hp;\n'
+        + 'void go(void){ oamDrawMeta(0, 100, 80, hero_frame0, 0, 0, OBJ_LARGE); animPlay(&hp, &hero_anim); (void)animTick(&hp); }\n';
+    const msC = path.join(os.tmpdir(), `cooper_meta_${process.pid}.c`);
+    fs.writeFileSync(msC, '#include <snes.h>\n#include <snes/anim.h>\n' + src);
+    const r = cp.spawnSync('clang', ['-fsyntax-only', ...msFlags, msC], { encoding: 'utf8' });
+    check('emitted metasprite + anim C compiles against the real snes.h', r.status === 0);
+    if (r.status !== 0) { console.log(r.stderr.split('\n').slice(0, 8).join('\n')); }
+    try { fs.unlinkSync(msC); } catch {}
+}
+try { fs.unlinkSync(tmpMs); } catch {}
+
 // --- G4: memory map — WRAM ramsections + VRAM heatmap (pure, real .sym) ---
 console.log('\n=== memory map: wramMap / vramHeat ===');
 const tmpMm = path.join(os.tmpdir(), `cooper_memmap_${process.pid}.cjs`);

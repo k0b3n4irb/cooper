@@ -1159,6 +1159,31 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-064 — Metasprite / animation C emitter (opensnes#97, 2026-07-07)
+- **Context:** OpenSNES v0.29.0 (PR #101) shipped `sprite.h` metasprites
+  (`MetaspriteItem`/`oamDrawMeta`) + `anim.h` (`AnimClip`/`animPlay`/`animTick`,
+  `DECLARE_ANIM_CLIP`). `sprite.h` explicitly names **Cooper** as the tooling
+  that must compute the `tile` field as an **8x8 OAM char-name** from the sheet
+  geometry — NOT a block index (gfx4snes `-T` emits block indices and renders
+  wrong for 16/32px blocks, opensnes#100).
+- **Decision:** `Cooper: Export Metasprite / Animation (C)…` (from a sprite PNG)
+  emits a correct `const MetaspriteItem <base>_frame0[]` for a rectangular
+  `cols×rows` grid, `tile = col*(cellPx/8) + row*(cellPx/8)*(sheetW/8)`
+  (verified against the SDK's own hand-authored `.inc` worked values:
+  `(2,1)→72`, `(0,2)→128`, `(3,2)→140`), plus an optional `DECLARE_ANIM_CLIP`.
+  Pure `metasprite.ts` (`charName`/`gridMetasprite`/`emitMetasprite`/
+  `emitAnimClip`); opens the generated C in an editor. This delivers exactly the
+  correctness the library delegates — a contiguous 2×2 of 32px emits char-names
+  `0,4,64,68`, NOT block indices `0,1,2,3`.
+- **Gotcha (caught by verification):** `anim.h` is **not** in the umbrella
+  `snes.h` (the examples `#include <snes/anim.h>` explicitly), so the emitter
+  adds that include only when a clip is emitted — proven by compiling the
+  emitted C (metasprite + clip + `oamDrawMeta`/`animPlay`/`animTick`) against the
+  real headers with clang.
+- **Scope:** v1 is a rectangular-grid emitter (the common contiguous case, which
+  Cooper's untransposed sheets make correct). A visual drag-place composer for
+  scattered layouts is a possible follow-up.
+
 ### D-063 — Gameplay tests migrate onto the SDK `make test` harness (opensnes#98, 2026-07-07)
 - **Context:** OpenSNES **v0.29.0** (PR #101, tested Cooper-side before merge)
   shipped a user-project test harness: `test/manifest.toml` declares

@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.45.0] — 2026-07-07
+
+### Added — metasprite & animation export
+
+- **Cooper: Export Metasprite / Animation (C)…** (right-click a sprite PNG):
+  emits a `MetaspriteItem[]` table for a multi-cell sprite with the **correct
+  8×8 OAM tile names computed from your sheet geometry** (OpenSNES ≥ 0.29,
+  opensnes#97) — what the library asks the editor to compute, and what
+  gfx4snes `-T` gets wrong for 16/32px blocks. Optionally emits a matching
+  `DECLARE_ANIM_CLIP` for `animPlay`/`animTick`. Verified by compiling the
+  generated C against the real SDK headers.
+
 ## [0.44.0] — 2026-07-07
 
 ### Changed — gameplay tests now use the SDK `make test` harness
