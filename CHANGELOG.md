@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.37.0] — 2026-07-07
+
+### Added — deterministic input replay
+
+- **Cooper: Replay Inputs…** — at a debug stop, give it `frame:buttons`
+  checkpoints (`120:Start, 300:A+Right, 360:0`; a checkpoint holds until the
+  next one) and Cooper replays them **from power-on, deterministically**, then
+  pauses the debugger at the end — reproduce a gameplay bug with the exact same
+  inputs, forever. Button names or raw hex masks; the canonical form is
+  compatible with `luna run --input`. Recording while you play is coming via
+  [luna#83](https://github.com/k0b3n4irb/luna/issues/83).
+
 ## [0.36.0] — 2026-07-07
 
 ### Added — memory map

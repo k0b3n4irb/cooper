@@ -194,6 +194,11 @@ The jewel. Workflow:
    **Disassembly** — **Cooper: Show Disassembly** opens the 65816 instructions at
    the stop, disassembled by luna itself and annotated with your symbols
    (`main`, `enemies_update+0x12`…), the current PC highlighted.
+   **Replay inputs** — **Cooper: Replay Inputs…**: give it `frame:buttons`
+   checkpoints (`120:Start, 300:A+Right, 360:0` — a checkpoint holds until the
+   next one) and Cooper replays them **deterministically from power-on**, then
+   pauses the debugger at the end. Reproduce a gameplay bug forever with the
+   same inputs; the canonical script also works with `luna run --input`.
    **Who writes this address?** — **Cooper: Trace Memory Accesses (one frame)…**:
    give it a symbol or address (`frame_count`, `$7E0030`) and it records every
    read/write to it over the next frame, each attributed to the function that did

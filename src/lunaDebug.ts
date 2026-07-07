@@ -18,6 +18,7 @@ import { DebugProtocol } from '@vscode/debugprotocol';
 import * as path from 'path';
 import * as fs from 'fs';
 import { LunaMcp, CpuState } from './lunaMcp';
+import { parseInputScript, maskToButtons } from './inputScript';
 import {
     parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved, resolveExpr, parseAddress,
     buildCLineMap, CLineMap, CSource, cSourceForAddr, resolveLine,
@@ -750,6 +751,35 @@ export class LunaDebugSession extends LoggingDebugSession {
                 this.sendEvent(new StoppedEvent('trace', THREAD_ID));
             } catch (e) {
                 this.sendErrorResponse(response, 3012, `mem trace failed: ${(e as Error).message}`);
+            }
+            return;
+        }
+        if (command === 'cooperReplay') {
+            const a = (args ?? {}) as { script?: string; extraFrames?: number };
+            try {
+                const checkpoints = parseInputScript(a.script ?? '');
+                if (!checkpoints.length) {
+                    this.sendErrorResponse(response, 3013, 'empty input script');
+                    return;
+                }
+                // Deterministic like `luna --input`: replay from power-on, a
+                // checkpoint's mask holds until the next one.
+                await this.mcp.reset();
+                for (const c of checkpoints) {
+                    while (await this.mcp.frameCount() < c.frame) {
+                        await this.mcp.stepUntilFrame(2_000_000);
+                    }
+                    await this.mcp.setJoypad(0, c.mask);
+                    this.sendEvent(new OutputEvent(`replay: frame ${c.frame} → ${maskToButtons(c.mask)}\n`, 'console'));
+                }
+                for (let i = 0; i < (a.extraFrames ?? 2); i++) {
+                    await this.mcp.stepUntilFrame(2_000_000); // let the last input land
+                }
+                response.body = { frames: await this.mcp.frameCount() };
+                this.sendResponse(response);
+                this.sendEvent(new StoppedEvent('replay', THREAD_ID));
+            } catch (e) {
+                this.sendErrorResponse(response, 3014, `replay failed: ${(e as Error).message}`);
             }
             return;
         }

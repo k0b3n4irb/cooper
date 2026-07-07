@@ -226,6 +226,18 @@ export class LunaMcp {
         return this.callTool('step', { count });
     }
 
+    /** Set the joypad state latched by the next auto-read. Grounded bit layout
+     *  (high → low): B Y Select Start Up Down Left Right A X L R 0000. */
+    setJoypad(port: number, mask: number): Promise<unknown> {
+        return this.callTool('set_joypad', { port, mask });
+    }
+
+    /** Frames elapsed since reset (`state.scheduler.frame_count`). */
+    async frameCount(): Promise<number> {
+        const s = await this.state();
+        return ((s.scheduler as { frame_count?: number } | undefined)?.frame_count) ?? 0;
+    }
+
     /** Run until PB:PC reaches `pc` (24-bit) or `maxSteps` elapse. */
     runUntilPc(pc: number, maxSteps: number): Promise<{ hit: boolean }> {
         return this.callTool('run_until_pc', { pc, max_steps: maxSteps }) as Promise<{ hit: boolean }>;

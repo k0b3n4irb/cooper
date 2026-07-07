@@ -1071,6 +1071,26 @@ rationale and the docs that grounded it. Newest last.
   `oamMemory` attaches inside it, totals consistent; synthetic heatmap
   bucketing; static render with 64 cells.
 
+### D-056 — Input replay v1 (G5, 2026-07-07)
+- **Decision:** `Cooper: Replay Inputs…` at a debug stop — a `frame:mask`
+  checkpoint script (luna's own `--input` format/semantics: replay **from
+  power-on**, a checkpoint's mask holds until the next) driven over MCP
+  (`reset` → per checkpoint: `step_until_frame` to the frame → `set_joypad`).
+  Cooper accepts **button names** (`120:Start, 300:A+Right, 360:0`) and always
+  echoes the canonical hex so scripts stay luna-CLI compatible. Ends with
+  `stopped('replay')`; the last script is remembered per workspace.
+- **Recording is upstream:** gap confirmed live (no input capture anywhere in
+  luna v1.7.0) → **issue k0b3n4irb/luna#83** filed per the issue rule. When it
+  lands, Cooper wires "record a repro" in luna-gui → replay here.
+- **Grounding caveats:** `peek_memory` reads the `$2000-$5FFF` register band
+  as **0 by design** — the latched pad is `state.cpu_regs.joy1`; and
+  `set_joypad` only latches on the NEXT auto-read (hold ≥1 frame).
+- **Verified (behavioral):** mask latches into `joy1` after auto-read; and a
+  replayed `10:Right, 200:0` **drives the real game** — aim_target's sprite
+  clamps at its right bound (`target_x` 200 → exactly 247), read back through
+  the debugger's own `evaluate`. (The example's init eats ~50 frames — a
+  too-short hold plateaus at 227, which the first test run caught.)
+
 ---
 
 ### Known limitations (Component #1)

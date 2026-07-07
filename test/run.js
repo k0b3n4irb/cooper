@@ -426,6 +426,24 @@ try {
 }
 try { fs.unlinkSync(tmpNp); } catch {}
 
+// --- G5 v1: input script parse/format (pure, luna --input semantics) ---
+console.log('\n=== input script: parse / buttons / format ===');
+const tmpIs = path.join(os.tmpdir(), `cooper_inputscript_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'inputScript.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpIs });
+const IS = require(tmpIs);
+check('hex masks parse like luna (0x-optional, sorted by frame)',
+    JSON.stringify(IS.parseInputScript('300:0x1000, 120:80'))
+    === JSON.stringify([{ frame: 120, mask: 0x0080 }, { frame: 300, mask: 0x1000 }]));
+check('button names parse: Start, A+Right, 0 releases',
+    IS.buttonsToMask('Start') === 0x1000 && IS.buttonsToMask('A+Right') === 0x0180 && IS.buttonsToMask('0') === 0);
+check('unknown button throws with guidance',
+    (() => { try { IS.buttonsToMask('Z'); return false; } catch (e) { return /unknown button/.test(e.message); } })());
+check('missing colon throws', (() => { try { IS.parseInputScript('120'); return false; } catch { return true; } })());
+check('maskToButtons round-trips', IS.maskToButtons(0x1080) === 'Start+A' && IS.maskToButtons(0) === '(released)');
+check('formatInputScript emits luna-CLI canonical hex',
+    IS.formatInputScript(IS.parseInputScript('120:Start,300:A+Right')) === '120:0x1000,300:0x0180');
+try { fs.unlinkSync(tmpIs); } catch {}
+
 // --- G4: memory map — WRAM ramsections + VRAM heatmap (pure, real .sym) ---
 console.log('\n=== memory map: wramMap / vramHeat ===');
 const tmpMm = path.join(os.tmpdir(), `cooper_memmap_${process.pid}.cjs`);
@@ -836,6 +854,18 @@ try { fs.unlinkSync(tmpOM); } catch {}
             check('disasm is symbol-annotated after load_symbols',
                 dis.lines.some((l) => typeof l.symbol === 'string' && l.symbol.length > 0));
 
+            // --- G5: replay mechanics — set_joypad lands in JOY1 after auto-read ---
+            // NOTE: peek_memory reads the $2000-$5FFF register band as 0 by design
+            // (side-effect-free debug view) — the latched pad is state.cpu_regs.joy1.
+            await m.reset();
+            for (let f = 0; f < 5; f++) { await m.stepUntilFrame(2000000); } // init + NMI/auto-read on
+            await m.setJoypad(0, 0x1080); // Start+A
+            await m.stepUntilFrame(2000000);
+            const regs = (await m.state()).cpu_regs || {};
+            check('set_joypad mask latched by the auto-read (state.cpu_regs.joy1 = Start+A)',
+                regs.joy1 === 0x1080);
+            check('frameCount tracks the scheduler', (await m.frameCount()) >= 6);
+
             // --- G2: full 64 KB VRAM via two u16-capped reads ---
             const vlo = await m.peekVram(0, 0x8000);
             const vhi = await m.peekVram(0x8000, 0x8000);
@@ -1017,6 +1047,21 @@ try { fs.unlinkSync(tmpOM); } catch {}
                 if (ret && typeof ret.catch === 'function') { ret.catch(reject); }
             });
             check('cooperVram returns 0x1000 bytes', Array.isArray(vramResp.body.bytes) && vramResp.body.bytes.length === 0x1000);
+
+            // G5 v1: behavioral replay — hold Right long enough to clamp the
+            // aim_target sprite at its right bound (target_x: 200 → 247, exact).
+            const rep = await new Promise((resolve, reject) => {
+                const to = setTimeout(() => reject(new Error('cooperReplay timeout')), 60000);
+                session.sendResponse = (r) => { clearTimeout(to); resolve(r); };
+                const response = { seq: 0, type: 'response', request_seq: 0, success: true, command: 'cooperReplay', body: {} };
+                // hold Right until frame 200: the example's init takes ~50 frames,
+                // leaving 145+ update ticks — enough to CLAMP target_x at 247 exactly.
+                const ret = session.customRequest('cooperReplay', response, { script: '10:Right, 200:0' });
+                if (ret && typeof ret.catch === 'function') { ret.catch(reject); }
+            });
+            check('cooperReplay ran to ~frame 202', rep.body.frames >= 200 && rep.body.frames <= 210);
+            const evX = await dapCall('evaluate', { expression: 'target_x', context: 'watch' });
+            check('replayed D-pad drove the game: target_x clamped at 247 ($F7)', /\$F7$/.test(evX.body.result));
             const sheet = T.tilesToRgba(T.decodeTileSheet(vramResp.body.bytes, 4, 0x1000 / 32), P.decodeCgram(ppu.body.cgram).slice(0, 16), 16);
             const pngBuf = T.encodePng(sheet.width, sheet.height, sheet.data);
             check('VRAM sheet encodes a valid PNG', pngBuf[0] === 0x89 && pngBuf.slice(1, 4).toString('ascii') === 'PNG');

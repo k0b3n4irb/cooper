@@ -10,6 +10,7 @@ import { LunaMcp, DisasmLine } from './lunaMcp';
 import { renderDisasmHtml } from './disasmView';
 import { renderMemTraceHtml, TracedEvent } from './memTraceView';
 import { wramMap, renderMemoryMapHtml } from './memoryMap';
+import { parseInputScript, formatInputScript } from './inputScript';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { listExamples, scaffoldProject, validateProjectName } from './newProject';
 import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
@@ -94,6 +95,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.debugHere', (name: string) => debugHere(name)),
         vscode.commands.registerCommand('cooper.watch', () => toggleWatch(context)),
         vscode.commands.registerCommand('cooper.showMemoryMap', () => showMemoryMap()),
+        vscode.commands.registerCommand('cooper.replayInputs', () => replayInputs(context)),
         { dispose: () => { watchState?.watcher.dispose(); watchState?.status.dispose(); } },
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.languages.registerCodeLensProvider({ language: 'c' }, codeLens),
@@ -775,6 +777,42 @@ async function showDisasm(): Promise<void> {
         showViewer('cooperDisasm', 'Disassembly', (w) => renderDisasmHtml(r.lines, w.cspSource));
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input replay (G5 v1) — deterministic `frame:mask` replay from power-on at a
+// debug stop (luna --input semantics). Recording waits on luna#83.
+// ---------------------------------------------------------------------------
+
+async function replayInputs(context: vscode.ExtensionContext): Promise<void> {
+    const session = activeLunaSession();
+    if (!session) {
+        return;
+    }
+    const script = await vscode.window.showInputBox({
+        prompt: 'Input script — frame:buttons checkpoints; a checkpoint holds until the next one. Replays from power-on.',
+        placeHolder: '120:Start, 300:A+Right, 360:0   (buttons or hex masks)',
+        value: context.workspaceState.get<string>('cooper.lastReplayScript') ?? '',
+        validateInput: (v) => {
+            try {
+                return parseInputScript(v).length ? undefined : 'at least one frame:buttons checkpoint';
+            } catch (e) {
+                return (e as Error).message;
+            }
+        },
+    });
+    if (!script) {
+        return;
+    }
+    await context.workspaceState.update('cooper.lastReplayScript', script);
+    try {
+        const canonical = formatInputScript(parseInputScript(script));
+        log(`replay: ${canonical}`);
+        const r = await session.customRequest('cooperReplay', { script }) as { frames: number };
+        void vscode.window.showInformationMessage(`Cooper: replayed to frame ${r.frames} — the debugger is paused there. (luna CLI form: --input "${canonical}")`);
+    } catch (e) {
+        fail(`replay failed: ${String(e)}`);
     }
 }
 

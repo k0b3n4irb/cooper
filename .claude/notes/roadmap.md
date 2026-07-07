@@ -157,8 +157,9 @@ Reproduce gameplay without replaying by hand. Grounded: luna CLI already
 **replays** input scripts (`--input "frame:mask,…"`, `parsers.rs:13`); MCP has
 `set_joypad` + savestates. Plan v1: Cooper "replay this input script from this
 snapshot" (headless, deterministic). v2 (record while playing in luna-gui):
-**luna issue — record joypad input to the `frame:mask` script format** (GUI
-play → export). Cooper then gets a one-click "record a repro".
+**luna issue [k0b3n4irb/luna#83](https://github.com/k0b3n4irb/luna/issues/83)**
+(filed 2026-07-07, gap confirmed live) — record joypad input to the
+`frame:mask` script format. Cooper then gets a one-click "record a repro".
 
 ### G6 — ROM validation + flashcart deploy (medium, peripheral)
 Ship to real hardware. Plan: header/checksum validation first (pure, cheap);
