@@ -19,6 +19,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { LunaMcp, CpuState } from './lunaMcp';
 import { parseInputScript, maskToButtons } from './inputScript';
+import { aggregateProfile } from './profiler';
 import {
     parseSym, SymTable, symbolToAddr, addrToSymbol, formatResolved, resolveExpr, parseAddress,
     buildCLineMap, CLineMap, CSource, cSourceForAddr, resolveLine,
@@ -780,6 +781,23 @@ export class LunaDebugSession extends LoggingDebugSession {
                 this.sendEvent(new StoppedEvent('replay', THREAD_ID));
             } catch (e) {
                 this.sendErrorResponse(response, 3014, `replay failed: ${(e as Error).message}`);
+            }
+            return;
+        }
+        if (command === 'cooperProfile') {
+            try {
+                // One frame of instructions is ~30-50k events; 200k leaves room.
+                await this.mcp.enableCpuTrace(200_000);
+                await this.mcp.stepUntilFrame(2_000_000);
+                const t = await this.mcp.takeCpuTrace();
+                // Aggregate HERE — 40k raw events would be megabytes through DAP;
+                // the viewer only needs the per-function rows + the scanline strip.
+                const profile = aggregateProfile(t.events);
+                response.body = profile;
+                this.sendResponse(response);
+                this.sendEvent(new StoppedEvent('profile', THREAD_ID));
+            } catch (e) {
+                this.sendErrorResponse(response, 3015, `profile failed: ${(e as Error).message}`);
             }
             return;
         }

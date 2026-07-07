@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.39.0] — 2026-07-07
+
+### Added — frame profiler 📊
+
+- **Cooper: Profile One Frame (CPU)** — at a debug stop, traces every
+  instruction of the next frame and shows **which functions burn your master
+  clocks**: a per-function table (mclk, instructions, %) and a per-scanline
+  strip showing *when* in the frame the CPU is busy. Function attribution uses
+  your own symbols. A first for SNES homebrew tooling.
+
 ## [0.38.0] — 2026-07-07
 
 ### Added — ship to real hardware

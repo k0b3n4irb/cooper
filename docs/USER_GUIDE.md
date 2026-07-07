@@ -194,6 +194,10 @@ The jewel. Workflow:
    **Disassembly** — **Cooper: Show Disassembly** opens the 65816 instructions at
    the stop, disassembled by luna itself and annotated with your symbols
    (`main`, `enemies_update+0x12`…), the current PC highlighted.
+   **Profile a frame** — **Cooper: Profile One Frame (CPU)**: traces every
+   instruction of the next frame and shows **which functions burn your master
+   clocks** (table with mclk/instructions/%) plus a per-scanline strip — is
+   your game logic fitting the frame budget, and when in the frame does it run?
    **Replay inputs** — **Cooper: Replay Inputs…**: give it `frame:buttons`
    checkpoints (`120:Start, 300:A+Right, 360:0` — a checkpoint holds until the
    next one) and Cooper replays them **deterministically from power-on**, then

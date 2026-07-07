@@ -12,6 +12,7 @@ import { renderMemTraceHtml, TracedEvent } from './memTraceView';
 import { wramMap, renderMemoryMapHtml } from './memoryMap';
 import { parseInputScript, formatInputScript } from './inputScript';
 import { checkRom, renderRomCheckHtml } from './romCheck';
+import { renderProfileHtml, FrameProfile } from './profiler';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { listExamples, scaffoldProject, validateProjectName } from './newProject';
 import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
@@ -99,6 +100,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.replayInputs', () => replayInputs(context)),
         vscode.commands.registerCommand('cooper.validateRom', () => validateRom()),
         vscode.commands.registerCommand('cooper.deployRom', () => deployRom()),
+        vscode.commands.registerCommand('cooper.profileFrame', () => profileFrame()),
         { dispose: () => { watchState?.watcher.dispose(); watchState?.status.dispose(); } },
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.languages.registerCodeLensProvider({ language: 'c' }, codeLens),
@@ -780,6 +782,28 @@ async function showDisasm(): Promise<void> {
         showViewer('cooperDisasm', 'Disassembly', (w) => renderDisasmHtml(r.lines, w.cspSource));
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Frame profiler (G7) — "where do my scanlines go?": one traced frame,
+// aggregated per function in the adapter, rendered as table + scanline strip.
+// ---------------------------------------------------------------------------
+
+async function profileFrame(): Promise<void> {
+    const session = activeLunaSession();
+    if (!session) {
+        return;
+    }
+    try {
+        const p = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: 'Cooper: profiling one frame…' },
+            async () => await session.customRequest('cooperProfile', {}) as FrameProfile,
+        );
+        log(`profile: ${p.totalInstructions} instructions / ${p.totalCycles} mclk, top = ${p.rows[0]?.name ?? '—'} (${p.rows[0]?.pct.toFixed(1) ?? 0}%)`);
+        showViewer('cooperProfile', 'Frame Profile', (w) => renderProfileHtml(p, w.cspSource));
+    } catch (e) {
+        fail(`profiling failed: ${String(e)}`);
     }
 }
 

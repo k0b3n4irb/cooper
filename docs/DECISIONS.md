@@ -1110,6 +1110,25 @@ rationale and the docs that grounded it. Newest last.
   and a synthetic 512-byte copier header is detected while the header still
   parses.
 
+### D-058 — Frame profiler (G7, 2026-07-07)
+- **Decision:** `Cooper: Profile One Frame (CPU)` at a debug stop —
+  `enable_cpu_trace(200k)` → `step_until_frame` → `take_cpu_trace`, then
+  aggregate **in the adapter** (a frame is ~30–50k per-instruction events;
+  megabytes of raw JSON through DAP would be silly): an instruction's cost =
+  the mclk delta to the next event, grouped by luna's nearest-symbol
+  annotation (base name, `+0xNN` stripped) → per-function table (mclk, instr,
+  %) + a per-scanline strip (1364 mclk buckets — "when in the frame?"). Pure
+  `profiler.ts`; static viewer; the machine advances one frame
+  (`stopped('profile')`).
+- **Grounding:** `enable_cpu_trace {max_events}` (no hidden clamp),
+  `take_cpu_trace → {events:[{mclk, pc, …, symbol?}]}`; symbol annotation
+  needs the launch-time `load_symbols` (D-047). The 200k ring holds a full
+  frame with margin — the feared overflow (roadmap) doesn't materialize, so
+  no upstream issue.
+- **Verified:** pure aggregation (delta costs, base-symbol grouping, %≈100,
+  strip span) + a real traced frame: >1000 events, majority symbol-annotated,
+  aggregates into named functions with total mclk in the physical frame range.
+
 ---
 
 ### Known limitations (Component #1)

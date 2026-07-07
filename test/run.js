@@ -426,6 +426,28 @@ try {
 }
 try { fs.unlinkSync(tmpNp); } catch {}
 
+// --- G7: frame profiler aggregation (pure) ---
+console.log('\n=== profiler: aggregateProfile ===');
+const tmpPf = path.join(os.tmpdir(), `cooper_profiler_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'profiler.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPf });
+const PF = require(tmpPf);
+check('baseSymbol strips +0xNN', PF.baseSymbol('enemies_update+0x12') === 'enemies_update'
+    && PF.baseSymbol(null) === '(no symbol)');
+const prof = PF.aggregateProfile([
+    { mclk: 0, pc: 1, symbol: 'main' },          // cost 10
+    { mclk: 10, pc: 2, symbol: 'main+0x04' },    // cost 20
+    { mclk: 30, pc: 3, symbol: 'draw' },         // cost 30 (to frameEnd 60)
+], 60);
+check('costs are mclk deltas grouped by base symbol',
+    prof.rows[0].name === 'main' && prof.rows[0].cycles === 30 && prof.rows[0].instructions === 2
+    && prof.rows[1].name === 'draw' && prof.rows[1].cycles === 30);
+check('percentages sum to ~100', Math.round(prof.rows.reduce((a, r) => a + r.pct, 0)) === 100);
+check('scanline strip covers the span', prof.scanlines.length === 1 && prof.scanlines[0] === 60);
+const pfHtml = PF.renderProfileHtml(prof, 'csp');
+check('profile html: totals + strip, no scripts',
+    pfHtml.includes('master clocks') && pfHtml.includes('class="cell"') && !pfHtml.includes('<script'));
+try { fs.unlinkSync(tmpPf); } catch {}
+
 // --- G6: ROM validation (pure, vs real wlalink-built ROMs) ---
 console.log('\n=== ROM check: header / checksum ===');
 const tmpRc = path.join(os.tmpdir(), `cooper_romcheck_${process.pid}.cjs`);
@@ -893,6 +915,19 @@ try { fs.unlinkSync(tmpOM); } catch {}
             check('set_joypad mask latched by the auto-read (state.cpu_regs.joy1 = Start+A)',
                 regs.joy1 === 0x1080);
             check('frameCount tracks the scheduler', (await m.frameCount()) >= 6);
+
+            // --- G7: one traced frame profiles with symbol attribution ---
+            await m.enableCpuTrace(200000);
+            await m.stepUntilFrame(2000000);
+            const cpuTrace = await m.takeCpuTrace();
+            check('cpu trace captures a full frame of instructions', cpuTrace.events.length > 1000);
+            check('trace events are symbol-annotated (load_symbols ran)',
+                cpuTrace.events.filter((e) => e.symbol).length > cpuTrace.events.length / 2);
+            const PF2 = require(path.join(os.tmpdir(), `cooper_profiler_${process.pid}.cjs`));
+            const realProf = PF2.aggregateProfile(cpuTrace.events);
+            check('real frame aggregates into named functions with sane totals',
+                realProf.rows.length > 3 && realProf.rows[0].cycles > 0
+                && realProf.totalCycles > 100000 && realProf.totalCycles < 800000);
 
             // --- G2: full 64 KB VRAM via two u16-capped reads ---
             const vlo = await m.peekVram(0, 0x8000);

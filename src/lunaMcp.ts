@@ -304,6 +304,19 @@ export class LunaMcp {
         return this.callTool('load_symbols', { path: symPath }) as Promise<{ count: number }>;
     }
 
+    // --- CPU tracing (luna ≥ v1.6.0) ---
+
+    /** Record one register-file snapshot per instruction into a capped ring. */
+    enableCpuTrace(maxEvents: number): Promise<unknown> {
+        return this.callTool('enable_cpu_trace', { max_events: maxEvents });
+    }
+
+    /** Drain the recorded instructions (oldest first; draining resets the ring).
+     *  `symbol` is the nearest label when a `.sym` is loaded. */
+    takeCpuTrace(): Promise<{ events: { mclk: number; pc: number; symbol?: string | null }[] }> {
+        return this.callTool('take_cpu_trace', {}) as Promise<{ events: { mclk: number; pc: number; symbol?: string | null }[] }>;
+    }
+
     // --- memory tracing (luna ≥ v1.6.0) ---
 
     /** Start recording bus accesses into a capped ring, optionally filtered to a
