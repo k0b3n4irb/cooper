@@ -5,6 +5,19 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**🏁 THE GAME-ENVIRONMENT ROAD IS COMPLETE (G1→G10, 0.32.0 → 0.42.0,
+2026-07-07).** Final slice: G9 gameplay regression tests (record input script +
+framebuffer baseline into .cooper-tests/, deterministic power-on replay, BYTE
+equality — no fuzzy diffing; expected-vs-actual on failure; pure
+gameplayTest.ts over an McpLike, whole loop Node-tested vs the real binary;
+committed make-test format → **issue opensnes#98**, D-061). Every slice:
+grounded → verified vs reality → documented → tag-released with CI confirmed
+green in the logs. Open upstream gates: luna#83 (input recording → one-click
+repro + G3-v2 live reload), opensnes#97 (metasprite/anim tables → G8b
+composer), opensnes#98 (make test → G9 migration); plus G10 v2/v3 (tracker
+round-trip, SFX player) and usb2snes (needs hardware). Cooper is at
+equilibrium: next wave unblocks on upstream or new user priorities.
+
 **G5→G8 + G10v1 (0.37.0 → 0.41.0, 2026-07-07)** — G5 input replay (frame:mask
 scripts, luna --input semantics, behavioral test: target_x clamps at 247;
 recording → **issue luna#83**, D-056); G6 ROM validation (checksum w/ mirrored
