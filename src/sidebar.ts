@@ -94,6 +94,7 @@ export function buildTreeModel(p: ProjectInfo): TreeNode[] {
         cat('run', 'BUILD & RUN', [
             action('build', 'Build (make)', 'play', 'cooper.build'),
             action('preview', 'Run / Preview', 'device-camera', 'cooper.preview'),
+            action('play', 'Play (luna-gui)', 'game', 'cooper.play'),
             action('debug', 'Debug', 'debug-alt', 'cooper.debug'),
         ]),
         cat('viewers', 'PPU VIEWERS', [

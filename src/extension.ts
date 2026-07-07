@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, findProjectDir } from './clangdConfig';
-import { resolveLunaPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile } from './build';
+import { resolveLunaPath, resolveLunaGuiPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile } from './build';
 import { LunaDebugSession } from './lunaDebug';
 import { LunaMcp, DisasmLine } from './lunaMcp';
 import { renderDisasmHtml } from './disasmView';
@@ -69,6 +69,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.configureClangd', () => configureClangd()),
         vscode.commands.registerCommand('cooper.build', () => runBuild()),
         vscode.commands.registerCommand('cooper.preview', () => previewFrame(context)),
+        vscode.commands.registerCommand('cooper.play', () => playInLunaGui()),
         vscode.commands.registerCommand('cooper.showPalette', () => showPalette()),
         vscode.commands.registerCommand('cooper.showOam', () => showOam()),
         vscode.commands.registerCommand('cooper.showVram', () => showVram()),
@@ -634,6 +635,48 @@ async function previewFrame(context: vscode.ExtensionContext): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Play (G1) — launch the game in luna-gui, a real native window (D-051).
+// ---------------------------------------------------------------------------
+
+async function playInLunaGui(): Promise<void> {
+    const projectDir = await resolveProjectDir();
+    if (!projectDir) {
+        fail('no OpenSNES project (a folder with a Makefile) found.');
+        return;
+    }
+    const mk = path.join(projectDir, 'Makefile');
+    const romName = fs.existsSync(mk) ? romTargetFromMakefile(fs.readFileSync(mk, 'utf8')) : null;
+    if (!romName) {
+        fail('no TARGET in the Makefile — cannot locate the ROM.');
+        return;
+    }
+    const romPath = path.join(projectDir, romName);
+    if (!fs.existsSync(romPath)) {
+        const pick = await vscode.window.showWarningMessage(`Cooper: ${romName} not built yet. Build it first?`, 'Build');
+        if (pick === 'Build') {
+            await runBuild();
+        }
+        return;
+    }
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const opts = {
+        configured: cfg.get<string>('lunaPath')?.trim() || undefined,
+        sdkPath: detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir })?.path,
+    };
+    const gui = resolveLunaGuiPath(opts);
+    if (!gui) {
+        failWithDownload('luna', 'luna-gui not found — it ships in the luna release zip, next to the luna binary (point cooper.lunaPath at that folder).');
+        return;
+    }
+    // A game session, not a tool call: spawn detached so it lives (and keeps
+    // playing) independently of VS Code; stdio ignored, errors via 'error'.
+    log(`play: ${gui} ${romPath}`);
+    const child = spawn(gui, [romPath], { cwd: projectDir, detached: true, stdio: 'ignore' });
+    child.on('error', (e) => fail(`could not launch luna-gui: ${e.message}`));
+    child.unref();
+}
+
+// ---------------------------------------------------------------------------
 // Cooper Home — the dashboard webview (big buttons, live preview, viewer cards).
 // ---------------------------------------------------------------------------
 
@@ -676,6 +719,7 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
         switch (m.command) {
             case 'build': await runBuild(); break;
             case 'new': await newProject(); break;
+            case 'play': await playInLunaGui(); break;
             case 'debug': startLunaDebug((await resolveProjectInfo())); break;
             case 'palette': await showPalette(); break;
             case 'oam': await showOam(); break;

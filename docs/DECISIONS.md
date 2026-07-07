@@ -988,6 +988,23 @@ rationale and the docs that grounded it. Newest last.
   scaffolded project **builds with plain `make`** (no OPENSNES on the command
   line) against the real SDK.
 
+### D-051 — Play in luna-gui (G1, 2026-07-07)
+- **Decision:** `Cooper: Play (luna-gui)` launches the built ROM in luna's
+  native window, spawned **detached** (`detached: true` + `unref`, stdio
+  ignored): a game session belongs to the player, not to the IDE's lifetime.
+  Resolution (`resolveLunaGuiPath`, pure): configured `cooper.lunaPath` folder →
+  sibling of the resolved `luna` binary (the release tarball ships both side by
+  side) → PATH → null (then the arch-aware download toast). Single-engine rule
+  holds: luna-gui is orchestrated as a sibling process, never embedded.
+- **Grounding:** `luna-gui <rom>` takes the ROM as argv[1]
+  (`luna-gui/src/main.rs:1527`, v1.7.0); SDK ≥ 0.28 detects luna-gui
+  (`opensnes doctor`). The SDK's pinned harness installs only the CLI — hence
+  the sibling/folder lookup against the user's unzipped luna release.
+- **Verified:** synthetic-layout resolution tests (folder / sibling / absent),
+  and a real launch — breakout.sfc in luna-gui on this machine: window alive,
+  **60 fps with audio**, clean kill. (Not CI-testable: the Node tier runs
+  headless; the GUI needs a display.)
+
 ---
 
 ### Known limitations (Component #1)

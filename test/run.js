@@ -344,7 +344,8 @@ const tmpD2 = path.join(os.tmpdir(), `cooper_dash_${process.pid}.cjs`);
 esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'dashboard.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpD2 });
 const D2 = require(tmpD2);
 const dash = D2.renderDashboardHtml({ hasProject: true, projectName: 'shmup_1942', romBuilt: true, sdkName: 'opensnes', lunaFound: true }, 'vscode-csp', 'NONCE0');
-check('dashboard has Build/Run/Debug + viewer cards + refresh (8 actions)', (dash.match(/data-cmd=/g) || []).length === 8);
+check('dashboard has Build/Run/Play/Debug + viewer cards + refresh (9 actions)', (dash.match(/data-cmd=/g) || []).length === 9);
+check('dashboard has the Play button (luna-gui)', dash.includes('data-cmd="play"'));
 check('dashboard has a real status refresh (not the preview button)', dash.includes('data-cmd="refresh"'));
 check('dashboard announces ready (extension re-posts the cached preview)', dash.includes("{ command: 'ready' }"));
 check('dashboard script gated by a nonce (CSP)', dash.includes("script-src 'nonce-NONCE0'") && dash.includes('nonce="NONCE0"'));
@@ -424,6 +425,25 @@ try {
     try { fs.rmSync(path.dirname(npDest), { recursive: true, force: true }); } catch {}
 }
 try { fs.unlinkSync(tmpNp); } catch {}
+
+// --- G1: luna-gui resolution (pure, synthetic layouts) ---
+console.log('\n=== luna-gui resolution ===');
+const guiRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'cooper_gui_'));
+try {
+    // release-zip layout: luna + luna-gui side by side in a folder
+    fs.writeFileSync(path.join(guiRoot, 'luna'), '#!/bin/sh\n');
+    fs.writeFileSync(path.join(guiRoot, 'luna-gui'), '#!/bin/sh\n');
+    check('luna-gui found inside a configured folder',
+        B.resolveLunaGuiPath({ configured: guiRoot }) === path.join(guiRoot, 'luna-gui'));
+    check('luna-gui found as a sibling of a configured luna BINARY',
+        B.resolveLunaGuiPath({ configured: path.join(guiRoot, 'luna') }) === path.join(guiRoot, 'luna-gui'));
+    fs.unlinkSync(path.join(guiRoot, 'luna-gui'));
+    check('no luna-gui → null (SDK pinned harness ships only the CLI)',
+        B.resolveLunaGuiPath({ configured: guiRoot, sdkPath: OPENSNES }) === null
+        || fs.existsSync(path.join(OPENSNES, 'tools', 'luna-test', 'bin', 'luna-gui')));
+} finally {
+    try { fs.rmSync(guiRoot, { recursive: true, force: true }); } catch {}
+}
 
 // --- onboarding helpers (pure + against the real SDK) ---
 console.log('\n=== onboarding: arch mapping + debug-info detection ===');

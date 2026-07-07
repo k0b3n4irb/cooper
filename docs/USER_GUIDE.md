@@ -134,9 +134,16 @@ panel (click to jump to the line).
 > If you see `…/make/common.mk: No such file or directory`, set `cooper.opensnesPath`
 > to your OpenSNES release.
 
-## 6. Run / Preview
+## 6. Run / Preview / Play
 
 Click **Run**. Cooper renders a frame in luna and shows it inline.
+
+Click **🎮 Play** (sidebar, dashboard, or `Cooper: Play (luna-gui)`) to launch
+your game in **luna-gui** — a real native window at 60 fps with audio and your
+gamepad/keyboard, plus luna's own interactive debugger (breakpoints, F10/F11
+stepping, event viewer). The window lives on its own: closing VS Code doesn't
+kill your game. luna-gui ships in the luna release zip next to the `luna`
+binary — point `cooper.lunaPath` at that folder.
 
 ![A rendered frame](images/preview.png)
 

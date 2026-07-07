@@ -74,6 +74,7 @@ or start one from an SDK example:<br><br>
   <div class="row">
     <button class="btn" data-cmd="build">▶ Build</button>
     <button class="btn" data-cmd="run">▶ Run</button>
+    <button class="btn" data-cmd="play">🎮 Play</button>
     <button class="btn alt" data-cmd="debug">🐞 Debug</button>
   </div>
   <div class="grid">

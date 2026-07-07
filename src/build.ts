@@ -110,6 +110,50 @@ export function resolveLunaPath(opts: { configured?: string; sdkPath?: string })
     return null;
 }
 
+/**
+ * Resolve the `luna-gui` binary (the native play window, `luna-gui <rom>`).
+ * Order: inside a configured `cooper.lunaPath` directory → next to the resolved
+ * `luna` binary (the release tarball ships both side by side) → `luna-gui` on
+ * the PATH → null. (The SDK's pinned harness installs only the CLI, so the
+ * sibling lookup usually resolves from the user's unzipped luna release.)
+ */
+export function resolveLunaGuiPath(opts: { configured?: string; sdkPath?: string }): string | null {
+    const exists = (p: string): string | null => {
+        try {
+            return fs.statSync(p).isFile() ? p : null;
+        } catch {
+            return null;
+        }
+    };
+    if (opts.configured) {
+        try {
+            if (fs.statSync(opts.configured).isDirectory()) {
+                const r = exists(path.join(opts.configured, 'luna-gui')) ?? exists(path.join(opts.configured, 'bin', 'luna-gui'));
+                if (r) {
+                    return r;
+                }
+            }
+        } catch { /* not found */ }
+    }
+    const luna = resolveLunaPath(opts);
+    if (luna) {
+        const r = exists(path.join(path.dirname(luna), 'luna-gui'));
+        if (r) {
+            return r;
+        }
+    }
+    for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
+        if (!dir) {
+            continue;
+        }
+        const r = exists(path.join(dir, 'luna-gui'));
+        if (r) {
+            return r;
+        }
+    }
+    return null;
+}
+
 export interface PreviewOpts {
     /** CPU instructions before the screenshot (default 200000 — grounded stable). */
     steps?: number;

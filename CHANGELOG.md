@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.32.0] — 2026-07-07
+
+### Added — 🎮 Play your game
+
+- **Cooper: Play (luna-gui)** — one click (sidebar, dashboard, palette) launches
+  the built ROM in luna's **native window**: 60 fps, audio, gamepad/keyboard,
+  and luna's own interactive debugger (breakpoints, stepping, event viewer).
+  The window is independent of VS Code — close the editor, keep playing.
+  luna-gui is found next to your `luna` binary (the release zip ships both);
+  if it's missing you get the arch-aware download button.
+
 ## [0.31.0] — 2026-07-06
 
 ### Added — Cooper: New Project…
