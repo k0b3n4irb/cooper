@@ -194,6 +194,11 @@ The jewel. Workflow:
 |---|---|---|
 | 16×16 colour grid | the 128-sprite table | the decoded tile sheet |
 
+The **Tiles** viewer is interactive: pick the **bpp** (2/4/8), the 16 KB
+**window** into the 64 KB VRAM, and the **sub-palette** (groups of 4/16/256
+colours, exactly like the hardware). Changes are instant (rendered from the
+last snapshot); **↻ Re-read VRAM** re-reads the machine.
+
 ![VRAM tile sheet](images/vram.png)
 
 ### Source-level (C line) debugging

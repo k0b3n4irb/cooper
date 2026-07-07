@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.33.0] — 2026-07-07
+
+### Added — interactive VRAM viewer
+
+- The **Tiles (VRAM)** viewer gains hardware-exact controls: **bpp 2/4/8**,
+  the 16 KB **window offset** into the full 64 KB VRAM, and the
+  **sub-palette** (groups of 4/16/256 colours, like the PPU). Every change
+  re-renders instantly from the last snapshot — **↻ Re-read VRAM** refreshes
+  from the machine. Works at a debug stop and standalone (transient luna).
+
 ## [0.32.0] — 2026-07-07
 
 ### Added — 🎮 Play your game

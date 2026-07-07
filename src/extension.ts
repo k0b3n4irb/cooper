@@ -11,6 +11,7 @@ import { renderDisasmHtml } from './disasmView';
 import { renderMemTraceHtml, TracedEvent } from './memTraceView';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { listExamples, scaffoldProject, validateProjectName } from './newProject';
+import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
 import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
@@ -971,8 +972,12 @@ async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> 
     if (session && session.type === 'luna') {
         try {
             const ppu = await session.customRequest('cooperPpu') as { cgram?: number[]; oam?: number[] };
+            // full 64 KB VRAM in two reads (peek_vram's count is u16, max 0xFFFF)
             const vram = needVram
-                ? ((await session.customRequest('cooperVram', { offset: 0, count: 0x4000 })) as { bytes?: number[] }).bytes ?? []
+                ? [
+                    ...(((await session.customRequest('cooperVram', { offset: 0, count: 0x8000 })) as { bytes?: number[] }).bytes ?? []),
+                    ...(((await session.customRequest('cooperVram', { offset: 0x8000, count: 0x8000 })) as { bytes?: number[] }).bytes ?? []),
+                ]
                 : [];
             return { cgram: ppu.cgram ?? [], oam: ppu.oam ?? [], vram };
         } catch (e) {
@@ -1010,7 +1015,9 @@ async function ppuSnapshot(needVram: boolean): Promise<PpuSnapshot | undefined> 
                     await mcp.step(steps);
                     const s = await mcp.state() as { ppu?: { cgram?: number[]; oam_full?: number[] } };
                     const ppu = s.ppu ?? {};
-                    const vram = needVram ? await mcp.peekVram(0, 0x4000) : [];
+                    const vram = needVram
+                        ? [...await mcp.peekVram(0, 0x8000), ...await mcp.peekVram(0x8000, 0x8000)]
+                        : [];
                     return { cgram: ppu.cgram ?? [], oam: ppu.oam_full ?? [], vram };
                 })(), 25000, `luna at ${luna}`);
                 log(`ppu viewer: snapshot read in ${Date.now() - t0}ms`);
@@ -1066,19 +1073,49 @@ async function showOam(): Promise<void> {
     showViewer('cooperOam', 'OAM (sprites)', (w) => renderOamHtml(sprites, w.cspSource));
 }
 
+// The VRAM viewer is interactive (bpp/offset/sub-palette selectors, G2): it
+// keeps the last full VRAM+CGRAM snapshot and re-renders it locally on every
+// control change — luna is only consulted on open and on "Re-read VRAM".
+let vramPanel: vscode.WebviewPanel | undefined;
+let vramSnapshot: { vram: number[]; cgram: number[] } | undefined;
+let vramOpts: VramViewOpts = { ...DEFAULT_VRAM_OPTS };
+
+function renderVramPanel(): void {
+    if (vramPanel && vramSnapshot) {
+        vramPanel.webview.html = renderVramViewHtml(vramSnapshot.vram, vramSnapshot.cgram, vramOpts, vramPanel.webview.cspSource, nonce());
+    }
+}
+
 async function showVram(): Promise<void> {
     const ppu = await ppuSnapshot(true);
     if (!ppu) {
         return;
     }
-    const BPP = 4, TILES_PER_ROW = 16;
-    const count = Math.floor(ppu.vram.length / bytesPerTile(BPP));
-    const tiles = decodeTileSheet(ppu.vram, BPP, count);
-    const palette = decodeCgram(ppu.cgram).slice(0, 16); // sub-palette 0
-    const { width, height, data } = tilesToRgba(tiles, palette, TILES_PER_ROW);
-    const png = encodePng(width, height, data).toString('base64');
-    showViewer('cooperVram', 'VRAM tiles',
-        (w) => renderVramHtml(png, w.cspSource, `${count} tiles · ${BPP}bpp · palette 0 · ${width}×${height}`, width * 4));
+    vramSnapshot = { vram: ppu.vram, cgram: ppu.cgram };
+    if (vramPanel) {
+        vramPanel.reveal(undefined, true);
+    } else {
+        vramPanel = vscode.window.createWebviewPanel('cooperVram', 'Tiles (VRAM)', vscode.ViewColumn.Beside,
+            { enableScripts: true, retainContextWhenHidden: true });
+        vramPanel.onDidDispose(() => { vramPanel = undefined; vramSnapshot = undefined; });
+        vramPanel.webview.onDidReceiveMessage(async (m: { command?: string; bpp?: number; offset?: number; subpal?: number }) => {
+            if (m.command === 'vramOpts') {
+                vramOpts = {
+                    bpp: (m.bpp === 2 || m.bpp === 8 ? m.bpp : 4),
+                    offset: Math.max(0, Math.min(0x10000 - VRAM_WINDOW, m.offset ?? 0)),
+                    subpal: m.subpal ?? 0,
+                };
+                renderVramPanel();
+            } else if (m.command === 'vramRefresh') {
+                const fresh = await ppuSnapshot(true);
+                if (fresh) {
+                    vramSnapshot = { vram: fresh.vram, cgram: fresh.cgram };
+                    renderVramPanel();
+                }
+            }
+        });
+    }
+    renderVramPanel();
 }
 
 // ---------------------------------------------------------------------------

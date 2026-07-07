@@ -426,6 +426,32 @@ try {
 }
 try { fs.unlinkSync(tmpNp); } catch {}
 
+// --- G2: interactive VRAM viewer (pure) ---
+console.log('\n=== VRAM viewer: bpp/offset/sub-palette selectors ===');
+const tmpVv = path.join(os.tmpdir(), `cooper_vramview_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'vramView.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpVv });
+const VV = require(tmpVv);
+check('subpalCount: 2bpp=64, 4bpp=16, 8bpp=1',
+    VV.subpalCount(2) === 64 && VV.subpalCount(4) === 16 && VV.subpalCount(8) === 1);
+const vv_vram = new Array(0x10000).fill(0).map((_, i) => i & 0xFF);
+const vv_cgram = new Array(256).fill(0).map((_, i) => i);
+const vv1 = VV.renderVramViewHtml(vv_vram, vv_cgram, { bpp: 4, offset: 0, subpal: 0 }, 'csp', 'N1');
+check('vram view renders the toolbar (bpp/offset/subpal/refresh)',
+    ['id="bpp"', 'id="offset"', 'id="subpal"', 'id="refresh"'].every((s) => vv1.includes(s)));
+check('vram view embeds a PNG and a nonce-gated script',
+    vv1.includes('data:image/png;base64,') && vv1.includes('nonce="N1"'));
+check('vram view info line: 512 tiles at 4bpp', vv1.includes('512 tiles') && vv1.includes('$0000'));
+const vv2 = VV.renderVramViewHtml(vv_vram, vv_cgram, { bpp: 2, offset: 0x2000, subpal: 63 }, 'csp', 'N1');
+check('2bpp window: 1024 tiles, offset marked selected', vv2.includes('1024 tiles')
+    && vv2.includes('value="8192" selected'));
+check('sub-palette clamped to the bpp group count', vv2.includes('sub-palette 63/63'));
+const vv3 = VV.renderVramViewHtml(vv_vram, vv_cgram, { bpp: 8, offset: 0, subpal: 5 }, 'csp', 'N1');
+check('8bpp: single sub-palette (clamped 0/0), 256 tiles', vv3.includes('sub-palette 0/0') && vv3.includes('256 tiles'));
+check('different offsets render different sheets',
+    VV.renderVramViewHtml(vv_vram, vv_cgram, { bpp: 4, offset: 0, subpal: 0 }, 'csp', 'N')
+    !== VV.renderVramViewHtml(vv_vram, vv_cgram, { bpp: 4, offset: 0x4000, subpal: 0 }, 'csp', 'N'));
+try { fs.unlinkSync(tmpVv); } catch {}
+
 // --- G1: luna-gui resolution (pure, synthetic layouts) ---
 console.log('\n=== luna-gui resolution ===');
 const guiRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'cooper_gui_'));
@@ -757,6 +783,12 @@ try { fs.unlinkSync(tmpOM); } catch {}
                 dis.lines.every((l) => typeof l.text === 'string' && l.text.length > 0 && Array.isArray(l.bytes)));
             check('disasm is symbol-annotated after load_symbols',
                 dis.lines.some((l) => typeof l.symbol === 'string' && l.symbol.length > 0));
+
+            // --- G2: full 64 KB VRAM via two u16-capped reads ---
+            const vlo = await m.peekVram(0, 0x8000);
+            const vhi = await m.peekVram(0x8000, 0x8000);
+            check('full VRAM = two 32 KB peeks (u16 count cap workaround)',
+                vlo.length === 0x8000 && vhi.length === 0x8000);
 
             // --- D-048: mem trace over one frame ("who writes $2100?") ---
             await m.reset();

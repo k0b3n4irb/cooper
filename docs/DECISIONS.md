@@ -1005,6 +1005,22 @@ rationale and the docs that grounded it. Newest last.
   **60 fps with audio**, clean kill. (Not CI-testable: the Node tier runs
   headless; the GUI needs a display.)
 
+### D-052 — Interactive VRAM viewer: bpp/offset/sub-palette (G2a, 2026-07-07)
+- **Decision:** the VRAM viewer gains hardware-exact controls — **bpp 2/4/8**
+  (the SNES planar formats), **window offset** into the full 64 KB, and
+  **sub-palette** (CGRAM groups of 2^bpp colours: 64×4 / 16×16 / 1×256, clamped
+  per bpp). Control changes re-render **from a cached snapshot** in the
+  extension (no luna round-trip per tweak — a transient run costs seconds); an
+  explicit "Re-read VRAM" button re-reads the machine. Pure `vramView.ts`; the
+  old static `renderVramHtml` stays (the tilemap viewer uses it).
+- **Grounding:** `peek_vram(offset: u16, count: u16)` (luna-api lib.rs:2407) —
+  count caps at 0xFFFF, so the full 64 KB is read as **two 32 KB peeks**.
+  Workaround is trivial → no upstream issue (per the issue rule: file only for
+  real gaps).
+- **Verified:** pure renders (toolbar, 512/1024/256 tiles per bpp, offset
+  selected, sub-palette clamping 63/63 and 0/0, distinct sheets per offset) +
+  the two-peek 64 KB read against the real binary.
+
 ---
 
 ### Known limitations (Component #1)
