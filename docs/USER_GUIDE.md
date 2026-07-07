@@ -150,6 +150,14 @@ binary — point `cooper.lunaPath` at that folder.
 Tune it with `cooper.preview.steps` (how long to run before the screenshot) and
 `cooper.preview.forceDisplay` (show VRAM even if the screen is still blanked).
 
+### Watch mode — see every save
+
+**Cooper: Toggle Watch** (an 👁 appears in the status bar): every time you save
+a source (`.c`, `.asm`, a `res/` PNG, a `.it` track…), Cooper quietly rebuilds
+and refreshes the dashboard preview — the edit→see loop with zero clicks.
+Build failures turn the status-bar item red (details in **Cooper: Show Log**).
+Click the 👁 (or run the command again) to stop.
+
 ---
 
 ## 7. Debug

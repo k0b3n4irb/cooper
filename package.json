@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -183,6 +183,11 @@
       {
         "command": "cooper.newProject",
         "title": "New Project…",
+        "category": "Cooper"
+      },
+      {
+        "command": "cooper.watch",
+        "title": "Toggle Watch (rebuild + preview on save)",
         "category": "Cooper"
       }
     ],

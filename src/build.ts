@@ -154,6 +154,23 @@ export function resolveLunaGuiPath(opts: { configured?: string; sdkPath?: string
     return null;
 }
 
+// Watch mode (G3): which saved files should trigger a rebuild. Inclusion by
+// source extension, MINUS generated artifacts — `make` writes `main.c.asm`,
+// `*.wrap.asm`, `*.o`, the ROM… into the project dir, and re-triggering on
+// those would loop the watcher forever.
+const WATCH_SOURCE_EXTS = ['.c', '.h', '.asm', '.inc', '.png', '.it', '.tmj', '.tmx'];
+const WATCH_ARTIFACT_SUFFIXES = ['.c.asm', '.wrap.asm', '.c.o', '.o', '.sfc', '.smc', '.sym', '.dbg', '.pic', '.pal', '.map', '.bnk'];
+const WATCH_ARTIFACT_NAMES = new Set(['linkfile', 'project_hdr.asm', 'project_config.inc', 'project_sa1_boot.asm', 'data_init_start.wrap.asm', 'data_init_end.wrap.asm']);
+
+/** Whether a saved file is a build SOURCE (should trigger a watch rebuild). */
+export function isWatchSource(fileName: string): boolean {
+    const base = fileName.split(/[\\/]/).pop() ?? fileName;
+    if (WATCH_ARTIFACT_NAMES.has(base) || WATCH_ARTIFACT_SUFFIXES.some((s) => base.endsWith(s))) {
+        return false;
+    }
+    return WATCH_SOURCE_EXTS.some((e) => base.endsWith(e));
+}
+
 export interface PreviewOpts {
     /** CPU instructions before the screenshot (default 200000 — grounded stable). */
     steps?: number;

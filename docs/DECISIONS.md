@@ -1038,6 +1038,21 @@ rationale and the docs that grounded it. Newest last.
   (every extracted function found, lines contain the definitions), and a real
   Extension Host query (`vscode.executeCodeLensProvider`) returns both lenses.
 
+### D-054 — Watch mode: save → rebuild → refreshed preview (G3, 2026-07-07)
+- **Decision:** `Cooper: Toggle Watch` — a FileSystemWatcher over the project,
+  filtered by the pure `isWatchSource` predicate (**the load-bearing part**:
+  `make` writes `main.c.asm`, `*.wrap.asm`, `*.o`, the ROM, `res/*.pic/.pal/
+  .map`… into the project dir, and any of those re-triggering the watcher would
+  loop forever — inclusion by source extension MINUS the generated-artifact
+  list). Debounced 300 ms, **single-flight with one trailing rebuild** (saves
+  during a build coalesce into exactly one follow-up). The rebuild is a QUIET
+  `execFileAsync make` (no task-terminal spam per save; failures go to the
+  Cooper log + a status-bar error state), then the preview regenerates and the
+  dashboard thumbnail updates in place. A status-bar eye shows/stops the mode.
+- **Verified:** pure predicate (sources trigger; every generated artifact class
+  doesn't; unrelated files don't) + real-host toggle on/off. luna-gui live
+  reload stays G3-v2 (upstream luna issue, per the roadmap).
+
 ---
 
 ### Known limitations (Component #1)

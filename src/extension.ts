@@ -4,7 +4,7 @@ import * as path from 'path';
 import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { detectSdk, renderClangd, isOpenSnesRoot, SdkSource, findProjectDir } from './clangdConfig';
-import { resolveLunaPath, resolveLunaGuiPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile } from './build';
+import { resolveLunaPath, resolveLunaGuiPath, lunaPreviewArgs, buildMakeArgs, romTargetFromMakefile, isWatchSource } from './build';
 import { LunaDebugSession } from './lunaDebug';
 import { LunaMcp, DisasmLine } from './lunaMcp';
 import { renderDisasmHtml } from './disasmView';
@@ -91,6 +91,8 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.traceMemory', () => traceMemory()),
         vscode.commands.registerCommand('cooper.newProject', () => newProject()),
         vscode.commands.registerCommand('cooper.debugHere', (name: string) => debugHere(name)),
+        vscode.commands.registerCommand('cooper.watch', () => toggleWatch(context)),
+        { dispose: () => { watchState?.watcher.dispose(); watchState?.status.dispose(); } },
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.languages.registerCodeLensProvider({ language: 'c' }, codeLens),
         vscode.debug.onDidChangeBreakpoints(() => codeLens.refresh()),
@@ -772,6 +774,124 @@ async function showDisasm(): Promise<void> {
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Watch mode (G3) — save a source → quiet incremental rebuild → refreshed
+// preview. Single-flight with a trailing rebuild; generated artifacts filtered
+// (isWatchSource) so `make`'s own outputs can't re-trigger the loop.
+// ---------------------------------------------------------------------------
+
+let watchState: {
+    watcher: vscode.FileSystemWatcher;
+    status: vscode.StatusBarItem;
+    timer?: ReturnType<typeof setTimeout>;
+    building: boolean;
+    dirty: boolean;
+} | undefined;
+
+async function toggleWatch(context: vscode.ExtensionContext): Promise<void> {
+    if (watchState) {
+        watchState.watcher.dispose();
+        watchState.status.dispose();
+        clearTimeout(watchState.timer);
+        watchState = undefined;
+        log('watch: OFF');
+        return;
+    }
+    const projectDir = await resolveProjectDir();
+    if (!projectDir) {
+        fail('no OpenSNES project to watch (open a folder with a Makefile).');
+        return;
+    }
+    const sdk = sdkPathFor(projectDir);
+    if (!sdk) {
+        failWithDownload('sdk', 'the SDK is needed to rebuild on save — set cooper.opensnesPath.');
+        return;
+    }
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(projectDir, '**/*'));
+    const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
+    status.text = '$(eye) Cooper watch';
+    status.tooltip = 'Watch mode: rebuild + preview on save (click to stop)';
+    status.command = 'cooper.watch';
+    status.show();
+    watchState = { watcher, status, building: false, dirty: false };
+    log(`watch: ON (${projectDir})`);
+
+    const rebuild = async (): Promise<void> => {
+        if (!watchState) {
+            return;
+        }
+        if (watchState.building) {
+            watchState.dirty = true; // trailing rebuild after the current one
+            return;
+        }
+        watchState.building = true;
+        watchState.status.text = '$(sync~spin) Cooper build…';
+        const t0 = Date.now();
+        try {
+            await execFileAsync('make', [`OPENSNES=${sdk}`], { cwd: projectDir, timeout: 120000 });
+            log(`watch: rebuilt in ${Date.now() - t0}ms`);
+            watchState.status.text = '$(eye) Cooper watch';
+            const png = await generatePreviewPngQuiet(context, projectDir, sdk);
+            if (png && homePanel) {
+                lastPreviewDataUri = `data:image/png;base64,${fs.readFileSync(png).toString('base64')}`;
+                void homePanel.webview.postMessage({ type: 'preview', dataUri: lastPreviewDataUri });
+            }
+        } catch (e) {
+            watchState.status.text = '$(error) Cooper build failed';
+            const err = (e as { stderr?: string; stdout?: string });
+            log(`watch: build FAILED — ${(err.stderr || err.stdout || String(e)).split('\n').slice(-6).join('\n')}`);
+        } finally {
+            if (watchState) {
+                watchState.building = false;
+                if (watchState.dirty) {
+                    watchState.dirty = false;
+                    void rebuild();
+                }
+            }
+        }
+    };
+    const onChange = (uri: vscode.Uri): void => {
+        if (!watchState || !isWatchSource(uri.fsPath)) {
+            return;
+        }
+        clearTimeout(watchState.timer);
+        watchState.timer = setTimeout(() => void rebuild(), 300);
+    };
+    watcher.onDidChange(onChange);
+    watcher.onDidCreate(onChange);
+    watcher.onDidDelete(onChange);
+    void rebuild(); // prime: build now so the first save's change is visible alone
+}
+
+/** Preview render without toasts/progress — the watch loop's quiet variant. */
+async function generatePreviewPngQuiet(context: vscode.ExtensionContext, projectDir: string, sdk: string): Promise<string | null> {
+    const mk = path.join(projectDir, 'Makefile');
+    const romName = fs.existsSync(mk) ? romTargetFromMakefile(fs.readFileSync(mk, 'utf8')) : null;
+    const romPath = romName ? path.join(projectDir, romName) : null;
+    const luna = resolveLunaPath({
+        configured: vscode.workspace.getConfiguration('cooper').get<string>('lunaPath')?.trim() || undefined,
+        sdkPath: sdk,
+    });
+    if (!romPath || !fs.existsSync(romPath) || !luna) {
+        return null;
+    }
+    const storageDir = context.globalStorageUri.fsPath;
+    fs.mkdirSync(storageDir, { recursive: true });
+    const png = path.join(storageDir, 'preview.png');
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const args = lunaPreviewArgs(romPath, png, {
+        steps: cfg.get<number>('preview.steps'),
+        forceDisplay: cfg.get<boolean>('preview.forceDisplay'),
+    });
+    try {
+        await execFileAsync(luna, args, { cwd: projectDir, timeout: 30000 });
+    } catch (e) {
+        log(`watch: preview failed — ${String((e as { stderr?: string }).stderr ?? e)}`);
+        return null;
+    }
+    return fs.existsSync(png) ? png : null;
 }
 
 // ---------------------------------------------------------------------------

@@ -426,6 +426,16 @@ try {
 }
 try { fs.unlinkSync(tmpNp); } catch {}
 
+// --- G3: watch-mode source filter (the anti-rebuild-loop predicate) ---
+console.log('\n=== watch mode: isWatchSource ===');
+check('sources trigger: main.c, data.asm, res/hero.png, music.it, level.tmj',
+    ['main.c', 'data.asm', 'res/hero.png', 'music.it', 'level.tmj'].every((f) => B.isWatchSource(f)));
+check('generated artifacts NEVER trigger (rebuild-loop guard)',
+    ['main.c.asm', 'main.c.o', 'crt0.wrap.asm', 'data_init_start.wrap.asm', 'game.sfc', 'game.sym',
+        'linkfile', 'project_hdr.asm', 'res/hero.pic', 'res/hero.pal', 'level.map', 'soundbank.bnk', 'main.c.dbg']
+        .every((f) => !B.isWatchSource(f)));
+check('unrelated files ignored', !B.isWatchSource('notes.md') && !B.isWatchSource('.clangd'));
+
 // --- G2b: CodeLens function-line extraction (pure, real main.c) ---
 console.log('\n=== CodeLens: functionDefLines ===');
 const tmpSb2 = path.join(os.tmpdir(), `cooper_deflines_${process.pid}.cjs`);

@@ -4,6 +4,16 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.35.0] — 2026-07-07
+
+### Added — watch mode (the edit→see loop)
+
+- **Cooper: Toggle Watch** — save a source (`.c`, `.asm`, `res/` PNGs, `.it`
+  tracks…) and Cooper quietly rebuilds and refreshes the dashboard preview.
+  No terminals popping per save; failures turn the status-bar 👁 red with
+  details in the Cooper log. Saves during a build coalesce into one follow-up
+  rebuild; generated files (`.c.asm`, `.o`, `.pic`…) never re-trigger the loop.
+
 ## [0.34.0] — 2026-07-07
 
 ### Added — CodeLens above your functions

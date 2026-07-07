@@ -104,6 +104,14 @@ suite('Cooper — activation & commands', () => {
         }
     });
 
+    test('watch mode toggles on and off without error', async function () {
+        this.timeout(30000);
+        await vscode.extensions.getExtension(EXT_ID)!.activate();
+        await vscode.commands.executeCommand('cooper.watch');   // on (prime build kicks off)
+        await new Promise((r) => setTimeout(r, 500));
+        await vscode.commands.executeCommand('cooper.watch');   // off (disposes watcher + status)
+    });
+
     test('CodeLens: break / debug-here above project functions', async () => {
         await vscode.extensions.getExtension(EXT_ID)!.activate();
         const dir = vscode.workspace.workspaceFolders![0].uri.fsPath;
