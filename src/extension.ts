@@ -13,6 +13,7 @@ import { wramMap, renderMemoryMapHtml } from './memoryMap';
 import { parseInputScript, formatInputScript } from './inputScript';
 import { checkRom, renderRomCheckHtml } from './romCheck';
 import { renderProfileHtml, FrameProfile } from './profiler';
+import { encodeWav, nonSilentRatio } from './wav';
 import { releaseArchTag, sdkSupportsDebugInfo, OPENSNES_RELEASES_URL, LUNA_RELEASES_URL } from './onboarding';
 import { listExamples, scaffoldProject, validateProjectName } from './newProject';
 import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
@@ -101,6 +102,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.validateRom', () => validateRom()),
         vscode.commands.registerCommand('cooper.deployRom', () => deployRom()),
         vscode.commands.registerCommand('cooper.profileFrame', () => profileFrame()),
+        vscode.commands.registerCommand('cooper.audition', () => auditionGame(context)),
         { dispose: () => { watchState?.watcher.dispose(); watchState?.status.dispose(); } },
         vscode.window.registerTreeDataProvider('cooperTree', tree),
         vscode.languages.registerCodeLensProvider({ language: 'c' }, codeLens),
@@ -783,6 +785,76 @@ async function showDisasm(): Promise<void> {
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Audition (G10 v1) — "hear your game": run the ROM in a transient luna,
+// drain the SPC's 32 kHz stereo output, encode a .wav, play it in a webview.
+// ---------------------------------------------------------------------------
+
+async function auditionGame(context: vscode.ExtensionContext): Promise<void> {
+    const rom = await builtRomPath();
+    if (!rom) {
+        return;
+    }
+    const seconds = Number(await vscode.window.showQuickPick(['3', '5', '10'], {
+        placeHolder: 'Capture how many seconds of audio (from power-on)?',
+    }) ?? '');
+    if (!seconds) {
+        return;
+    }
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const projectDir = path.dirname(rom);
+    const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir });
+    const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
+    if (!luna) {
+        failWithDownload('luna', 'could not find the luna binary (needed to render audio).');
+        return;
+    }
+    const samples = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Cooper: rendering ${seconds}s of audio…` },
+        async () => {
+            const mcp = new LunaMcp({ onLog: log });
+            try {
+                return await withTimeout((async () => {
+                    await mcp.connect(luna, projectDir);
+                    await mcp.loadRom(rom);
+                    const out: number[] = [];
+                    const frames = seconds * 60;
+                    for (let f = 0; f < frames; f++) {
+                        await mcp.stepUntilFrame(2_000_000);
+                        out.push(...await mcp.drainAudio(4096)); // ~534 stereo samples/frame
+                    }
+                    return out;
+                })(), 60000, `luna audio render`);
+            } catch (e) {
+                fail(`audio render failed: ${(e as Error).message}`);
+                return null;
+            } finally {
+                mcp.dispose();
+            }
+        },
+    );
+    if (!samples) {
+        return;
+    }
+    const ratio = nonSilentRatio(samples);
+    log(`audition: ${samples.length / 2} stereo samples, ${(ratio * 100).toFixed(1)}% non-silent`);
+    const wav = encodeWav(samples);
+    const dir = context.globalStorageUri.fsPath;
+    fs.mkdirSync(dir, { recursive: true });
+    const wavPath = path.join(dir, 'audition.wav');
+    fs.writeFileSync(wavPath, wav);
+    const b64 = wav.toString('base64');
+    const panel = vscode.window.createWebviewPanel('cooperAudition', 'Audition', vscode.ViewColumn.Beside, {});
+    panel.webview.html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; media-src data:; style-src ${panel.webview.cspSource} 'unsafe-inline';">
+<style>body{font-family:var(--vscode-font-family);padding:14px;font-size:12px}</style></head><body>
+<h3>🎵 ${path.basename(rom)} — first ${seconds}s</h3>
+<audio controls autoplay src="data:audio/wav;base64,${b64}"></audio>
+<p>${ratio < 0.01 ? 'This capture is silent — does the game start its music at power-on?' : `${(ratio * 100).toFixed(0)}% of the samples carry sound.`}
+Saved to <code>${wavPath}</code>.</p>
+</body></html>`;
 }
 
 // ---------------------------------------------------------------------------

@@ -304,6 +304,12 @@ export class LunaMcp {
         return this.callTool('load_symbols', { path: symPath }) as Promise<{ count: number }>;
     }
 
+    /** Drain up to `max` stereo samples: interleaved [l0,r0,…] i16 @ 32 kHz. */
+    async drainAudio(max: number): Promise<number[]> {
+        const r = await this.callTool('drain_audio', { max }) as { samples?: number[] };
+        return r?.samples ?? [];
+    }
+
     // --- CPU tracing (luna ≥ v1.6.0) ---
 
     /** Record one register-file snapshot per instruction into a capped ring. */

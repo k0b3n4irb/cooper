@@ -150,6 +150,14 @@ binary — point `cooper.lunaPath` at that folder.
 Tune it with `cooper.preview.steps` (how long to run before the screenshot) and
 `cooper.preview.forceDisplay` (show VRAM even if the screen is still blanked).
 
+### Hear your game
+
+**Cooper: Hear the Game…** renders the first seconds of your ROM's **audio**
+(the SPC's real 32 kHz output) headlessly and plays it back in the editor —
+music and SFX without launching anything. The capture is also saved as a
+`.wav`. If it comes back silent, Cooper says so (does your game start its
+music at power-on?).
+
 ### Watch mode — see every save
 
 **Cooper: Toggle Watch** (an 👁 appears in the status bar): every time you save

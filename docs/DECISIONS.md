@@ -1145,6 +1145,20 @@ rationale and the docs that grounded it. Newest last.
 - **Verified:** editor renders the animation controls + preview canvas
   (nonce-gated script), 326 Node + 10 integration.
 
+### D-060 — Audition: hear the game (G10 v1, 2026-07-07)
+- **Decision:** `Cooper: Hear the Game…` — run the built ROM in a transient
+  luna, drain the SPC's native 32 kHz stereo output per frame
+  (`drain_audio {max} → interleaved i16`), encode a RIFF/WAVE PCM16 (pure
+  `wav.ts`), play it in a webview (`media-src data:`) and save the `.wav`
+  under globalStorage. A silence probe (`nonSilentRatio`) tells the user when
+  the capture is silent rather than leaving them doubting their speakers.
+  Zero upstream needs — exactly the roadmap's "v1 can jump the queue" slice.
+  G10 v2 (tracker round-trip) and v3 (per-entry SFX audition → the
+  soundbank-player example ask) remain per the roadmap.
+- **Verified:** pure WAV header/clamping tests + the real `snesmod_music`
+  example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
+  playable wav.
+
 ---
 
 ### Known limitations (Component #1)

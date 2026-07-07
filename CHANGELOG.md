@@ -4,6 +4,15 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.41.0] — 2026-07-07
+
+### Added — 🎵 hear your game
+
+- **Cooper: Hear the Game…** — renders 3/5/10 seconds of your ROM's audio (the
+  SPC's real 32 kHz stereo output) in a headless luna and plays it right in
+  the editor; the capture is saved as a `.wav` too. Silent captures are called
+  out explicitly instead of leaving you doubting your speakers.
+
 ## [0.40.0] — 2026-07-07
 
 ### Added — sprite animation preview

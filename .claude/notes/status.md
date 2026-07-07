@@ -5,6 +5,21 @@ decisions) lives in **`roadmap.md`** — this file is just the "now".
 
 ## Last shipped
 
+**G5→G8 + G10v1 (0.37.0 → 0.41.0, 2026-07-07)** — G5 input replay (frame:mask
+scripts, luna --input semantics, behavioral test: target_x clamps at 247;
+recording → **issue luna#83**, D-056); G6 ROM validation (checksum w/ mirrored
+remainder, prototyped vs 4 real ROMs) + SD deploy (usb2snes deferred: no HW to
+verify, D-057); G7 frame profiler (per-function mclk + scanline strip, adapter-
+side aggregation, 200k ring holds a frame, D-058); G8a sprite animation preview
+in the tile editor (G8b metasprite composer gated on **issue opensnes#97** —
+the lib must own the table format, D-059); G10v1 audition (drain_audio → WAV →
+webview playback, verified vs the real snesmod_music example, D-060). Gotchas
+worth remembering: peek_memory reads \$2000-\$5FFF as 0 by design (pad =
+state.cpu_regs.joy1); luna mem-trace interleaves nmi/irq markers; aim_target
+init eats ~50 frames. REMAINING on the road: G9 gameplay regression tests
+(needs the OpenSNES "luna-test for user projects" issue), G10 v2/v3 (tracker
+round-trip; SFX player example), G3-v2 (luna-gui live reload, luna#83-adjacent).
+
 **G1→G4 of the game-environment road (0.32.0 → 0.36.0, 2026-07-07)** — G1 Play
 (luna-gui native window, D-051); G2a interactive VRAM viewer (bpp/offset/
 sub-palette from a cached snapshot; peek_vram count is u16 → full 64KB = two

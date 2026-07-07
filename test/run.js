@@ -426,6 +426,23 @@ try {
 }
 try { fs.unlinkSync(tmpNp); } catch {}
 
+// --- G10 v1: WAV encoder (pure) ---
+console.log('\n=== audition: encodeWav / nonSilentRatio ===');
+const tmpWv = path.join(os.tmpdir(), `cooper_wav_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'wav.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpWv });
+const WV = require(tmpWv);
+const wav = WV.encodeWav([100, -100, 32767, -32768], 32000);
+check('wav: RIFF/WAVE/fmt/data structure', wav.slice(0, 4).toString() === 'RIFF'
+    && wav.slice(8, 12).toString() === 'WAVE' && wav.slice(36, 40).toString() === 'data');
+check('wav: PCM16 stereo @32kHz header fields',
+    wav.readUInt16LE(20) === 1 && wav.readUInt16LE(22) === 2 && wav.readUInt32LE(24) === 32000
+    && wav.readUInt16LE(34) === 16 && wav.readUInt32LE(40) === 8);
+check('wav: samples written little-endian with clamping',
+    wav.readInt16LE(44) === 100 && wav.readInt16LE(48) === 32767
+    && WV.encodeWav([40000], 32000).readInt16LE(44) === 32767);
+check('nonSilentRatio', WV.nonSilentRatio([0, 0, 5, -5]) === 0.5 && WV.nonSilentRatio([]) === 0);
+try { fs.unlinkSync(tmpWv); } catch {}
+
 // --- G7: frame profiler aggregation (pure) ---
 console.log('\n=== profiler: aggregateProfile ===');
 const tmpPf = path.join(os.tmpdir(), `cooper_profiler_${process.pid}.cjs`);
@@ -959,6 +976,44 @@ try { fs.unlinkSync(tmpOM); } catch {}
         }
     }
     try { fs.unlinkSync(tmpM); } catch {}
+
+    // --- G10 v1: hear the game — real music example renders non-silent audio ---
+    console.log('\n=== audition: real snesmod_music audio ===');
+    const musicDir = path.join(OPENSNES, 'examples', 'audio', 'snesmod_music');
+    const lunaBinA = B.resolveLunaPath({ sdkPath: OPENSNES });
+    if (!lunaBinA || !fs.existsSync(musicDir)) {
+        skipped('luna or the snesmod_music example not available');
+    } else {
+        let musicRom = (fs.readdirSync(musicDir).find((f) => f.endsWith('.sfc')));
+        if (!musicRom) {
+            cp.spawnSync('make', [], { cwd: musicDir, timeout: 180000 });
+            musicRom = fs.readdirSync(musicDir).find((f) => f.endsWith('.sfc'));
+        }
+        if (!musicRom) {
+            skipped('snesmod_music did not build');
+        } else {
+            const WV2 = require(path.join(os.tmpdir(), `cooper_wav_${process.pid}.cjs`));
+            const mA = new LunaMcp({ timeoutMs: 30000 });
+            try {
+                await mA.connect(lunaBinA, musicDir);
+                await mA.loadRom(path.join(musicDir, musicRom));
+                const out = [];
+                for (let f = 0; f < 120; f++) { // 2 seconds
+                    await mA.stepUntilFrame(2000000);
+                    out.push(...await mA.drainAudio(4096));
+                }
+                check('two seconds of audio drained (~128k samples)', out.length > 60000);
+                const ratio = WV2.nonSilentRatio(out);
+                check('the music example actually makes sound (>10% non-silent)', ratio > 0.10);
+                const wavBuf = WV2.encodeWav(out);
+                check('the capture encodes to a playable wav', wavBuf.length === 44 + out.length * 2);
+            } catch (e) {
+                check('audition e2e threw: ' + String((e && e.message) || e), false);
+            } finally {
+                mA.dispose();
+            }
+        }
+    }
 
     // =======================================================================
     // P2.1b — the DAP session, driven headlessly end-to-end (real binary).
