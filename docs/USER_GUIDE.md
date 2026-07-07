@@ -158,7 +158,10 @@ The jewel. Workflow:
 
 1. **Set a breakpoint** — in the sidebar under **SYMBOLS**, click a function (e.g.
    `enemies_update`). It appears under **BREAKPOINTS** in the Run-and-Debug view.
-   Click the symbol again to remove it.
+   Click the symbol again to remove it. Or straight **in the editor**: every
+   function that made it into the ROM shows **`◉ break · ▶ debug here`** above
+   its definition — one click to break there, one to start debugging there.
+   (Disable with the `cooper.codeLens` setting.)
 2. **Start** — click **Debug** (sidebar) or press **F5**. Cooper **builds a debug
    (`-g`) ROM automatically** (you don't need to Build first), then luna launches
    and pauses at the program's entry.

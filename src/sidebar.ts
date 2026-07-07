@@ -50,6 +50,22 @@ export function extractCFunctions(cText: string): string[] {
 }
 
 /**
+ * 0-based document lines of the definitions of `names` in a C source (same
+ * loose header match as `extractCFunctions`). Feeds the CodeLens provider.
+ */
+export function functionDefLines(cText: string, names: ReadonlySet<string>): { name: string; line: number }[] {
+    const out: { name: string; line: number }[] = [];
+    const re = /^(?:static\s+|inline\s+)*[A-Za-z_][\w\s*]*?\b([A-Za-z_]\w*)\s*\([^;{}]*\)\s*\{/gm;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(cText)) !== null) {
+        if (names.has(m[1])) {
+            out.push({ name: m[1], line: cText.slice(0, m.index).split('\n').length - 1 });
+        }
+    }
+    return out;
+}
+
+/**
  * The user's own functions: C function names that actually made it into the ROM
  * (present in the `.sym`). Returns {name, addr} sorted by address (≈ source order).
  */

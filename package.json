@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -249,50 +249,86 @@
             "id": "tools",
             "title": "Point Cooper at your tools",
             "description": "Your game lives in its own folder; OpenSNES and luna are installed separately — **download** the prebuilt build for your architecture (no compiler to install).\n\n**Get them:** the OpenSNES SDK zip for your OS/arch from https://github.com/k0b3n4irb/opensnes/releases (extract it — `cc65816`/`qbe`/`wla-65816` are in its `bin/`), and **luna** from https://github.com/k0b3n4irb/luna/releases/latest . Then point Cooper at them:\n\n[Set the OpenSNES SDK path](command:workbench.action.openSettings?%22cooper.opensnesPath%22)\n[Set the luna path](command:workbench.action.openSettings?%22cooper.lunaPath%22)\n\n`cooper.lunaPath` accepts the luna binary **or** the folder that contains it.",
-            "media": { "image": "media/cooper-dashboard.png", "altText": "The Cooper dashboard with SDK/luna status" },
-            "completionEvents": ["onSettingChanged:cooper.opensnesPath"]
+            "media": {
+              "image": "media/cooper-dashboard.png",
+              "altText": "The Cooper dashboard with SDK/luna status"
+            },
+            "completionEvents": [
+              "onSettingChanged:cooper.opensnesPath"
+            ]
           },
           {
             "id": "project",
             "title": "Create your first project",
             "description": "No project yet? Start from a **real SDK example** — Cooper copies it out of the SDK tree, wires its Makefile to your setup, and runs the first build for you.\n\n[New Project…](command:cooper.newProject)\n\n(Already have a project folder? Just open it — Cooper detects the Makefile.)",
-            "media": { "image": "media/cooper-preview.png", "altText": "A freshly built example frame" },
-            "completionEvents": ["onCommand:cooper.newProject"]
+            "media": {
+              "image": "media/cooper-preview.png",
+              "altText": "A freshly built example frame"
+            },
+            "completionEvents": [
+              "onCommand:cooper.newProject"
+            ]
           },
           {
             "id": "sidebar",
             "title": "Open the Cooper panel",
             "description": "Click the **Cooper** icon (a gamepad) in the activity bar. Everything is one click — Build, Run, Debug, PPU viewers, and your project's functions.\n\n[Open the Cooper panel](command:workbench.view.extension.cooper)",
-            "media": { "image": "media/cooper-sidebar.png", "altText": "The Cooper sidebar tree" },
-            "completionEvents": ["onView:cooperTree"]
+            "media": {
+              "image": "media/cooper-sidebar.png",
+              "altText": "The Cooper sidebar tree"
+            },
+            "completionEvents": [
+              "onView:cooperTree"
+            ]
           },
           {
             "id": "build",
             "title": "Build your ROM",
             "description": "Compile with `make`. Cooper passes your SDK path automatically, so it works from any folder. Errors land in the Problems panel.\n\n[Build (make)](command:cooper.build)",
-            "media": { "image": "media/cooper-dashboard.png", "altText": "The Cooper dashboard" },
-            "completionEvents": ["onCommand:cooper.build"]
+            "media": {
+              "image": "media/cooper-dashboard.png",
+              "altText": "The Cooper dashboard"
+            },
+            "completionEvents": [
+              "onCommand:cooper.build"
+            ]
           },
           {
             "id": "run",
             "title": "Run a frame",
             "description": "Render a frame in luna and see it inline — your game, on cycle-accurate hardware.\n\n[Run / Preview](command:cooper.preview)",
-            "media": { "image": "media/cooper-preview.png", "altText": "A rendered SNES frame" },
-            "completionEvents": ["onCommand:cooper.preview"]
+            "media": {
+              "image": "media/cooper-preview.png",
+              "altText": "A rendered SNES frame"
+            },
+            "completionEvents": [
+              "onCommand:cooper.preview"
+            ]
           },
           {
             "id": "debug",
             "title": "Debug your game",
             "description": "In the Cooper panel under **SYMBOLS**, click one of your functions to set a breakpoint, then start debugging and press **Continue**. Inspect CPU registers, memory and the live PPU at the stop.\n\n[Start Debugging](command:cooper.debug)",
-            "media": { "image": "media/cooper-sidebar.png", "altText": "Symbols and Debug in the Cooper panel" },
-            "completionEvents": ["onCommand:cooper.debug"]
+            "media": {
+              "image": "media/cooper-sidebar.png",
+              "altText": "Symbols and Debug in the Cooper panel"
+            },
+            "completionEvents": [
+              "onCommand:cooper.debug"
+            ]
           },
           {
             "id": "viewers",
             "title": "Inspect the PPU",
             "description": "At a debug stop, view the live **Palette**, **Sprites (OAM)** and **Tiles (VRAM)** — decoded straight from the emulator.\n\n[Open the Dashboard](command:cooper.home)",
-            "media": { "image": "media/cooper-vram.png", "altText": "A decoded VRAM tile sheet" },
-            "completionEvents": ["onCommand:cooper.home", "onCommand:cooper.showVram"]
+            "media": {
+              "image": "media/cooper-vram.png",
+              "altText": "A decoded VRAM tile sheet"
+            },
+            "completionEvents": [
+              "onCommand:cooper.home",
+              "onCommand:cooper.showVram"
+            ]
           }
         ]
       }
@@ -406,6 +442,11 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Pass `--force-display` so the preview bypasses INIDISP forced-blank — shows what the ROM uploaded to VRAM/CGRAM even if it left the screen blanked (e.g. a title waiting on Start)."
+        },
+        "cooper.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show '◉ break · ▶ debug here' CodeLens above your project's C functions."
         }
       }
     }

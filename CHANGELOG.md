@@ -4,6 +4,17 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.34.0] — 2026-07-07
+
+### Added — CodeLens above your functions
+
+- Every project function (the ones that actually made it into the ROM) shows
+  **`◉ break · ▶ debug here`** right above its definition in the editor —
+  toggle a breakpoint or start debugging at that function in one click. The
+  lenses track your breakpoints live. Opt out with the `cooper.codeLens`
+  setting. This completes the GUI plan's third mockup (sidebar → dashboard →
+  CodeLens).
+
 ## [0.33.0] — 2026-07-07
 
 ### Added — interactive VRAM viewer

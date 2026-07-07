@@ -1021,6 +1021,23 @@ rationale and the docs that grounded it. Newest last.
   selected, sub-palette clamping 63/63 and 0/0, distinct sheets per offset) +
   the two-peek 64 KB read against the real binary.
 
+### D-053 — CodeLens "◉ break · ▶ debug here" (G2b, 2026-07-07)
+- **Decision:** a CodeLens provider on C files shows two lenses above each
+  **project function** (the `.c ∩ .sym` set the sidebar already computes — only
+  functions that actually made it into the ROM, so no lens on dead code):
+  `◉ break` toggles the function breakpoint (existing `cooper.breakOnSymbol`),
+  `▶ debug here` ensures the breakpoint then launches the debugger (new
+  internal `cooper.debugHere`, not palette-contributed). Lenses re-render on
+  breakpoint changes; opt-out via the `cooper.codeLens` setting (default on).
+  Definition lines come from the pure `functionDefLines` (sidebar.ts, same
+  loose header regex as `extractCFunctions` — the `.sym` stays the truth).
+- **Gotcha (integration tier):** a test opening `main.c` must run AFTER the
+  `.clangd` auto-write test — an already-open document doesn't re-fire
+  `onDidOpenTextDocument`, starving that test of its trigger.
+- **Verified:** pure line extraction against the real aim_target `main.c`
+  (every extracted function found, lines contain the definitions), and a real
+  Extension Host query (`vscode.executeCodeLensProvider`) returns both lenses.
+
 ---
 
 ### Known limitations (Component #1)

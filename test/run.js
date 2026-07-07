@@ -426,6 +426,22 @@ try {
 }
 try { fs.unlinkSync(tmpNp); } catch {}
 
+// --- G2b: CodeLens function-line extraction (pure, real main.c) ---
+console.log('\n=== CodeLens: functionDefLines ===');
+const tmpSb2 = path.join(os.tmpdir(), `cooper_deflines_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'sidebar.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpSb2 });
+const SB2 = require(tmpSb2);
+const aimC = fs.readFileSync(path.join(aimDir, 'main.c'), 'utf8');
+const aimNames = new Set(SB2.extractCFunctions(aimC));
+const defs = SB2.functionDefLines(aimC, aimNames);
+check('functionDefLines finds every extracted function', defs.length === aimNames.size && defs.length > 2);
+check('reported lines actually contain the definitions',
+    defs.every(({ name, line }) => aimC.split('\n')[line] !== undefined
+        && new RegExp(`\\b${name}\\s*\\(`).test(aimC.split('\n').slice(line, line + 1).join(''))));
+check('filtering by names subset works',
+    SB2.functionDefLines(aimC, new Set(['main'])).length === (aimNames.has('main') ? 1 : 0));
+try { fs.unlinkSync(tmpSb2); } catch {}
+
 // --- G2: interactive VRAM viewer (pure) ---
 console.log('\n=== VRAM viewer: bpp/offset/sub-palette selectors ===');
 const tmpVv = path.join(os.tmpdir(), `cooper_vramview_${process.pid}.cjs`);

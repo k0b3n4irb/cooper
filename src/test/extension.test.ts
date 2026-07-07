@@ -103,6 +103,18 @@ suite('Cooper — activation & commands', () => {
             }
         }
     });
+
+    test('CodeLens: break / debug-here above project functions', async () => {
+        await vscode.extensions.getExtension(EXT_ID)!.activate();
+        const dir = vscode.workspace.workspaceFolders![0].uri.fsPath;
+        const doc = await vscode.workspace.openTextDocument(path.join(dir, 'main.c'));
+        await vscode.window.showTextDocument(doc);
+        const lenses = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+            'vscode.executeCodeLensProvider', doc.uri);
+        assert.ok(lenses && lenses.length >= 2, `expected lenses, got ${lenses?.length ?? 0}`);
+        assert.ok(lenses.some((l) => l.command?.command === 'cooper.breakOnSymbol'), 'no break lens');
+        assert.ok(lenses.some((l) => l.command?.command === 'cooper.debugHere'), 'no debug-here lens');
+    });
 });
 
 suite('Cooper — luna debug adapter (real host)', () => {

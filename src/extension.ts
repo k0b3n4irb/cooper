@@ -21,7 +21,7 @@ import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
 import { mergeVscodeMcp, mergeProjectMcp } from './mcpConfig';
 import { parseSym } from './sym';
-import { buildTreeModel, userFunctions, TreeNode, ProjectInfo } from './sidebar';
+import { buildTreeModel, userFunctions, functionDefLines, TreeNode, ProjectInfo } from './sidebar';
 import { renderDashboardHtml, DashboardState } from './dashboard';
 
 const execFileAsync = promisify(execFile);
@@ -64,6 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
     output = vscode.window.createOutputChannel('Cooper');
     log(`Cooper activated (v${(context.extension.packageJSON as { version?: string }).version ?? '?'})`);
     const tree = new CooperTreeProvider();
+    const codeLens = new CooperCodeLensProvider();
     context.subscriptions.push(
         output,
         vscode.commands.registerCommand('cooper.showLog', () => output?.show(true)),
@@ -89,7 +90,10 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.showDisasm', () => showDisasm()),
         vscode.commands.registerCommand('cooper.traceMemory', () => traceMemory()),
         vscode.commands.registerCommand('cooper.newProject', () => newProject()),
+        vscode.commands.registerCommand('cooper.debugHere', (name: string) => debugHere(name)),
         vscode.window.registerTreeDataProvider('cooperTree', tree),
+        vscode.languages.registerCodeLensProvider({ language: 'c' }, codeLens),
+        vscode.debug.onDidChangeBreakpoints(() => codeLens.refresh()),
         vscode.tasks.registerTaskProvider(MAKE_TASK_TYPE, makeTaskProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory('luna', new LunaDebugAdapterFactory()),
         vscode.debug.registerDebugConfigurationProvider('luna', new LunaConfigProvider()),
@@ -768,6 +772,63 @@ async function showDisasm(): Promise<void> {
     } catch (e) {
         fail(`could not disassemble: ${String(e)}`);
     }
+}
+
+// ---------------------------------------------------------------------------
+// CodeLens (G2b) — "◉ break · ▶ debug here" above the project's C functions
+// (the ones that actually made it into the ROM: .c ∩ .sym, like the sidebar).
+// ---------------------------------------------------------------------------
+
+class CooperCodeLensProvider implements vscode.CodeLensProvider {
+    private emitter = new vscode.EventEmitter<void>();
+    readonly onDidChangeCodeLenses = this.emitter.event;
+
+    refresh(): void {
+        this.emitter.fire();
+    }
+
+    async provideCodeLenses(doc: vscode.TextDocument): Promise<vscode.CodeLens[]> {
+        if (!vscode.workspace.getConfiguration('cooper').get<boolean>('codeLens', true)) {
+            return [];
+        }
+        const info = await resolveProjectInfo();
+        if (!info.projectDir || !info.functions.length
+            || !doc.uri.fsPath.startsWith(info.projectDir + path.sep)) {
+            return [];
+        }
+        const names = new Set(info.functions.map((f) => f.name));
+        return functionDefLines(doc.getText(), names).flatMap(({ name, line }) => {
+            const range = new vscode.Range(line, 0, line, 0);
+            const has = vscode.debug.breakpoints.some(
+                (b) => b instanceof vscode.FunctionBreakpoint && b.functionName === name,
+            );
+            return [
+                new vscode.CodeLens(range, {
+                    title: has ? '◉ breakpoint set' : '◉ break',
+                    tooltip: `Toggle a breakpoint on ${name}()`,
+                    command: 'cooper.breakOnSymbol',
+                    arguments: [name],
+                }),
+                new vscode.CodeLens(range, {
+                    title: '▶ debug here',
+                    tooltip: `Break on ${name}() and start debugging`,
+                    command: 'cooper.debugHere',
+                    arguments: [name],
+                }),
+            ];
+        });
+    }
+}
+
+/** Ensure a function breakpoint on `name`, then launch the debugger. */
+async function debugHere(name: string): Promise<void> {
+    const has = vscode.debug.breakpoints.some(
+        (b) => b instanceof vscode.FunctionBreakpoint && b.functionName === name,
+    );
+    if (!has) {
+        vscode.debug.addBreakpoints([new vscode.FunctionBreakpoint(name)]);
+    }
+    await vscode.commands.executeCommand('cooper.debug');
 }
 
 // ---------------------------------------------------------------------------
