@@ -25,6 +25,8 @@ import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bg
 import { renderPaletteEditorHtml } from './paletteEditor';
 import { renderTileEditorHtml } from './tileEditor';
 import { gridMetasprite, emitMetasprite, emitAnimClip } from './metasprite';
+import { BG_MODES, OBJ_SIZE_PAIRS } from './snesModes';
+import { resolveGraphics, serializeOverride, ResolvedGraphics, GRAPHICS_CONFIG_REL } from './graphicsConfig';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
 import { mergeVscodeMcp, mergeProjectMcp } from './mcpConfig';
@@ -93,6 +95,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
         vscode.commands.registerCommand('cooper.exportMetasprite', (uri?: vscode.Uri) => exportMetasprite(uri)),
+        vscode.commands.registerCommand('cooper.setGraphicsMode', () => setGraphicsMode()),
         vscode.commands.registerCommand('cooper.configureAI', () => configureAI()),
         vscode.commands.registerCommand('cooper.saveSnapshot', () => saveSnapshot(context)),
         vscode.commands.registerCommand('cooper.restoreSnapshot', () => restoreSnapshot(context)),
@@ -305,6 +308,70 @@ async function resolveProjectFile(uri: vscode.Uri | undefined, ext: string, purp
         found.map((u) => ({ label: path.basename(u.fsPath), description: vscode.workspace.asRelativePath(u), u })),
         { placeHolder: `Pick a ${ext} to ${purpose}` });
     return pick?.u.fsPath;
+}
+
+// ---------------------------------------------------------------------------
+// Graphics mode (D-065) — the mode-driven constraint spine. Resolve the config
+// (code default overridable by .cooper/graphics.json) and a didactic picker.
+// ---------------------------------------------------------------------------
+
+/** Resolve the active graphics config for a project (hybrid: code + override). */
+function resolveProjectGraphics(projectDir: string): ResolvedGraphics {
+    let codeTexts: string[] = [];
+    try {
+        codeTexts = fs.readdirSync(projectDir)
+            .filter((f) => f.endsWith('.c'))
+            .map((f) => { try { return fs.readFileSync(path.join(projectDir, f), 'utf8'); } catch { return ''; } });
+    } catch { /* no project dir */ }
+    let override: string | undefined;
+    const ovPath = path.join(projectDir, GRAPHICS_CONFIG_REL);
+    if (fs.existsSync(ovPath)) {
+        try {
+            override = fs.readFileSync(ovPath, 'utf8');
+        } catch { /* unreadable — ignore */ }
+    }
+    return resolveGraphics(codeTexts, override);
+}
+
+async function setGraphicsMode(): Promise<void> {
+    const projectDir = await resolveProjectDir();
+    if (!projectDir) {
+        fail('no OpenSNES project (a folder with a Makefile) found.');
+        return;
+    }
+    const current = resolveProjectGraphics(projectDir);
+    // Pick a BG mode, each shown with its didactic description + provenance.
+    const modePick = await vscode.window.showQuickPick(
+        BG_MODES.map((m) => ({
+            label: `Mode ${m.mode}`,
+            description: m.mode === current.config.mode ? `current (${current.source.mode})` : `${m.layers.length} layer(s)`,
+            detail: m.description,
+            mode: m.mode,
+        })),
+        { placeHolder: 'Background mode — sets the legal layers, colour depths and palettes', matchOnDetail: true },
+    );
+    if (!modePick) {
+        return;
+    }
+    const objPick = await vscode.window.showQuickPick(
+        OBJ_SIZE_PAIRS.map((p) => ({
+            label: `${p.small}px / ${p.large}px`,
+            description: p.id === current.config.objSize ? 'current' : `OBJ_SIZE id ${p.id}`,
+            id: p.id,
+        })),
+        { placeHolder: 'Sprite sizes (OBSEL) — the small/large pair every sprite chooses from' },
+    );
+    if (!objPick) {
+        return;
+    }
+    const config = { mode: modePick.mode, objSize: objPick.id };
+    const ovPath = path.join(projectDir, GRAPHICS_CONFIG_REL);
+    fs.mkdirSync(path.dirname(ovPath), { recursive: true });
+    fs.writeFileSync(ovPath, serializeOverride(config));
+    log(`graphics: mode ${config.mode}, OBSEL ${config.objSize} → ${ovPath}`);
+    const m = BG_MODES[config.mode];
+    void vscode.window.showInformationMessage(
+        `Cooper: Mode ${config.mode} (${m.layers.map((l) => `BG${l.bg} ${l.bpp}bpp`).join(', ')}), sprites ${OBJ_SIZE_PAIRS[config.objSize].name}. Saved to .cooper/graphics.json — the asset editors now enforce it.`);
 }
 
 /** Edit the palette of an indexed PNG (the source `gfx4snes` consumes) — a BGR555

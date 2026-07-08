@@ -583,6 +583,32 @@ check('validateSpriteImage: 24px sprite under OBSEL 16/32 rejected; 16px OK',
 check('validateSpriteImage: 17 colours rejected (sprites are 4bpp)', SM.validateSpriteImage(0, 8, 17).ok === false);
 try { fs.unlinkSync(tmpSm); } catch {}
 
+// --- C6 spine: hybrid graphics-config resolution (pure, real example .c) ---
+console.log('\n=== graphicsConfig: parse code + override precedence ===');
+const tmpGc = path.join(os.tmpdir(), `cooper_graphicscfg_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'graphicsConfig.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpGc });
+const GC = require(tmpGc);
+// parse against REAL example sources with known modes
+const mode1C = fs.readFileSync(path.join(OPENSNES, 'examples', 'graphics', 'backgrounds', 'mode1', 'main.c'), 'utf8');
+const orbitC = fs.readFileSync(path.join(OPENSNES, 'examples', 'basics', 'fix32_orbit', 'main.c'), 'utf8');
+check('parse real mode1/main.c → setMode(BG_MODE1) = mode 1', GC.parseGraphicsFromCode(mode1C).mode === 1);
+check('parse real fix32_orbit/main.c → oamInit(OBJ_SIZE8_L16) = objSize 0', GC.parseGraphicsFromCode(orbitC).objSize === 0);
+check('parse numeric forms: setMode(3, …) / oamInit(5, …)',
+    GC.parseGraphicsFromCode('setMode(3, 0); oamInit(5, 0);').mode === 3 && GC.parseGraphicsFromCode('oamInit(5,0);').objSize === 5);
+check('parse struct .sizeMode = OBJ_SIZE16_L32', GC.parseGraphicsFromCode('.sizeMode = OBJ_SIZE16_L32,').objSize === 3);
+// resolve precedence: default → code → override
+const r0 = GC.resolveGraphics([], undefined);
+check('resolve: empty → default (mode 1, obj 0) from code=default', r0.config.mode === 1 && r0.source.mode === 'default');
+const r1 = GC.resolveGraphics([mode1C, orbitC]);
+check('resolve: code wins over default, first file per field', r1.config.mode === 1 && r1.source.mode === 'code' && r1.config.objSize === 0 && r1.source.objSize === 'code');
+const r2 = GC.resolveGraphics([mode1C], '{"mode":7}');
+check('resolve: override beats code (mode 7 from json, provenance=override)', r2.config.mode === 7 && r2.source.mode === 'override');
+check('override validation rejects out-of-range', (() => { try { GC.parseOverride('{"mode":9}'); return false; } catch { return true; } })()
+    && (() => { try { GC.parseOverride('{"objSize":6}'); return false; } catch { return true; } })());
+check('serializeOverride round-trips through parseOverride',
+    JSON.stringify(GC.parseOverride(GC.serializeOverride({ mode: 3, objSize: 5 }))) === JSON.stringify({ mode: 3, objSize: 5 }));
+try { fs.unlinkSync(tmpGc); } catch {}
+
 // --- G8b (opensnes#97): metasprite name computation + C emit (pure) ---
 console.log('\n=== metasprite: char-names + emit ===');
 const tmpMs = path.join(os.tmpdir(), `cooper_metasprite_${process.pid}.cjs`);

@@ -1182,10 +1182,17 @@ rationale and the docs that grounded it. Newest last.
   (`BG_MODES`, `OBJ_SIZE_PAIRS`, `bgPaletteLayout`, `maxTiles`) + didactic
   validators (`validateBgImage`/`validateSpriteImage`). **17 tests cross-check
   the model against the SDK headers' own `#define`s** (not copied values).
-- **Next slices:** a didactic mode-picker + where the config lives (a
-  `.cooper/graphics.json`, or read from the code's `setMode`/`oamInit`); then
-  make the palette + tile editors mode-aware; then the tilemap editor. A real
-  dogfood game runs in parallel to prioritise by real friction.
+- **Config mechanism (slice 2, done):** **hybrid** (user, 2026-07-08) — the
+  DEFAULT is parsed from the code's own `setMode(...)`/`oamInit(...)` (the code
+  is the truth), and a **`.cooper/graphics.json`** override wins when present.
+  Pure `graphicsConfig.ts` (`parseGraphicsFromCode`/`parseOverride`/
+  `resolveGraphics` with per-field provenance default→code→override), tested
+  against real example `.c`. `Cooper: Set Graphics Mode…` is the didactic
+  picker (each BG mode shown with its description; the OBSEL pair) that writes
+  the override.
+- **Next slices:** make the palette + tile editors read the resolved config
+  (enforce sub-palette structure, bpp, sprite sizes); then the tilemap editor.
+  A real dogfood game runs in parallel to prioritise by real friction.
 
 ### D-064 — Metasprite / animation C emitter (opensnes#97, 2026-07-07)
 - **Context:** OpenSNES v0.29.0 (PR #101) shipped `sprite.h` metasprites

@@ -310,7 +310,22 @@ clangd**.
 
 ---
 
-## 11. Asset editors — palette
+## 11. Asset editors
+
+### Graphics mode — the SNES constraints, chosen once
+
+Run **Cooper: Set Graphics Mode…** to pick your game's **BG mode** (each shown
+with what it gives you — *Mode 1 = two rich layers + a text layer*, *Mode 7 =
+one rotating layer*…) and the **sprite sizes** (an OBSEL pair like 16/32). From
+that, Cooper knows exactly what's legal: how many background layers, how many
+colours per palette, which sprite sizes — and the asset editors enforce it so
+you can't paint an impossible image.
+
+Cooper reads a sensible default straight from your code's `setMode(...)` /
+`oamInit(...)` calls; the picker saves an explicit override to
+`.cooper/graphics.json` (commit it with your project).
+
+### Palette
 
 **Right-click an indexed `.png`** in the Explorer → **Edit Palette (SNES BGR555)**
 (or run **Cooper: Edit Palette**). You get a hardware-accurate palette editor:

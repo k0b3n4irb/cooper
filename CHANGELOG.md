@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.46.0] — 2026-07-08
+
+### Added — graphics mode (the SNES constraint spine)
+
+- **Cooper: Set Graphics Mode…** — pick your game's **BG mode** (each explained
+  didactically) and **sprite sizes** (OBSEL pair). Cooper derives what's legal —
+  layer count, colours per palette, sprite sizes, VRAM budget — the foundation
+  for asset editors that make impossible states unrepresentable. Config is
+  hybrid: a default read from your `setMode`/`oamInit` calls, overridable by a
+  committed `.cooper/graphics.json`. (First step toward mode-aware editors; the
+  editors start enforcing it next.)
+
 ## [0.45.0] — 2026-07-07
 
 ### Added — metasprite & animation export
