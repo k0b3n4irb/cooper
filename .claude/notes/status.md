@@ -17,6 +17,9 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
 - **0.50 (D-070):** **Insert Snippet** — the A3 data-driven snippet library
   (`data/snippets.json`), seeded with **Collision** (AABB / push-out / tile).
   Every snippet CI-compiled against the real SDK (anti-drift).
+- **0.51 (D-071):** **Add Sprite → multi-frame sheets** — computes each frame's
+  OAM tile (`<base>_tiles[]`), verified against real gfx4snes in CI (kills F8).
+  Follow-up noted: metasprite `charName()` only correct at 128px sheet width.
 - **Dogfood:** #1 (stardodge) and #2 (**Star Catcher** — original art +
   gameplay + score + original synthesised SFX, verified in luna). Frictions in
   `dogfood-01.md`/`dogfood-02.md` drive the Workshop priority.

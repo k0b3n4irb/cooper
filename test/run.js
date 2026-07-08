@@ -726,6 +726,73 @@ if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !B.resolveLunaPa
         try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
     }
 }
+// --- Add Sprite → sheets: frame→tile math (F8) + gfx4snes tile-truth + build ---
+check('sheetFrameTile 16px: 0,1,7 → 0,2,14 (band 0), 8,9 → 32,34 (band 1)',
+    SS.sheetFrameTile(0, 16) === 0 && SS.sheetFrameTile(1, 16) === 2 && SS.sheetFrameTile(7, 16) === 14 && SS.sheetFrameTile(8, 16) === 32 && SS.sheetFrameTile(9, 16) === 34);
+check('sheetFrameTile 8px stride 1; 32px stride 4 → band at 4', SS.sheetFrameTile(1, 8) === 1 && SS.sheetFrameTile(1, 32) === 4 && SS.sheetFrameTile(4, 32) === 64);
+check('sheetFrameTiles: 32×32 @16 → [0,2,4,6]; 32×16 @16 → [0,2]',
+    JSON.stringify(SS.sheetFrameTiles(16, 32, 32)) === '[0,2,4,6]' && JSON.stringify(SS.sheetFrameTiles(16, 32, 16)) === '[0,2]');
+check('sheetSnippet: tiles table + oamInitGfxSet + oamSet indexing a frame',
+    (() => { const s = SS.sheetSnippet('sh', { objSize: 3, small: true, frameTiles: [0, 2, 4, 6] }); return s.includes('static const u16 sh_tiles[4] = { 0, 2, 4, 6 }') && s.includes('oamInitGfxSet(sh,') && s.includes('oamSet(0, 120, 100, sh_tiles[0], 0, 2, 0)') && s.includes('OBJ_SMALL'); })());
+
+// close the loop TWICE: (1) the computed frame tiles match what gfx4snes really
+// lays out, and (2) a scaffolded sheet builds. Uses a solid-colour sheet so each
+// cell is identifiable in the .pic.
+if (!fs.existsSync(path.join(OPENSNES, 'bin', 'gfx4snes')) || !fs.existsSync(path.join(OPENSNES, 'make', 'common.mk'))) {
+    skipped('gfx4snes / SDK make not available');
+} else {
+    const tmpPng = path.join(os.tmpdir(), `cooper_png_${process.pid}.cjs`);
+    const tmpPgSh = path.join(os.tmpdir(), `cooper_pg_forsh_${process.pid}.cjs`);
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'pngPalette.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPng });
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'projectGen.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPgSh });
+    const PNG = require(tmpPng);
+    const PGsh = require(tmpPgSh);
+    const seed = path.join(OPENSNES, 'examples', 'graphics', 'sprites', 'simple_sprite', 'res', 'sprite32.png');
+    const dir = path.join(os.tmpdir(), `cooper_sheet_${process.pid}`);
+    try {
+        fs.mkdirSync(path.join(dir, 'res'), { recursive: true });
+        // build a 32×32 sheet = 2×2 of 16px cells, each a solid palette index 1..4
+        let png = fs.readFileSync(seed);
+        png = PNG.writePalette(png, [{ r: 0, g: 0, b: 0 }, { r: 248, g: 0, b: 0 }, { r: 0, g: 248, b: 0 }, { r: 0, g: 0, b: 248 }, { r: 248, g: 248, b: 0 }]);
+        const idx = new Uint8Array(32 * 32);
+        for (let y = 0; y < 32; y++) { for (let x = 0; x < 32; x++) { idx[y * 32 + x] = 1 + (x >= 16 ? 1 : 0) + (y >= 16 ? 2 : 0); } }
+        png = PNG.writeIndexedPixels(png, idx);
+        const pngPath = path.join(dir, 'res', 'sheet.png');
+        fs.writeFileSync(pngPath, png);
+
+        // (1) tile-truth: convert and decode the .pic; the cell at each computed
+        // frame tile must be that frame's colour (row-major 1,2,3,4).
+        cp.spawnSync(path.join(OPENSNES, 'bin', 'gfx4snes'), ['-s', '16', '-o', '16', '-u', '16', '-p', '-i', pngPath], { cwd: dir });
+        const pic = fs.readFileSync(path.join(dir, 'res', 'sheet.pic'));
+        const tileColor = (t) => { const b = t * 32; const bit = (v) => (v >> 7) & 1; return bit(pic[b]) | (bit(pic[b + 1]) << 1) | (bit(pic[b + 16]) << 2) | (bit(pic[b + 17]) << 3); };
+        const tiles = SS.sheetFrameTiles(16, 32, 32);
+        check('sheet frame tiles match gfx4snes reality (2×2 → cells 1,2,3,4)',
+            tiles.length === 4 && tiles.every((t, n) => tileColor(t) === n + 1));
+
+        // (2) a scaffolded sheet builds
+        const spec = { name: 'shtest', graphics: { mode: 1, objSize: 3 }, build: { sound: false }, modules: ['console', 'background', 'sprite', 'dma', 'input'] };
+        let mk = PGsh.renderMakefile(spec, OPENSNES);
+        mk = SS.ensureAsmSrc(mk, 'data.asm');
+        mk = SS.appendGfxRule(mk, 'res/sheet.png', 16);
+        fs.writeFileSync(path.join(dir, 'Makefile'), mk);
+        fs.writeFileSync(path.join(dir, 'data.asm'), SS.upsertDataAsm('', 'sheet', 'res/sheet.png'));
+        fs.writeFileSync(path.join(dir, 'main.c'),
+            '#include <snes.h>\n'
+            + 'extern u8 sheet[], sheet_end[];\nextern u8 sheet_pal[], sheet_pal_end[];\n'
+            + `static const u16 sheet_tiles[4] = { ${tiles.join(', ')} };\n`
+            + 'int main(void){ consoleInit(); setMode(BG_MODE1,0); WaitForVBlank();\n'
+            + '  oamInitGfxSet(sheet, sheet_end - sheet, sheet_pal, sheet_pal_end - sheet_pal, 0, 0x0000, OBJ_SIZE16_L32);\n'
+            + '  oamSet(0, 40, 40, sheet_tiles[0], 0, 2, 0); oamSet(1, 80, 40, sheet_tiles[1], 0, 2, 0); oamSetSize(0, OBJ_SMALL); oamSetSize(1, OBJ_SMALL);\n'
+            + '  setMainScreen(LAYER_OBJ); setScreenOn(); while(1){ WaitForVBlank(); } return 0; }\n');
+        const r = cp.spawnSync('make', [], { cwd: dir, encoding: 'utf8', timeout: 180000 });
+        check('scaffolded sheet (multi-frame) builds a .sfc', r.status === 0 && fs.existsSync(path.join(dir, 'shtest.sfc')));
+        if (r.status !== 0) { console.log((r.stdout || '').split('\n').slice(-6).join('\n')); }
+    } finally {
+        try { fs.unlinkSync(tmpPng); } catch {}
+        try { fs.unlinkSync(tmpPgSh); } catch {}
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+}
 try { fs.unlinkSync(tmpSs); } catch {}
 
 // --- Audio v2: Add Sound Effect (WAV → .it → soundbank) + REAL build ---

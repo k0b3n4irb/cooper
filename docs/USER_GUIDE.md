@@ -377,6 +377,14 @@ already worked out. Paste the `extern`s at the top and the load call in
 `main()`, **Build**, and your sprite is on screen. (Cooper checks the sprite
 size against your graphics mode's sprite sizes and warns if it doesn't fit.)
 
+Point it at a **sprite sheet** (a grid or strip of frames) instead of one square
+sprite and Cooper asks the cell size, then also gives you a `<name>_tiles[]`
+array with the **correct OAM tile of each frame** — so `oamSet(id, x, y,
+<name>_tiles[frame], …)` works for animation or for several sprites sharing one
+sheet. (Those tile numbers aren't the frame index — they jump by the cell's
+tile-width and wrap across VRAM bands — so Cooper computes them; the maths is
+checked against real `gfx4snes` output in CI.)
+
 ### Add a sound effect (a WAV → a sound in your game)
 
 **Right-click a `.wav` → Add Sound Effect…** is the audio counterpart of Add

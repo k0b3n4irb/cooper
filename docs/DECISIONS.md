@@ -1159,6 +1159,32 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-071 — Add Sprite → multi-frame sheets (dogfood #2 F8, 2026-07-08)
+- **Context:** dogfood #2 F8 — a sheet of several frames (ship + star, or anim
+  frames) needs each frame's OAM tile number, and those are NOT frame-index: for
+  16px cells they jump by 2 and wrap across VRAM bands. Hand-computing them is
+  the arcane wall D-064 fixed for metasprites, still open for plain sprites.
+- **Decision:** `Cooper: Add Sprite…` detects a non-single-cell PNG as a
+  **sheet**, prompts the cell size (8/16/32/64, defaulting to the project's OBJ
+  small size), wires the gfx rule at that cell size + the data.asm bridge, and
+  emits a `<base>_tiles[]` array of each frame's OAM tile so the user writes
+  `oamSet(id, x, y, <base>_tiles[frame], …)` — no stride math. Single square
+  sprites (8/16/32/64) keep the existing one-sprite path unchanged.
+- **Grounded the real layout (did NOT trust `charName`):** probed `gfx4snes`
+  output with a solid-colour-per-cell sheet — cells pack **row-major into
+  16-tile-wide VRAM bands** (`-o 16`). The tile of frame N is
+  `band*(16*cellNames) + pos*cellNames`, `cellNames=cellPx/8`,
+  `cellsPerBand=16/cellNames`. Verified: 2×2 16px → 0,2,4,6; a 10-frame 16px
+  strip crosses to 32 at frame 8. **Note:** this exposes that metasprite's
+  `charName()` (D-064) is only correct for 128px-wide sheets (where a sheet-row
+  equals a band); non-128px metasprite sheets are a latent bug — follow-up, not
+  in this slice.
+- **Pure `spriteScaffold.ts`** gains `sheetFrameTile`/`sheetFrameTiles`/
+  `sheetSnippet`; glue branches single vs sheet.
+- **Verified by closing the loop in CI:** the computed frame tiles are asserted
+  to match the actual decoded `.pic` from `gfx4snes`, and a scaffolded
+  multi-frame sheet builds to a `.sfc`.
+
 ### D-070 — Snippet library (A3), seeded with Collision (2026-07-08)
 - **Context:** "add collisions" — a Workshop feature. The SDK already ships a real
   `collision` module (`Rect`, `collideRect`/`collideRectEx`, `collideTile*`,

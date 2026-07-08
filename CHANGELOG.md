@@ -4,6 +4,22 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.51.0] — 2026-07-08
+
+### Added — Add Sprite now handles multi-frame sheets
+
+- **Cooper: Add Sprite…** now accepts a **sprite sheet**, not just one square
+  sprite. Point it at a grid/strip PNG, pick the cell size, and Cooper wires the
+  gfx + `data.asm` bridge as before **and** emits a `<name>_tiles[]` array giving
+  the correct OAM tile of every frame — so you can `oamSet(id, x, y,
+  <name>_tiles[frame], …)` for animation or for several distinct sprites sharing
+  one sheet. This kills dogfood #2's friction F8: the frame→tile numbers (which
+  jump by the cell's tile-width and wrap across VRAM bands — e.g. frame 8 of a
+  16px strip is tile 32, not 16) are **computed for you**, no stride math. The
+  formula is verified in CI against real `gfx4snes` output (a 2×2 sheet →
+  0,2,4,6; a strip crosses to 32 at frame 8) and a scaffolded sheet is built to
+  a `.sfc`. Single square sprites behave exactly as before.
+
 ## [0.50.0] — 2026-07-08
 
 ### Added — Insert Snippet (a data-driven, CI-compiled snippet library)

@@ -30,7 +30,7 @@ import { resolveGraphics, serializeOverride, ResolvedGraphics, GRAPHICS_CONFIG_R
 import { parseGameTypes } from './gameTypes';
 import { parseSnippets, snippetText, ensureModules, missingIncludes, lastIncludeLine } from './snippets';
 import { renderMakefile, renderStarterMainC, ProjectSpec } from './projectGen';
-import { symbolBase, loadSnippet, ensureAsmSrc, appendGfxRule, upsertDataAsm } from './spriteScaffold';
+import { symbolBase, loadSnippet, ensureAsmSrc, appendGfxRule, upsertDataAsm, sheetFrameTiles, sheetSnippet } from './spriteScaffold';
 import { decodeWav } from './wav';
 import { buildIt, sfxSymbol, sfxSnippet, ensureSoundbank } from './soundScaffold';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
@@ -480,13 +480,36 @@ async function addSprite(uri?: vscode.Uri): Promise<void> {
         fail(`${(e as Error).message}`);
         return;
     }
-    if (img.width !== img.height || ![8, 16, 32, 64].includes(img.width)) {
-        fail(`a sprite must be a square 8/16/32/64px tile — this PNG is ${img.width}×${img.height}. (Metasprites for bigger characters: use Export Metasprite.)`);
-        return;
-    }
-    // Didactic check against the project's OBSEL pair (the constraint model).
     const { config } = resolveProjectGraphics(projectDir);
-    const diag = validateSpriteImage(config.objSize, img.width, img.palette.length);
+    const pair = objSizePair(config.objSize);
+
+    // Single square sprite, or a multi-frame sheet? A sheet gets split into
+    // cells and Cooper computes each frame's OAM tile (kills dogfood #2 F8).
+    let cellPx: number;
+    let frameTiles: number[] | null = null;   // null → single sprite
+    if (img.width === img.height && [8, 16, 32, 64].includes(img.width)) {
+        cellPx = img.width;
+    } else {
+        const candidates = [8, 16, 32, 64].filter(
+            (s) => s <= Math.min(img.width, img.height) && img.width % s === 0 && img.height % s === 0);
+        if (candidates.length === 0) {
+            fail(`this PNG is ${img.width}×${img.height} — not a square 8/16/32/64px sprite, nor a grid of them. Resize so both sides are a multiple of the cell size.`);
+            return;
+        }
+        const dflt = candidates.includes(pair.small) ? pair.small : candidates[candidates.length - 1];
+        const picks = [dflt, ...candidates.filter((s) => s !== dflt)].map((s) => ({ label: `${s}px cells`, s }));
+        const pick = await vscode.window.showQuickPick(picks, {
+            placeHolder: `Sheet ${img.width}×${img.height} — cell size to split it into frames`,
+        });
+        if (!pick) {
+            return;
+        }
+        cellPx = pick.s;
+        frameTiles = sheetFrameTiles(cellPx, img.width, img.height);
+    }
+
+    // Didactic check against the project's OBSEL pair (the constraint model).
+    const diag = validateSpriteImage(config.objSize, cellPx, img.palette.length);
     if (!diag.ok) {
         const go = await vscode.window.showWarningMessage(`Cooper: ${diag.message}`, 'Add anyway', 'Cancel');
         if (go !== 'Add anyway') {
@@ -509,7 +532,7 @@ async function addSprite(uri?: vscode.Uri): Promise<void> {
         const mkPath = path.join(projectDir, 'Makefile');
         let mk = fs.readFileSync(mkPath, 'utf8');
         mk = ensureAsmSrc(mk, 'data.asm');
-        mk = appendGfxRule(mk, pngRel, img.width);
+        mk = appendGfxRule(mk, pngRel, cellPx);
         fs.writeFileSync(mkPath, mk);
         const dataPath = path.join(projectDir, 'data.asm');
         const existing = fs.existsSync(dataPath) ? fs.readFileSync(dataPath, 'utf8') : '';
@@ -519,14 +542,17 @@ async function addSprite(uri?: vscode.Uri): Promise<void> {
         return;
     }
 
-    const pair = objSizePair(config.objSize);
-    const snippet = loadSnippet(base, { objSize: config.objSize, small: img.width === pair.small });
+    const small = cellPx === pair.small;
+    const snippet = frameTiles
+        ? sheetSnippet(base, { objSize: config.objSize, small, frameTiles })
+        : loadSnippet(base, { objSize: config.objSize, small });
+    const what = frameTiles ? `${frameTiles.length}-frame sheet (${cellPx}px cells)` : `${cellPx}px sprite`;
     await vscode.env.clipboard.writeText(snippet);
-    log(`add sprite: ${pngRel} (${img.width}px) → Makefile + data.asm wired; snippet for '${base}' on the clipboard`);
+    log(`add sprite: ${pngRel} as ${what} → Makefile + data.asm wired; snippet for '${base}' on the clipboard`);
     const doc = await vscode.workspace.openTextDocument({ language: 'c', content: snippet });
     await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
     void vscode.window.showInformationMessage(
-        `Cooper: wired ${pngRel} — Makefile rule + data.asm bridge done. The C to load it is on your clipboard (and shown here). Build to see it.`);
+        `Cooper: wired ${pngRel} as a ${what} — Makefile rule + data.asm bridge done. The C is on your clipboard (and shown here). Build to see it.`);
 }
 
 /**
