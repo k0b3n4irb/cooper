@@ -1159,6 +1159,32 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-070 — Snippet library (A3), seeded with Collision (2026-07-08)
+- **Context:** "add collisions" — a Workshop feature. The SDK already ships a real
+  `collision` module (`Rect`, `collideRect`/`collideRectEx`, `collideTile*`,
+  `rectInit`…) with a `collision_demo` example. The question is the Cooper shape:
+  a one-off "Add Collision" command, or the roadmap's A3 **data-driven snippet
+  library**.
+- **Decision:** build the **snippet library** — `Cooper: Insert Snippet…` over a
+  data catalogue (`data/snippets.json`); each entry has `{id, title, category,
+  blurb, modules[], includes[], code}`. On pick: ensure the snippet's
+  `LIB_MODULES` are in the Makefile, then insert the code at the cursor (adding
+  missing `#include`s after the last one) or clipboard+tab when no C file is
+  open. Seed **category Collision** with three snippets (AABB, AABB push-out via
+  `collideRectEx`, 4-corner `collideTile`). Chose the library over a one-off
+  because it's the stated A3 slice, evolvable as pure data (graphics/sound/effects
+  categories later, no recompile), and answers the ask directly.
+- **Anti-drift (D-050 lesson):** snippets are **self-contained compilable
+  fragments**; the Node test wraps each shipped snippet (`wrapForCompile`) and
+  runs `clang -fsyntax-only` with the SDK flags (`renderClangd`) + asserts each
+  declared module exists in `lib/source/`. An SDK API change turns a snippet red
+  in CI, not in a user's build.
+- **Pure `snippets.ts`** (`parseSnippets`/`wrapForCompile`/`ensureModules`/
+  `missingIncludes`/`lastIncludeLine`/`snippetText`); thin glue in `extension.ts`.
+  Grounded in `collision.h` + `collision_demo`.
+- **Verified:** pure catalogue/wiring tests + **all three collision snippets
+  compile against the real snes headers** and their `collision` module resolves.
+
 ### D-069 — Add Sound Effect: WAV → `.it` → soundbank authoring (dogfood #2, 2026-07-08)
 - **Context:** dogfood #2 (`.claude/notes/dogfood-02.md`) finished Star Catcher
   with an original catch chime and surfaced F11: **there is no `.it` authoring

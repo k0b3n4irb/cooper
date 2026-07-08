@@ -1,0 +1,29 @@
+[
+  {
+    "id": "collision-rect",
+    "title": "AABB — do two boxes overlap?",
+    "category": "Collision",
+    "blurb": "The bread-and-butter check: catching a pickup, a hit, an overlap. Uses the SDK collision module (Rect + collideRect).",
+    "modules": ["collision"],
+    "includes": ["snes/collision.h"],
+    "code": "// Do two boxes overlap? (AABB — catching / hitting / pickups.)\nRect a, b;\nrectInit(&a, 120, 100, 16, 16);   // e.g. your player: x, y, w, h\nrectInit(&b, 130, 108, 16, 16);   // e.g. an enemy or a pickup\nif (collideRect(&a, &b)) {\n    // overlap — react here: score++, play an SFX, despawn…\n}\n"
+  },
+  {
+    "id": "collision-rect-resolve",
+    "title": "AABB with push-out (overlap depth)",
+    "category": "Collision",
+    "blurb": "Not just \"do they touch\" but \"how deep\", so you can push a mover out of a wall or platform along the smaller axis.",
+    "modules": ["collision"],
+    "includes": ["snes/collision.h"],
+    "code": "// Overlap AND how deep, to push out of a solid.\nRect mover, solid;\ns16 overlapX, overlapY;\nrectInit(&mover, 120, 100, 16, 16);   // the thing that moves\nrectInit(&solid, 128, 112, 32, 8);    // a wall / platform tile\nif (collideRectEx(&mover, &solid, &overlapX, &overlapY)) {\n    // classic AABB response: resolve along the smaller penetration\n    if (overlapX < overlapY) { mover.x -= overlapX; }\n    else                     { mover.y -= overlapY; }\n}\n"
+  },
+  {
+    "id": "collision-tile",
+    "title": "Tile collision (a box vs the map)",
+    "category": "Collision",
+    "blurb": "Is a mover hitting a solid tile in a collision map? Checks all four corners — the standard platformer/top-down ground test.",
+    "modules": ["collision"],
+    "includes": ["snes/collision.h"],
+    "code": "// Is a box hitting a solid tile? (checks all 4 corners)\nextern u8 collision_map[];   // your tilemap: 1 byte/tile, 0 = empty\ns16 px = 120, py = 100;      // top-left of the mover, in pixels\nu16 mapWidth = 32;           // map width in tiles\nif (collideTile(px,      py,      collision_map, mapWidth) ||\n    collideTile(px + 15, py,      collision_map, mapWidth) ||\n    collideTile(px,      py + 15, collision_map, mapWidth) ||\n    collideTile(px + 15, py + 15, collision_map, mapWidth)) {\n    // blocked — stop, or push back to the last free position\n}\n"
+  }
+]

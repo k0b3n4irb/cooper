@@ -398,6 +398,26 @@ call it once during setup — never inside the game loop.
 > — compose music/effects in OpenMPT or Schism and round-trip the `.it`. (The
 > SDK's direct sample API isn't usable from C, so `snesmod` is the way.)
 
+### Snippets (collision, and more)
+
+**Command Palette → Cooper: Insert Snippet…** gives you working, SNES-correct
+code for common needs. Pick one and Cooper wires the `LIB_MODULES` it needs into
+your Makefile and drops the code where your cursor is (adding any missing
+`#include`s), or hands it back on the clipboard when no C file is open.
+
+The first category is **Collision**, built on the SDK's `collision` module:
+
+- **AABB — do two boxes overlap?** the core check for catching a pickup, taking a
+  hit, or triggering something (`Rect` + `collideRect`);
+- **AABB with push-out** — how *deep* they overlap, so you can slide a mover out
+  of a wall or platform (`collideRectEx`);
+- **Tile collision** — is a box hitting a solid tile in the map? checks all four
+  corners (`collideTile`).
+
+The snippet catalogue is just data (`data/snippets.json`), so it grows over time,
+and every snippet is compiled against the current SDK in CI — if the library API
+changes, that's a failing test here, not a broken build in your game.
+
 ### Metasprites & animation
 
 **Right-click a sprite `.png` → Export Metasprite / Animation (C)…** builds a

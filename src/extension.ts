@@ -28,6 +28,7 @@ import { gridMetasprite, emitMetasprite, emitAnimClip } from './metasprite';
 import { BG_MODES, OBJ_SIZE_PAIRS, objSizePair, validateSpriteImage } from './snesModes';
 import { resolveGraphics, serializeOverride, ResolvedGraphics, GRAPHICS_CONFIG_REL } from './graphicsConfig';
 import { parseGameTypes } from './gameTypes';
+import { parseSnippets, snippetText, ensureModules, missingIncludes, lastIncludeLine } from './snippets';
 import { renderMakefile, renderStarterMainC, ProjectSpec } from './projectGen';
 import { symbolBase, loadSnippet, ensureAsmSrc, appendGfxRule, upsertDataAsm } from './spriteScaffold';
 import { decodeWav } from './wav';
@@ -110,6 +111,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.traceMemory', () => traceMemory()),
         vscode.commands.registerCommand('cooper.newProject', () => newProject()),
         vscode.commands.registerCommand('cooper.createNewGame', () => createNewGame(context)),
+        vscode.commands.registerCommand('cooper.insertSnippet', () => insertSnippet(context)),
         vscode.commands.registerCommand('cooper.debugHere', (name: string) => debugHere(name)),
         vscode.commands.registerCommand('cooper.watch', () => toggleWatch(context)),
         vscode.commands.registerCommand('cooper.showMemoryMap', () => showMemoryMap()),
@@ -578,6 +580,78 @@ async function addSoundEffect(uri?: vscode.Uri): Promise<void> {
     const note = built.truncated ? ` (trimmed to ${durMs}ms to fit SPC sample RAM)` : '';
     void vscode.window.showInformationMessage(
         `Cooper: wired ${itRel} → ${symbol}${note}. The C to play it is on your clipboard (and shown here). Build to hear it.`);
+}
+
+/**
+ * Insert Snippet (A3 snippet library): pick a working, SDK-grounded code snippet
+ * (first category: Collision — Rect/collideRect/collideTile), wire the LIB_MODULES
+ * it needs into the Makefile, and drop the code at the cursor (or clipboard + a
+ * tab). Every snippet is CI-compiled against the real headers, so it never rots.
+ */
+async function insertSnippet(context: vscode.ExtensionContext): Promise<void> {
+    let snippets;
+    try {
+        snippets = parseSnippets(fs.readFileSync(context.asAbsolutePath('data/snippets.json'), 'utf8'));
+    } catch (e) {
+        fail(`could not load the snippet library: ${(e as Error).message}`);
+        return;
+    }
+    if (snippets.length === 0) {
+        fail('the snippet library is empty.');
+        return;
+    }
+    const pick = await vscode.window.showQuickPick(
+        snippets.map((s) => ({ label: s.title, description: s.category, detail: s.blurb, s })),
+        { placeHolder: 'Insert a code snippet', matchOnDescription: true, matchOnDetail: true });
+    if (!pick) {
+        return;
+    }
+    const snip = pick.s;
+
+    // Wire the required LIB_MODULES into the project's Makefile when we can find it.
+    let wired = false;
+    const projectDir = await resolveProjectDir();
+    if (projectDir) {
+        try {
+            const mkPath = path.join(projectDir, 'Makefile');
+            if (fs.existsSync(mkPath)) {
+                const before = fs.readFileSync(mkPath, 'utf8');
+                const after = ensureModules(before, snip.modules);
+                if (after !== before) {
+                    fs.writeFileSync(mkPath, after);
+                    wired = true;
+                }
+            }
+        } catch { /* non-fatal — the snippet header lists the modules */ }
+    }
+
+    // Prefer inserting into the active C editor (includes at top + code at cursor).
+    const ed = vscode.window.activeTextEditor;
+    if (ed && (ed.document.languageId === 'c' || ed.document.fileName.endsWith('.c'))) {
+        const text = ed.document.getText();
+        const missing = missingIncludes(text, snip.includes);
+        const at = ed.selection.active;
+        await ed.edit((b) => {
+            if (missing.length) {
+                const line = lastIncludeLine(text) + 1; // 0 if none → very top
+                b.insert(new vscode.Position(line, 0), missing.map((h) => `#include <${h}>`).join('\n') + '\n');
+            }
+            b.insert(at, '\n' + snip.code);
+        });
+        log(`insert snippet: ${snip.id} at cursor${missing.length ? ` (+${missing.length} include)` : ''}${wired ? '; LIB_MODULES wired' : ''}`);
+        void vscode.window.showInformationMessage(
+            `Cooper: inserted "${snip.title}"${wired ? ` and wired ${snip.modules.join(' ')} into the Makefile` : ''}. Build to use it.`);
+        return;
+    }
+
+    // No C editor open → clipboard + a tab (like Add Sprite / Add Sound).
+    const body = snippetText(snip);
+    await vscode.env.clipboard.writeText(body);
+    const doc = await vscode.workspace.openTextDocument({ language: 'c', content: body });
+    await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+    log(`insert snippet: ${snip.id} → clipboard + tab${wired ? '; LIB_MODULES wired' : ''}`);
+    void vscode.window.showInformationMessage(
+        `Cooper: "${snip.title}" is on your clipboard (and shown here)${wired ? `; wired ${snip.modules.join(' ')} into the Makefile` : ''}.`);
 }
 
 /**

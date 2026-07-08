@@ -810,6 +810,44 @@ if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !fs.existsSync(p
 try { fs.unlinkSync(tmpWav); } catch {}
 try { fs.unlinkSync(tmpSnd); } catch {}
 
+// --- A3 snippet library: pure logic + EVERY shipped snippet compiles vs SDK ---
+console.log('\n=== snippets: catalogue is valid, wiring works, and it all compiles ===');
+const tmpSnip = path.join(os.tmpdir(), `cooper_snippets_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'snippets.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpSnip });
+const SNIP = require(tmpSnip);
+const catalogue = SNIP.parseSnippets(fs.readFileSync(path.join(__dirname, '..', 'data', 'snippets.json'), 'utf8'));
+check('parseSnippets: catalogue loads with ≥1 entry', catalogue.length >= 1);
+check('parseSnippets rejects a malformed entry', (() => { try { SNIP.parseSnippets('[{"id":"x"}]'); return false; } catch { return true; } })());
+check('there is a Collision category (the ask)', catalogue.some((s) => s.category === 'Collision'));
+check('ensureModules adds/extends LIB_MODULES before include, idempotent',
+    (() => { let mk = 'LIB_MODULES := console dma\ninclude $(OPENSNES)/make/common.mk\n'; mk = SNIP.ensureModules(mk, ['collision']); const once = mk; mk = SNIP.ensureModules(mk, ['collision']); return once.includes('LIB_MODULES := console dma collision') && once === mk; })());
+check('ensureModules creates LIB_MODULES when absent', SNIP.ensureModules('TARGET := x.sfc\ninclude $(OPENSNES)/make/common.mk\n', ['collision']).includes('LIB_MODULES := collision'));
+check('missingIncludes: reports only the absent ones',
+    (() => { const m = SNIP.missingIncludes('#include <snes.h>\n#include <snes/collision.h>\n', ['snes/collision.h', 'snes/text.h']); return m.length === 1 && m[0] === 'snes/text.h'; })());
+check('lastIncludeLine: index of the last #include (−1 if none)',
+    SNIP.lastIncludeLine('#include <a.h>\nint x;\n#include <b.h>\n') === 2 && SNIP.lastIncludeLine('int x;\n') === -1);
+check('snippetText carries the includes + modules + code',
+    (() => { const t = SNIP.snippetText(catalogue[0]); return t.includes('#include <' + catalogue[0].includes[0] + '>') && t.includes(catalogue[0].modules.join(' ')) && t.includes(catalogue[0].code.trim().split('\n')[0]); })());
+
+// close the loop: every shipped snippet compiles against the REAL SDK headers.
+if (cp.spawnSync('clang', ['--version']).status !== 0 || !fs.existsSync(path.join(OPENSNES, 'lib', 'include', 'snes.h'))) {
+    skipped('clang or SDK headers not available');
+} else {
+    const snFlags = [...C.renderClangd(OPENSNES).matchAll(/- "([^"]+)"/g)].map((m) => m[1]);
+    for (const s of catalogue) {
+        // each snippet declares real LIB_MODULES (backed by lib/source/<m>.c)
+        const realMods = s.modules.every((m) => fs.existsSync(path.join(OPENSNES, 'lib', 'source', `${m}.c`)));
+        check(`snippet '${s.id}': modules exist in the SDK (${s.modules.join(',') || 'none'})`, realMods);
+        const f = path.join(os.tmpdir(), `cooper_snip_${process.pid}_${s.id}.c`);
+        fs.writeFileSync(f, SNIP.wrapForCompile(s));
+        const r = cp.spawnSync('clang', ['-fsyntax-only', ...snFlags, f], { encoding: 'utf8' });
+        check(`snippet '${s.id}' compiles against the real snes headers`, r.status === 0);
+        if (r.status !== 0) { console.log(r.stderr.split('\n').slice(0, 6).join('\n')); }
+        try { fs.unlinkSync(f); } catch {}
+    }
+}
+try { fs.unlinkSync(tmpSnip); } catch {}
+
 // --- C6 spine: hybrid graphics-config resolution (pure, real example .c) ---
 console.log('\n=== graphicsConfig: parse code + override precedence ===');
 const tmpGc = path.join(os.tmpdir(), `cooper_graphicscfg_${process.pid}.cjs`);

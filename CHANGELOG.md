@@ -4,6 +4,20 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.50.0] — 2026-07-08
+
+### Added — Insert Snippet (a data-driven, CI-compiled snippet library)
+
+- **Cooper: Insert Snippet…** — pick a working, SDK-grounded code snippet; Cooper
+  wires the `LIB_MODULES` it needs into the Makefile and drops the code at your
+  cursor (adding any missing `#include`s), or hands it back on the clipboard + a
+  tab when no C file is open. First category is **Collision** (the SDK
+  `collision` module): AABB rect-vs-rect, AABB with push-out (overlap depth), and
+  4-corner tile-vs-map collision — the checks every game needs for catching,
+  hitting, and walls. The catalogue is plain data (`data/snippets.json`) so it
+  grows without a recompile, and **every snippet is compiled against the real SDK
+  headers in CI** — an API change is a red test, never a user's broken build.
+
 ## [0.49.0] — 2026-07-08
 
 ### Added — Add Sound Effect (a WAV → a sound in your game)

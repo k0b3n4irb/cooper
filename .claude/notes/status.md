@@ -14,6 +14,9 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   dogfood #1's F1/F2/F4).
 - **0.49 (D-069):** **Add Sound Effect** — WAV → `.it` → soundbank + snippet
   (kills dogfood #2's F11). Cooper owns the audio *bridge*, not a tracker.
+- **0.50 (D-070):** **Insert Snippet** — the A3 data-driven snippet library
+  (`data/snippets.json`), seeded with **Collision** (AABB / push-out / tile).
+  Every snippet CI-compiled against the real SDK (anti-drift).
 - **Dogfood:** #1 (stardodge) and #2 (**Star Catcher** — original art +
   gameplay + score + original synthesised SFX, verified in luna). Frictions in
   `dogfood-01.md`/`dogfood-02.md` drive the Workshop priority.
