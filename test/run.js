@@ -528,6 +528,61 @@ check('parseInputFile on a comments-only file → empty (nothing to replay)',
     IS.parseInputFile('# just comments\n#more').length === 0);
 try { fs.unlinkSync(tmpIs); } catch {}
 
+// --- C6 spine: the SNES graphics constraint model (pure), cross-checked
+//     against the SDK headers' own #defines (grounding, not memory) ---
+console.log('\n=== snesModes: constraint model vs SDK headers ===');
+const tmpSm = path.join(os.tmpdir(), `cooper_snesmodes_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'snesModes.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpSm });
+const SM = require(tmpSm);
+const spriteH = fs.readFileSync(path.join(OPENSNES, 'lib', 'include', 'snes', 'sprite.h'), 'utf8');
+const videoH = fs.readFileSync(path.join(OPENSNES, 'lib', 'include', 'snes', 'video.h'), 'utf8');
+const bgH = fs.readFileSync(path.join(OPENSNES, 'lib', 'include', 'snes', 'background.h'), 'utf8');
+const def = (txt, name) => { const m = new RegExp(`#define\\s+${name}\\s+(\\S+)`).exec(txt); return m ? m[1] : undefined; };
+
+// bpp → colours must match BG_4COLORS/16/256
+check('bppColors matches background.h (2→4, 4→16, 8→256)',
+    SM.bppColors(2) === Number(def(bgH, 'BG_4COLORS')) && SM.bppColors(4) === Number(def(bgH, 'BG_16COLORS')) && SM.bppColors(8) === Number(def(bgH, 'BG_256COLORS')));
+// all 8 modes exist and match video.h's BG_MODE0..7
+check('BG_MODES covers modes 0..7 (video.h BG_MODE0..7 all defined)',
+    SM.BG_MODES.length === 8 && [0, 1, 2, 3, 4, 5, 6, 7].every((n) => def(videoH, `BG_MODE${n}`) === String(n)));
+// mode layer layout (the grounded truth)
+check('mode 0 = four 2bpp layers', (() => { const m = SM.bgMode(0); return m.layers.length === 4 && m.layers.every((l) => l.bpp === 2); })());
+check('mode 1 = BG1/BG2 4bpp + BG3 2bpp', (() => { const l = SM.bgMode(1).layers; return l.length === 3 && l[0].bpp === 4 && l[1].bpp === 4 && l[2].bpp === 2; })());
+check('mode 3 = BG1 8bpp + BG2 4bpp', (() => { const l = SM.bgMode(3).layers; return l.length === 2 && l[0].bpp === 8 && l[1].bpp === 4; })());
+check('mode 7 = single 8bpp rotation layer', (() => { const m = SM.bgMode(7); return m.layers.length === 1 && m.layers[0].bpp === 8 && m.rotation === true; })());
+check('modes 5 & 6 are hi-res; 2/4/6 are offset-per-tile',
+    SM.bgMode(5).hiRes && SM.bgMode(6).hiRes && SM.bgMode(2).offsetPerTile && SM.bgMode(4).offsetPerTile && SM.bgMode(6).offsetPerTile);
+check('invalid mode throws', (() => { try { SM.bgMode(8); return false; } catch { return true; } })());
+
+// OBSEL pairs must match sprite.h's OBJ_SIZE* order + values
+const objDefs = ['OBJ_SIZE8_L16', 'OBJ_SIZE8_L32', 'OBJ_SIZE8_L64', 'OBJ_SIZE16_L32', 'OBJ_SIZE16_L64', 'OBJ_SIZE32_L64'];
+check('OBJ_SIZE_PAIRS match sprite.h ids + the documented small/large',
+    SM.OBJ_SIZE_PAIRS.length === 6 && objDefs.every((d, i) => Number(def(spriteH, d)) === SM.OBJ_SIZE_PAIRS[i].id)
+    && SM.OBJ_SIZE_PAIRS[3].small === 16 && SM.OBJ_SIZE_PAIRS[3].large === 32 && SM.OBJ_SIZE_PAIRS[5].name === '32/64');
+
+// CGRAM layout vs sprite.h
+check('sprite CGRAM base + palette stride match sprite.h (128, +16)',
+    SM.OBJ_CGRAM_BASE === Number(def(spriteH, 'OBJ_CGRAM_BASE')) && SM.objPaletteBase(0) === 128 && SM.objPaletteBase(3) === 128 + 3 * 16);
+check('MAX_SPRITES matches sprite.h (128), sprites 4bpp/8 palettes',
+    SM.MAX_SPRITES === Number(def(spriteH, 'MAX_SPRITES')) && SM.SPRITE_BPP === 4 && SM.SPRITE_PALETTES === 8);
+
+// derived palette layout + VRAM budget
+check('bgPaletteLayout: 4bpp → 8 sub-palettes of 16; 2bpp → 32 of 4; 8bpp → 1 of 256',
+    (() => { const a = SM.bgPaletteLayout(4), b = SM.bgPaletteLayout(2), c = SM.bgPaletteLayout(8);
+        return a.subPaletteSize === 16 && a.subPaletteCount === 8 && b.subPaletteCount === 32 && c.subPaletteCount === 1 && c.subPaletteSize === 256; })());
+check('bytesPerTile / maxTiles: 4bpp = 32 B → 2048 tiles in 64 KB',
+    SM.bytesPerTile(4) === 32 && SM.maxTiles(4) === 2048 && SM.bytesPerTile(2) === 16 && SM.bytesPerTile(8) === 64);
+
+// the didactic validators — "make the impossible impossible"
+check('validateBgImage: 20 colours on Mode 1 BG3 (2bpp) is rejected didactically',
+    (() => { const d = SM.validateBgImage(1, 3, 20); return !d.ok && /4 colours max/.test(d.message); })());
+check('validateBgImage: 16 colours on Mode 1 BG1 (4bpp) is OK; BG4 in Mode 1 is unavailable',
+    SM.validateBgImage(1, 1, 16).ok === true && SM.validateBgImage(1, 4, 4).ok === false);
+check('validateSpriteImage: 24px sprite under OBSEL 16/32 rejected; 16px OK',
+    SM.validateSpriteImage(3, 24, 16).ok === false && SM.validateSpriteImage(3, 16, 16).ok === true);
+check('validateSpriteImage: 17 colours rejected (sprites are 4bpp)', SM.validateSpriteImage(0, 8, 17).ok === false);
+try { fs.unlinkSync(tmpSm); } catch {}
+
 // --- G8b (opensnes#97): metasprite name computation + C emit (pure) ---
 console.log('\n=== metasprite: char-names + emit ===');
 const tmpMs = path.join(os.tmpdir(), `cooper_metasprite_${process.pid}.cjs`);

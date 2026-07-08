@@ -1159,6 +1159,34 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-065 — Mode-driven SNES constraint model = the spine of the C6 editors (2026-07-08)
+- **Decision (user, 2026-07-08):** the asset editors are built **in-editor** but
+  are **SNES-perfect, not generic**: the project picks a **BG mode** (+ an OBSEL
+  sprite-size pair), and *all* graphics constraints derive from it — legal layer
+  count, per-layer colour depth, palette/sub-palette structure, allowed sprite
+  sizes, VRAM budget. Editors read this model to **make impossible states
+  unrepresentable** and teach the developer as they go ("BG3 in Mode 1 is 2bpp —
+  4 colours max"). This is the differentiator no off-the-shelf tool (Aseprite,
+  Tiled, a tracker) provides.
+- **Refines/revisits D-042:** the tilemap becomes a **mode-aware editor**, not
+  just a Tiled viewer — because mode-constrained authoring is precisely what
+  Tiled can't do. Still squarely inside the garde-fou: **C6 (asset editors) is
+  an explicit differentiator.**
+- **Grounded (the model's correctness IS the feature):** BG modes → layers +
+  depth from `video.h` (`BG_MODE0..7`), colours from `background.h`
+  (`BG_4/16/256COLORS`), sprite sizes + CGRAM from `sprite.h`
+  (`OBJ_SIZE8_L16..OBJ_SIZE32_L64`, `OBJ_CGRAM_BASE=128`, `OBJ_CGRAM_PAL`,
+  `MAX_SPRITES=128`). Sprites are an **independent** axis (OBSEL, always 4bpp) —
+  *not* tied to the BG mode (a nuance corrected during design).
+- **First slice (this one):** pure `snesModes.ts` — the rules as data
+  (`BG_MODES`, `OBJ_SIZE_PAIRS`, `bgPaletteLayout`, `maxTiles`) + didactic
+  validators (`validateBgImage`/`validateSpriteImage`). **17 tests cross-check
+  the model against the SDK headers' own `#define`s** (not copied values).
+- **Next slices:** a didactic mode-picker + where the config lives (a
+  `.cooper/graphics.json`, or read from the code's `setMode`/`oamInit`); then
+  make the palette + tile editors mode-aware; then the tilemap editor. A real
+  dogfood game runs in parallel to prioritise by real friction.
+
 ### D-064 — Metasprite / animation C emitter (opensnes#97, 2026-07-07)
 - **Context:** OpenSNES v0.29.0 (PR #101) shipped `sprite.h` metasprites
   (`MetaspriteItem`/`oamDrawMeta`) + `anim.h` (`AnimClip`/`animPlay`/`animTick`,
