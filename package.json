@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.47.0",
+  "version": "0.48.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -236,6 +236,11 @@
         "category": "Cooper"
       },
       {
+        "command": "cooper.addSprite",
+        "title": "Add Sprite (wire a PNG into the game)…",
+        "category": "Cooper"
+      },
+      {
         "command": "cooper.exportMetasprite",
         "title": "Export Metasprite / Animation (C)…",
         "category": "Cooper"
@@ -289,6 +294,11 @@
           "command": "cooper.exportMetasprite",
           "when": "resourceExtname == .png",
           "group": "cooper@3"
+        },
+        {
+          "command": "cooper.addSprite",
+          "when": "resourceExtname == .png",
+          "group": "cooper@4"
         }
       ],
       "view/title": [

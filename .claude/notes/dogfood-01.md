@@ -51,12 +51,11 @@ the project's mode — not only editing an existing PNG. (Feeds Phase B.)
 
 ## Priorities this sets (feeds the roadmap)
 
-- **P1 — `Cooper: Add Sprite…` (the art→code scaffolder).** From a PNG (or a new
-  one): run gfx4snes, generate the `data.asm` incbin bridge, wire the Makefile
-  rule/ASMSRC, and insert the C snippet (`extern` + a correct
-  `dmaCopyVram`/`dmaCopyCGram`/`oamSet` with the tile number COMPUTED). Kills
-  F1/F2/F4 in one command. **This is A3's spearhead and the single highest-value
-  onramp feature — do it next.**
+- **P1 — `Cooper: Add Sprite…` (the art→code scaffolder). ✅ SHIPPED 0.48.0
+  (D-068).** From a PNG: runs gfx4snes, generates the `data.asm` incbin bridge,
+  wires the Makefile, and hands back the C snippet (clipboard + tab) with the
+  tile number handled (`oamInitGfxSet` → tile 0). Kills F1/F2/F4. Verified by
+  building the scaffolded output.
 - **P2 — richer per-genre starters (A3).** The shmup starter ships a controllable
   ship (what I hand-wrote), so New Game → Run → *you already move something*.
 - **P3 — tile editor "New Sprite at mode constraints" (Phase B).** Addresses F5.

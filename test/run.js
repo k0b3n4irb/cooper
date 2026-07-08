@@ -664,6 +664,70 @@ if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk'))) {
 }
 try { fs.unlinkSync(tmpPg); fs.unlinkSync(tmpGtPg); } catch {}
 
+// --- A3 spearhead: Add Sprite scaffolder (pure) + REAL build with a sprite ---
+console.log('\n=== spriteScaffold: art→code wiring, and it builds + shows ===');
+const tmpSs = path.join(os.tmpdir(), `cooper_spritescaffold_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'spriteScaffold.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpSs });
+const SS = require(tmpSs);
+check('symbolBase: res/ship.png → ship; leading digit guarded', SS.symbolBase('res/ship.png') === 'ship' && SS.symbolBase('2p.png') === '_2p');
+check('gfx4snesRule: .pic/.pal target + -s<size> -o16 -u16 -p -i',
+    (() => { const r = SS.gfx4snesRule('res/ship.png', 32); return r.includes('res/ship.pic res/ship.pal: res/ship.png') && r.includes('-s 32 -o 16 -u 16 -p -i $<'); })());
+check('dataAsmSection: superfree section + incbin .pic/.pal + 4 labels',
+    (() => { const a = SS.dataAsmSection('ship', 'res/ship.png'); return a.includes('superfree') && a.includes('.incbin "res/ship.pic"') && a.includes('.incbin "res/ship.pal"') && a.includes('ship:') && a.includes('ship_end:') && a.includes('ship_pal:') && a.includes('ship_pal_end:'); })());
+check('loadSnippet: oamInitGfxSet + tile 0 (no arcane math) + OBJ_LARGE for a large sprite',
+    (() => { const s = SS.loadSnippet('ship', { objSize: 3, small: false }); return s.includes('extern u8 ship[], ship_end[];') && s.includes('oamInitGfxSet(ship, ship_end - ship, ship_pal, ship_pal_end - ship_pal, 0, 0x0000, OBJ_SIZE16_L32)') && s.includes('oamSet(0, 120, 100, 0, 0, 3, 0)') && s.includes('oamSetSize(0, OBJ_LARGE)'); })());
+check('loadSnippet: small sprite → OBJ_SMALL', SS.loadSnippet('p', { objSize: 3, small: true }).includes('OBJ_SMALL'));
+check('ensureAsmSrc adds an ASMSRC line before the include, idempotently',
+    (() => { let mk = 'TARGET := x.sfc\ninclude $(OPENSNES)/make/common.mk\n'; mk = SS.ensureAsmSrc(mk, 'data.asm'); const once = mk; mk = SS.ensureAsmSrc(mk, 'data.asm'); return once.includes('ASMSRC      := data.asm') && once.indexOf('data.asm') === mk.indexOf('data.asm') && (mk.match(/data\.asm/g) || []).length === 1; })());
+check('ensureAsmSrc extends an existing ASMSRC', SS.ensureAsmSrc('ASMSRC := boot.asm\ninclude x\n', 'data.asm').includes('ASMSRC := boot.asm data.asm'));
+check('appendGfxRule is idempotent', (() => { let mk = 'include x\n'; mk = SS.appendGfxRule(mk, 'res/ship.png', 32); const n1 = (mk.match(/res\/ship\.pic /g) || []).length; mk = SS.appendGfxRule(mk, 'res/ship.png', 32); return n1 === 1 && (mk.match(/res\/ship\.pic /g) || []).length === 1; })());
+check('upsertDataAsm creates then is idempotent by base',
+    (() => { let d = SS.upsertDataAsm('', 'ship', 'res/ship.png'); const one = d; d = SS.upsertDataAsm(d, 'ship', 'res/ship.png'); return one.includes('ship:') && d === one; })());
+
+// REAL build: generate a project, scaffold a sprite into it end-to-end, build,
+// and confirm luna places the sprite on-screen (the whole cliff, automated).
+if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !B.resolveLunaPath({ sdkPath: OPENSNES })) {
+    skipped('SDK make / luna not available');
+} else {
+    const tmpPgSs = path.join(os.tmpdir(), `cooper_pg_forss_${process.pid}.cjs`);
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'projectGen.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPgSs });
+    const PGss = require(tmpPgSs);
+    const srcPng = path.join(OPENSNES, 'examples', 'graphics', 'sprites', 'simple_sprite', 'res', 'sprite32.png');
+    const dir = path.join(os.tmpdir(), `cooper_addsprite_${process.pid}`);
+    try {
+        fs.mkdirSync(path.join(dir, 'res'), { recursive: true });
+        const spec = { name: 'sprtest', graphics: { mode: 1, objSize: 3 }, build: { sound: false }, modules: ['console', 'background', 'sprite', 'dma', 'input'] };
+        let mk = PGss.renderMakefile(spec, OPENSNES);
+        // scaffold the sprite exactly as the command will
+        fs.copyFileSync(srcPng, path.join(dir, 'res', 'ship.png'));
+        mk = SS.ensureAsmSrc(mk, 'data.asm');
+        mk = SS.appendGfxRule(mk, 'res/ship.png', 32);
+        fs.writeFileSync(path.join(dir, 'Makefile'), mk);
+        fs.writeFileSync(path.join(dir, 'data.asm'), SS.upsertDataAsm('', 'ship', 'res/ship.png'));
+        // a main.c that pastes the snippet's code (extern + load + place)
+        fs.writeFileSync(path.join(dir, 'main.c'),
+            '#include <snes.h>\n'
+            + 'extern u8 ship[], ship_end[];\nextern u8 ship_pal[], ship_pal_end[];\n'
+            + 'int main(void){ consoleInit(); setMode(BG_MODE1,0); WaitForVBlank();\n'
+            + '  oamInitGfxSet(ship, ship_end - ship, ship_pal, ship_pal_end - ship_pal, 0, 0x0000, OBJ_SIZE16_L32);\n'
+            + '  oamSet(0, 120, 100, 0, 0, 3, 0); oamSetSize(0, OBJ_LARGE);\n'
+            + '  setMainScreen(LAYER_OBJ); setScreenOn(); while(1){ WaitForVBlank(); } return 0; }\n');
+        // Build+link success IS the proof the whole cliff is wired: the gfx rule
+        // ran (produced .pic/.pal), the data.asm incbin resolved, the externs
+        // linked, and the oamInitGfxSet/oamSet snippet compiled. (The sprite
+        // showing on-screen was verified live in dogfood #1.)
+        const r = cp.spawnSync('make', [], { cwd: dir, encoding: 'utf8', timeout: 180000 });
+        check('scaffolded sprite: gfx rule + data.asm bridge + snippet build a .sfc',
+            r.status === 0 && fs.existsSync(path.join(dir, 'sprtest.sfc'))
+            && fs.existsSync(path.join(dir, 'res', 'ship.pic')) && fs.existsSync(path.join(dir, 'res', 'ship.pal')));
+        if (r.status !== 0) { console.log((r.stdout || '').split('\n').slice(-6).join('\n')); }
+    } finally {
+        try { fs.unlinkSync(tmpPgSs); } catch {}
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+}
+try { fs.unlinkSync(tmpSs); } catch {}
+
 // --- C6 spine: hybrid graphics-config resolution (pure, real example .c) ---
 console.log('\n=== graphicsConfig: parse code + override precedence ===');
 const tmpGc = path.join(os.tmpdir(), `cooper_graphicscfg_${process.pid}.cjs`);

@@ -25,10 +25,11 @@ import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bg
 import { renderPaletteEditorHtml } from './paletteEditor';
 import { renderTileEditorHtml } from './tileEditor';
 import { gridMetasprite, emitMetasprite, emitAnimClip } from './metasprite';
-import { BG_MODES, OBJ_SIZE_PAIRS } from './snesModes';
+import { BG_MODES, OBJ_SIZE_PAIRS, objSizePair, validateSpriteImage } from './snesModes';
 import { resolveGraphics, serializeOverride, ResolvedGraphics, GRAPHICS_CONFIG_REL } from './graphicsConfig';
 import { parseGameTypes } from './gameTypes';
 import { renderMakefile, renderStarterMainC, ProjectSpec } from './projectGen';
+import { symbolBase, loadSnippet, ensureAsmSrc, appendGfxRule, upsertDataAsm } from './spriteScaffold';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
 import { mergeVscodeMcp, mergeProjectMcp } from './mcpConfig';
@@ -96,6 +97,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.editPalette', (uri?: vscode.Uri) => editPalette(uri)),
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
+        vscode.commands.registerCommand('cooper.addSprite', (uri?: vscode.Uri) => addSprite(uri)),
         vscode.commands.registerCommand('cooper.exportMetasprite', (uri?: vscode.Uri) => exportMetasprite(uri)),
         vscode.commands.registerCommand('cooper.setGraphicsMode', () => setGraphicsMode()),
         vscode.commands.registerCommand('cooper.configureAI', () => configureAI()),
@@ -448,6 +450,78 @@ async function editTiles(uri?: vscode.Uri): Promise<void> {
             }
         }
     });
+}
+
+/**
+ * Add Sprite (A3 spearhead — kills the dogfood #1 art→code cliff): from a sprite
+ * PNG, wire the gfx4snes rule + the data.asm incbin bridge into the project, and
+ * hand back the C load snippet (tile number handled). The one command that turns
+ * "I have art" into "it's on screen".
+ */
+async function addSprite(uri?: vscode.Uri): Promise<void> {
+    const png = await resolveProjectFile(uri, '.png', 'add it as a sprite');
+    if (!png) {
+        return;
+    }
+    const projectDir = findProjectDir(path.dirname(png));
+    if (!projectDir) {
+        fail('that PNG is not inside an OpenSNES project (a folder with a Makefile).');
+        return;
+    }
+    let img;
+    try {
+        img = readIndexedPng(fs.readFileSync(png));
+    } catch (e) {
+        fail(`${(e as Error).message}`);
+        return;
+    }
+    if (img.width !== img.height || ![8, 16, 32, 64].includes(img.width)) {
+        fail(`a sprite must be a square 8/16/32/64px tile — this PNG is ${img.width}×${img.height}. (Metasprites for bigger characters: use Export Metasprite.)`);
+        return;
+    }
+    // Didactic check against the project's OBSEL pair (the constraint model).
+    const { config } = resolveProjectGraphics(projectDir);
+    const diag = validateSpriteImage(config.objSize, img.width, img.palette.length);
+    if (!diag.ok) {
+        const go = await vscode.window.showWarningMessage(`Cooper: ${diag.message}`, 'Add anyway', 'Cancel');
+        if (go !== 'Add anyway') {
+            return;
+        }
+    }
+
+    // Make sure the PNG lives inside the project (copy into res/ if it doesn't).
+    let pngRel = path.relative(projectDir, png).split(path.sep).join('/');
+    if (pngRel.startsWith('..')) {
+        const resDir = path.join(projectDir, 'res');
+        fs.mkdirSync(resDir, { recursive: true });
+        const dest = path.join(resDir, path.basename(png));
+        fs.copyFileSync(png, dest);
+        pngRel = `res/${path.basename(png)}`;
+    }
+    const base = symbolBase(png);
+
+    try {
+        const mkPath = path.join(projectDir, 'Makefile');
+        let mk = fs.readFileSync(mkPath, 'utf8');
+        mk = ensureAsmSrc(mk, 'data.asm');
+        mk = appendGfxRule(mk, pngRel, img.width);
+        fs.writeFileSync(mkPath, mk);
+        const dataPath = path.join(projectDir, 'data.asm');
+        const existing = fs.existsSync(dataPath) ? fs.readFileSync(dataPath, 'utf8') : '';
+        fs.writeFileSync(dataPath, upsertDataAsm(existing, base, pngRel));
+    } catch (e) {
+        fail(`could not wire the sprite into the project: ${(e as Error).message}`);
+        return;
+    }
+
+    const pair = objSizePair(config.objSize);
+    const snippet = loadSnippet(base, { objSize: config.objSize, small: img.width === pair.small });
+    await vscode.env.clipboard.writeText(snippet);
+    log(`add sprite: ${pngRel} (${img.width}px) → Makefile + data.asm wired; snippet for '${base}' on the clipboard`);
+    const doc = await vscode.workspace.openTextDocument({ language: 'c', content: snippet });
+    await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+    void vscode.window.showInformationMessage(
+        `Cooper: wired ${pngRel} — Makefile rule + data.asm bridge done. The C to load it is on your clipboard (and shown here). Build to see it.`);
 }
 
 /**

@@ -4,6 +4,18 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.48.0] — 2026-07-08
+
+### Added — Add Sprite (art → on screen, no boilerplate)
+
+- **Cooper: Add Sprite…** (right-click a sprite `.png`) — the answer to the
+  dogfood's #1 friction. It converts the PNG (gfx4snes), generates the
+  `data.asm` incbin bridge, wires the Makefile, and hands you the C snippet
+  (clipboard + a tab) with the **tile number already computed** (via
+  `oamInitGfxSet` → tile 0). Paste, Build, and your sprite is on screen — no
+  hand-written asm, no `($2100-$2000)/16`. Checks the sprite size against your
+  graphics mode and warns if it doesn't fit.
+
 ## [0.47.0] — 2026-07-08
 
 ### Added — Create New Game (guided)

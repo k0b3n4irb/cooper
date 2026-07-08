@@ -367,6 +367,16 @@ Sprites**). A zoomable paint grid over the indexed image:
   frame 2 of the walk cycle and watch it move).
 - **Save to PNG** writes the pixels back; **Build** regenerates the `.pic`.
 
+### Add a sprite (art → on screen)
+
+**Right-click a sprite `.png` → Add Sprite…** does the tedious wiring for you:
+it converts the PNG (gfx4snes), generates the `data.asm` bridge that pulls the
+tiles/palette into the ROM, adds the Makefile rule — and hands you the C to
+load and place it (on your clipboard and in a tab), with the tile number
+already worked out. Paste the `extern`s at the top and the load call in
+`main()`, **Build**, and your sprite is on screen. (Cooper checks the sprite
+size against your graphics mode's sprite sizes and warns if it doesn't fit.)
+
 ### Metasprites & animation
 
 **Right-click a sprite `.png` → Export Metasprite / Animation (C)…** builds a

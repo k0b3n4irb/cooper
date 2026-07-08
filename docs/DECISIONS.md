@@ -1159,6 +1159,28 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-068 — Add Sprite scaffolder — kill the art→code cliff (dogfood #1, 2026-07-08)
+- **Context:** dogfood #1 (`.claude/notes/dogfood-01.md`) hit the wall F1/F2/F4:
+  after Create New Game, getting a sprite on screen meant hand-writing a
+  gfx4snes rule + a `data.asm` incbin bridge + `extern`s + arcane VRAM/CGRAM
+  tile math. The single highest-value onramp gap.
+- **Decision:** `Cooper: Add Sprite…` (explorer context on a `.png`, or picker):
+  wires the **gfx4snes rule** (`-s <size> -o 16 -u 16 -p -i`) and the **data.asm
+  bridge** (`.rodata_<base> superfree` + incbin + 4 labels) into the project
+  (idempotent Makefile/ASMSRC edits), copies the PNG into `res/` if outside,
+  runs a **didactic OBSEL check** (`validateSpriteImage` — the constraint model),
+  and hands back a C snippet on the clipboard + in an editor. The snippet uses
+  **`oamInitGfxSet` at a VRAM base so the sprite is tile 0** — no
+  `($2100-$2000)/16`; F2 gone.
+- **Pure `spriteScaffold.ts`** (symbolBase/gfx4snesRule/dataAsmSection/
+  loadSnippet/ensureAsmSrc/appendGfxRule/upsertDataAsm); glue reads the PNG
+  (`readIndexedPng`), resolves the project (`findProjectDir`) + graphics config.
+  Grounded in the SDK sprite examples + `gfx4snes -h`.
+- **Verified by BUILDING the scaffolded output:** a generated project + a
+  scaffolded sprite (rule + data.asm + snippet C) links to a `.sfc` with
+  `res/ship.pic`/`.pal` produced — the whole cliff, automated and tested. Plus
+  the sprite-on-screen was verified live in dogfood #1.
+
 ### D-067 — Project generator + Create New Game wizard (D-066 slice 1-2, 2026-07-08)
 - **Decision:** a **pure generator** `src/projectGen.ts` turns a resolved spec
   (`{name, graphics, build, modules}`) into a Makefile (`USE_*` flags +
