@@ -728,6 +728,88 @@ if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !B.resolveLunaPa
 }
 try { fs.unlinkSync(tmpSs); } catch {}
 
+// --- Audio v2: Add Sound Effect (WAV → .it → soundbank) + REAL build ---
+console.log('\n=== soundScaffold: WAV→.it authoring, smconv accepts it, it builds ===');
+const tmpWav = path.join(os.tmpdir(), `cooper_wavdec_${process.pid}.cjs`);
+const tmpSnd = path.join(os.tmpdir(), `cooper_soundscaffold_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'wav.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpWav });
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'soundScaffold.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpSnd });
+const WAV = require(tmpWav);
+const SND = require(tmpSnd);
+
+// build a mono 16-bit PCM WAV in memory (a short beep at a given rate)
+function monoWav(rate, seconds, freq) {
+    const n = Math.floor(rate * seconds);
+    const buf = Buffer.alloc(44 + n * 2);
+    buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8); buf.write('fmt ', 12);
+    buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(rate, 24);
+    buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
+    for (let i = 0; i < n; i++) { buf.writeInt16LE(Math.round(Math.sin((2 * Math.PI * freq * i) / rate) * 18000), 44 + i * 2); }
+    return buf;
+}
+
+check('sfxSymbol: res/coin.wav → SFX_COIN; leading digit guarded',
+    SND.sfxSymbol('res/coin.wav') === 'SFX_COIN' && SND.sfxSymbol('8bit.wav') === 'SFX__8BIT');
+check('decodeWav: 44.1k mono 16-bit round-trips', (() => { const d = WAV.decodeWav(monoWav(44100, 0.1, 800)); return d.channels === 1 && d.sampleRate === 44100 && d.samples.length === 4410; })());
+check('decodeWav: 8-bit + stereo downmix', (() => {
+    const rate = 16000, n = 100, buf = Buffer.alloc(44 + n * 2);
+    buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8); buf.write('fmt ', 12);
+    buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(2, 22); buf.writeUInt32LE(rate, 24);
+    buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(8, 34); buf.write('data', 36); buf.writeUInt32LE(n, 40);
+    for (let i = 0; i < n; i++) { buf.writeUInt8(128 + (i % 2 ? 40 : -40), 44 + i); }
+    const d = WAV.decodeWav(buf); return d.channels === 2 && d.samples.length === 50;
+})());
+check('buildIt: valid IMPM, resamples >32k down, reports rate/count',
+    (() => { const b = SND.buildIt('coin.wav', WAV.decodeWav(monoWav(44100, 0.1, 800)).samples, 44100); return b.it.slice(0, 4).toString() === 'IMPM' && b.sampleRate === 32000 && b.sampleCount === 3200 && !b.truncated; })());
+check('buildIt: caps overly long samples (truncated=true, ≤ MAX_SFX_SAMPLES)',
+    (() => { const b = SND.buildIt('long.wav', new Array(60000).fill(1000), 32000); return b.truncated && b.sampleCount === SND.MAX_SFX_SAMPLES; })());
+check('ensureSoundbank adds USE_SNESMOD + SOUNDBANK_SRC before include, idempotent',
+    (() => { let mk = 'TARGET := x.sfc\ninclude $(OPENSNES)/make/common.mk\n'; mk = SND.ensureSoundbank(mk, 'sfx/coin.it'); const once = mk; mk = SND.ensureSoundbank(mk, 'sfx/coin.it'); return once.includes('USE_SNESMOD   := 1') && once.includes('SOUNDBANK_SRC := sfx/coin.it') && (mk.match(/coin\.it/g) || []).length === 1 && (mk.match(/USE_SNESMOD/g) || []).length === 1; })());
+check('ensureSoundbank extends an existing SOUNDBANK_SRC', SND.ensureSoundbank('USE_SNESMOD := 1\nSOUNDBANK_SRC := music.it\ninclude x\n', 'sfx/coin.it').includes('SOUNDBANK_SRC := music.it sfx/coin.it'));
+check('sfxSnippet: init + load + process + play, with the symbol and soundbank.h',
+    (() => { const s = SND.sfxSnippet('SFX_COIN'); return s.includes('#include "soundbank.h"') && s.includes('snesmodInit();') && s.includes('snesmodLoadEffect(SFX_COIN)') && s.includes('snesmodProcess();') && s.includes('snesmodPlayEffect(') && s.includes('SNESMOD_PITCH_NORMAL'); })());
+
+// REAL build: generate a project, author a sound into it end-to-end, build, and
+// confirm smconv emitted SFX_COIN and the snesmod snippet compiled+linked. (The
+// effect actually playing was verified live in dogfood #2 via luna's DSP state.)
+if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !fs.existsSync(path.join(OPENSNES, 'bin', 'smconv'))) {
+    skipped('SDK make / smconv not available');
+} else {
+    const tmpPgSnd = path.join(os.tmpdir(), `cooper_pg_forsnd_${process.pid}.cjs`);
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'projectGen.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPgSnd });
+    const PGsnd = require(tmpPgSnd);
+    const dir = path.join(os.tmpdir(), `cooper_addsound_${process.pid}`);
+    try {
+        fs.mkdirSync(path.join(dir, 'sfx'), { recursive: true });
+        const spec = { name: 'sndtest', graphics: { mode: 1, objSize: 0 }, build: { sound: false }, modules: ['console', 'dma', 'input'] };
+        let mk = PGsnd.renderMakefile(spec, OPENSNES);
+        // author the sound exactly as the command will
+        const dec = WAV.decodeWav(monoWav(22050, 0.12, 900));
+        const built = SND.buildIt('coin.wav', dec.samples, dec.sampleRate);
+        fs.writeFileSync(path.join(dir, 'sfx', 'coin.it'), built.it);
+        mk = SND.ensureSoundbank(mk, 'sfx/coin.it');
+        fs.writeFileSync(path.join(dir, 'Makefile'), mk);
+        fs.writeFileSync(path.join(dir, 'main.c'),
+            '#include <snes.h>\n#include <snes/snesmod.h>\n#include "soundbank.h"\n'
+            + 'int main(void){ u8 s; consoleInit(); setMode(BG_MODE1,0); WaitForVBlank();\n'
+            + '  snesmodInit(); snesmodSetSoundbank(SOUNDBANK_BANK); s = snesmodLoadEffect(SFX_COIN);\n'
+            + '  setScreenOn();\n'
+            + '  while(1){ WaitForVBlank(); snesmodProcess(); snesmodPlayEffect(s, 127, 128, SNESMOD_PITCH_NORMAL); } return 0; }\n');
+        const r = cp.spawnSync('make', [], { cwd: dir, encoding: 'utf8', timeout: 180000 });
+        const sbh = path.join(dir, 'soundbank.h');
+        check('authored sound: smconv built soundbank.h with SFX_COIN',
+            fs.existsSync(sbh) && fs.readFileSync(sbh, 'utf8').includes('#define SFX_COIN'));
+        check('authored sound: soundbank + snesmod snippet build a .sfc',
+            r.status === 0 && fs.existsSync(path.join(dir, 'sndtest.sfc')));
+        if (r.status !== 0) { console.log((r.stdout || '').split('\n').slice(-8).join('\n')); }
+    } finally {
+        try { fs.unlinkSync(tmpPgSnd); } catch {}
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+}
+try { fs.unlinkSync(tmpWav); } catch {}
+try { fs.unlinkSync(tmpSnd); } catch {}
+
 // --- C6 spine: hybrid graphics-config resolution (pure, real example .c) ---
 console.log('\n=== graphicsConfig: parse code + override precedence ===');
 const tmpGc = path.join(os.tmpdir(), `cooper_graphicscfg_${process.pid}.cjs`);

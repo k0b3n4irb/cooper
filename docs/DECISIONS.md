@@ -1159,6 +1159,37 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-069 — Add Sound Effect: WAV → `.it` → soundbank authoring (dogfood #2, 2026-07-08)
+- **Context:** dogfood #2 (`.claude/notes/dogfood-02.md`) finished Star Catcher
+  with an original catch chime and surfaced F11: **there is no `.it` authoring
+  path in the toolchain.** `smconv` ingests only `.it`; the direct-BRR C API
+  (`audio.h`/`audioLoadSample`) is **unusable from C** — `audio.asm`'s PVSnesLib
+  ABI is incompatible with cc65816 (*"multi-arg functions … operate on garbage"*),
+  documented upstream, no examples. So snesmod + a soundbank `.it` is the only
+  working path, and a beginner would have to hand-roll an Impulse Tracker module
+  (as I did) to get one sound.
+- **Decision:** `Cooper: Add Sound Effect…` (explorer context on a `.wav`, or
+  picker): decode the WAV → generate a **spec-valid, sample-only, one-pattern
+  `.it`** holding that one sample → write it to `sfx/<name>.it` → wire
+  `USE_SNESMOD := 1` + `SOUNDBANK_SRC` into the Makefile (idempotent) → hand back
+  the C snippet (`snesmodInit`/`SetSoundbank`/`LoadEffect`/`Process`/`PlayEffect`,
+  with the note that init costs frames — F12). `smconv` derives `SFX_<NAME>` from
+  the sample name. WAVs above 32 kHz are resampled to the SPC's native rate and
+  length is capped (`MAX_SFX_SAMPLES`, ~1.5 s) with a truncation notice — no
+  silent cap.
+- **Garde-fou:** this is exactly the audio rule — **Cooper owns the
+  sample→`.it`→soundbank bridge + audition (D-060); the tracker stays external.**
+  Not a tracker, not a synth: it ingests a WAV authored anywhere.
+- **Pure modules:** `wav.ts` gains `decodeWav`/`resampleMono`; new
+  `soundScaffold.ts` (`sfxSymbol`/`sampleName`/`buildIt`/`ensureSoundbank`/
+  `sfxSnippet`). The `.it` byte layout is the exact form proven accepted by
+  `smconv` during the dogfood.
+- **Verified by BUILDING the authored output:** a generated project + an authored
+  WAV → `smconv` emits `soundbank.h` with `#define SFX_COIN`, and the snesmod
+  snippet compiles + links to a `.sfc`. The effect actually keying a DSP voice
+  was verified live in dogfood #2 (`active_voices=1`, `voice_envelope≈2032`, real
+  output samples in luna's `apu` state).
+
 ### D-068 — Add Sprite scaffolder — kill the art→code cliff (dogfood #1, 2026-07-08)
 - **Context:** dogfood #1 (`.claude/notes/dogfood-01.md`) hit the wall F1/F2/F4:
   after Create New Game, getting a sprite on screen meant hand-writing a

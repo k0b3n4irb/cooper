@@ -377,6 +377,27 @@ already worked out. Paste the `extern`s at the top and the load call in
 `main()`, **Build**, and your sprite is on screen. (Cooper checks the sprite
 size against your graphics mode's sprite sizes and warns if it doesn't fit.)
 
+### Add a sound effect (a WAV → a sound in your game)
+
+**Right-click a `.wav` → Add Sound Effect…** is the audio counterpart of Add
+Sprite. On the SNES a sound effect has to travel a long road — a soundbank the
+`smconv` tool builds from an Impulse Tracker `.it`, uploaded to the SPC700 sound
+chip by the `snesmod` driver. Cooper does all of it for you: it reads your WAV,
+generates the `.it`, wires `USE_SNESMOD` + `SOUNDBANK_SRC` into the Makefile, and
+hands you the C to play it (clipboard + a tab) — initialise the driver, load the
+effect, and fire it on an event. Author the sound in any editor, export a WAV,
+drop it in, **Build**, and you hear it.
+
+Two things Cooper handles so you don't trip on them: the SPC chip runs at 32 kHz,
+so higher-rate WAVs are resampled down; and its sample memory is small, so an
+over-long clip is trimmed (Cooper tells you if it did). One gotcha the snippet
+spells out: `snesmodInit()` uploads the driver and **costs a few frames**, so
+call it once during setup — never inside the game loop.
+
+> Cooper owns the *bridge* (WAV → `.it` → soundbank) and audition, not a tracker
+> — compose music/effects in OpenMPT or Schism and round-trip the `.it`. (The
+> SDK's direct sample API isn't usable from C, so `snesmod` is the way.)
+
 ### Metasprites & animation
 
 **Right-click a sprite `.png` → Export Metasprite / Animation (C)…** builds a

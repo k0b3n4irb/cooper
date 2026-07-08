@@ -1,9 +1,27 @@
 # Cooper — current snapshot
 
-_Last updated 2026-07-06._ The full plan (all phases, dependencies, open
+_Last updated 2026-07-08._ The full plan (all phases, dependencies, open
 decisions) lives in **`roadmap.md`** — this file is just the "now".
 
-## Last shipped
+## Now — the guided-creation onramp + dogfood loop (0.46→0.49)
+
+Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
+**code-first guided IDE** (not a no-code clone). Shipped, each grounded + built:
+- **0.46 (D-065/066/067):** the mode-driven SNES constraint spine
+  (`snesModes.ts`), hybrid graphics config, game-type presets
+  (`gameTypes.json`), the **project generator** + **Create New Game** wizard.
+- **0.48 (D-068):** **Add Sprite** — art → on screen, tile math handled (kills
+  dogfood #1's F1/F2/F4).
+- **0.49 (D-069):** **Add Sound Effect** — WAV → `.it` → soundbank + snippet
+  (kills dogfood #2's F11). Cooper owns the audio *bridge*, not a tracker.
+- **Dogfood:** #1 (stardodge) and #2 (**Star Catcher** — original art +
+  gameplay + score + original synthesised SFX, verified in luna). Frictions in
+  `dogfood-01.md`/`dogfood-02.md` drive the Workshop priority.
+- **Next candidates (dogfood-driven):** Add Sprite → multi-frame **sheets** (F7/
+  F8); richer per-genre starters (A3); Audio v2 audition/round-trip; mode-aware
+  palette/tile/tilemap editors (Phase B).
+
+## Previously shipped
 
 **Upstream dividends wave — the 3 issues Cooper filed are MERGED & released**
 (2026-07-07). Tested each develop branch Cooper-side BEFORE opening the PRs

@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.48.0",
+  "version": "0.49.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -241,6 +241,11 @@
         "category": "Cooper"
       },
       {
+        "command": "cooper.addSoundEffect",
+        "title": "Add Sound Effect (wire a WAV into the game)…",
+        "category": "Cooper"
+      },
+      {
         "command": "cooper.exportMetasprite",
         "title": "Export Metasprite / Animation (C)…",
         "category": "Cooper"
@@ -299,6 +304,11 @@
           "command": "cooper.addSprite",
           "when": "resourceExtname == .png",
           "group": "cooper@4"
+        },
+        {
+          "command": "cooper.addSoundEffect",
+          "when": "resourceExtname == .wav",
+          "group": "cooper@5"
         }
       ],
       "view/title": [

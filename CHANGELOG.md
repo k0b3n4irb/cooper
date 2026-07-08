@@ -4,6 +4,24 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.49.0] — 2026-07-08
+
+### Added — Add Sound Effect (a WAV → a sound in your game)
+
+- **Cooper: Add Sound Effect…** (right-click a `.wav`) — the audio counterpart
+  of Add Sprite, and the answer to dogfood #2's friction F11. It decodes the
+  WAV, generates a spec-valid soundbank `.it` (the SDK's `smconv` only ingests
+  `.it`), wires `USE_SNESMOD` + `SOUNDBANK_SRC` into the Makefile, and hands you
+  the C snippet (`snesmodInit` → `snesmodLoadEffect` → `snesmodPlayEffect`, with
+  the "init costs frames" gotcha spelled out). Author a sound anywhere, drop the
+  WAV in, Build — you hear it. Cooper owns the sample→`.it`→soundbank bridge; the
+  tracker stays external (and the direct-BRR C API is unusable — its PVSnesLib
+  ABI is incompatible with cc65816). WAVs above 32 kHz are resampled to the
+  SPC's native rate and over-long samples are trimmed (with a notice) to fit
+  SPC RAM. Verified by building the authored output (`smconv` emits `SFX_<NAME>`,
+  the snesmod snippet links to a `.sfc`) and, live in the dogfood, by luna's DSP
+  state showing the voice key on.
+
 ## [0.48.0] — 2026-07-08
 
 ### Added — Add Sprite (art → on screen, no boilerplate)

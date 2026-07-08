@@ -30,6 +30,8 @@ import { resolveGraphics, serializeOverride, ResolvedGraphics, GRAPHICS_CONFIG_R
 import { parseGameTypes } from './gameTypes';
 import { renderMakefile, renderStarterMainC, ProjectSpec } from './projectGen';
 import { symbolBase, loadSnippet, ensureAsmSrc, appendGfxRule, upsertDataAsm } from './spriteScaffold';
+import { decodeWav } from './wav';
+import { buildIt, sfxSymbol, sfxSnippet, ensureSoundbank } from './soundScaffold';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
 import { mergeVscodeMcp, mergeProjectMcp } from './mcpConfig';
@@ -98,6 +100,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
         vscode.commands.registerCommand('cooper.addSprite', (uri?: vscode.Uri) => addSprite(uri)),
+        vscode.commands.registerCommand('cooper.addSoundEffect', (uri?: vscode.Uri) => addSoundEffect(uri)),
         vscode.commands.registerCommand('cooper.exportMetasprite', (uri?: vscode.Uri) => exportMetasprite(uri)),
         vscode.commands.registerCommand('cooper.setGraphicsMode', () => setGraphicsMode()),
         vscode.commands.registerCommand('cooper.configureAI', () => configureAI()),
@@ -522,6 +525,59 @@ async function addSprite(uri?: vscode.Uri): Promise<void> {
     await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
     void vscode.window.showInformationMessage(
         `Cooper: wired ${pngRel} — Makefile rule + data.asm bridge done. The C to load it is on your clipboard (and shown here). Build to see it.`);
+}
+
+/**
+ * Add Sound Effect (kills dogfood #2 friction F11 — no `.it` authoring path):
+ * from a plain WAV, generate a spec-valid soundbank `.it`, wire USE_SNESMOD +
+ * SOUNDBANK_SRC into the Makefile, and hand back the C snippet (init the driver,
+ * load, play). Cooper owns the sample→`.it`→soundbank bridge; the direct-BRR C
+ * API is broken (PVSnesLib ABI) so snesmod is the only path.
+ */
+async function addSoundEffect(uri?: vscode.Uri): Promise<void> {
+    const wav = await resolveProjectFile(uri, '.wav', 'add it as a sound effect');
+    if (!wav) {
+        return;
+    }
+    const projectDir = findProjectDir(path.dirname(wav));
+    if (!projectDir) {
+        fail('that WAV is not inside an OpenSNES project (a folder with a Makefile).');
+        return;
+    }
+    let decoded;
+    try {
+        decoded = decodeWav(fs.readFileSync(wav));
+    } catch (e) {
+        fail(`could not read the WAV: ${(e as Error).message}`);
+        return;
+    }
+    if (decoded.samples.length === 0) {
+        fail('that WAV has no audio samples.');
+        return;
+    }
+    const built = buildIt(path.basename(wav), decoded.samples, decoded.sampleRate);
+
+    const itRel = `sfx/${path.basename(wav, path.extname(wav))}.it`;
+    try {
+        fs.mkdirSync(path.join(projectDir, 'sfx'), { recursive: true });
+        fs.writeFileSync(path.join(projectDir, itRel), built.it);
+        const mkPath = path.join(projectDir, 'Makefile');
+        fs.writeFileSync(mkPath, ensureSoundbank(fs.readFileSync(mkPath, 'utf8'), itRel));
+    } catch (e) {
+        fail(`could not wire the sound into the project: ${(e as Error).message}`);
+        return;
+    }
+
+    const symbol = sfxSymbol(path.basename(wav));
+    const snippet = sfxSnippet(symbol);
+    await vscode.env.clipboard.writeText(snippet);
+    const durMs = Math.round((built.sampleCount / built.sampleRate) * 1000);
+    log(`add sound: ${itRel} (${symbol}, ${durMs}ms @ ${built.sampleRate}Hz) → Makefile soundbank wired; snippet on the clipboard`);
+    const doc = await vscode.workspace.openTextDocument({ language: 'c', content: snippet });
+    await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+    const note = built.truncated ? ` (trimmed to ${durMs}ms to fit SPC sample RAM)` : '';
+    void vscode.window.showInformationMessage(
+        `Cooper: wired ${itRel} → ${symbol}${note}. The C to play it is on your clipboard (and shown here). Build to hear it.`);
 }
 
 /**
