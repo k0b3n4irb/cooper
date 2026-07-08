@@ -1,84 +1,76 @@
-# Cooper — OpenSNES IDE
+# Cooper — the OpenSNES IDE
 
-> The one ring to bind them: a unified development environment for making SNES
-> games on the **OpenSNES** SDK + **luna** emulator.
+> Make SNES games without seams. Cooper turns VS Code into a full IDE for the
+> **OpenSNES** SDK + the **luna** cycle-accurate emulator: create, edit, build,
+> **play**, debug at the C-source level, author art, test, and ship — all in one
+> place.
 
-Cooper is a VS Code extension (pack, eventually) that ties together the whole
-OpenSNES vertical — SDK, compiler (`cc65816`: cproc→QBE→wla), and the luna
-cycle-accurate emulator — into one workflow: edit, build, run, debug, and
-author assets, without seams.
+Cooper is a VS Code extension. It's not a bag of loosely-wired tools: one author
+owns the whole vertical (the SDK, the `cc65816` compiler, and luna), so Cooper is
+**co-designed** with them — the debugger reads compiler-emitted debug info, the
+tests run in the same emulator the SDK ships, and your AI can query the real API.
 
-**New to Cooper? → [User Guide](docs/USER_GUIDE.md)** (install, configure, build /
-run / debug, troubleshooting, with screenshots).
+**New here?**
+- **[Tutorials](docs/TUTORIALS.md)** — short use-case walkthroughs (from zero to
+  a running game, draw & animate a sprite, debug a crash, profile a slow frame,
+  turn a bug into a test, ship to hardware).
+- **[User Guide](docs/USER_GUIDE.md)** — the full reference: install, every
+  command, settings, troubleshooting.
 
-The design is captured in [`docs/`](docs/):
+## What you can do with it
 
-- [`docs/01-architecture.md`](docs/01-architecture.md) — the full architecture
-  (the "ring" = a shared contract, not a fourth app).
-- [`docs/02-debugger-dap-luna.md`](docs/02-debugger-dap-luna.md) — the DAP ↔ luna
-  debugger design.
-- [`docs/03-debug-info-format.md`](docs/03-debug-info-format.md) — the debug-info
-  format (extend the WLA `.sym`, don't invent).
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) — stack & build decisions, dated.
+- **Start & build** — scaffold a project from a real SDK example (`New Project`),
+  one-click **Build**, and a **watch mode** that rebuilds + refreshes on every
+  save.
+- **Run & play** — render a frame inline, or **Play** your game in a native
+  luna-gui window (60 fps, sound, gamepad).
+- **Debug at the C source level** — breakpoints in your `main.c` (gutter or a
+  `◉ break · ▶ debug here` CodeLens), **typed locals** with struct/array
+  expansion, C-line stepping, registers, data watchpoints, **snapshots**,
+  symbol-annotated **disassembly**, a **"who wrote this address?" memory trace**,
+  and a **frame profiler** (per-function cycles + a per-scanline strip).
+- **See the hardware** — live **PPU viewers** (CGRAM palette, OAM sprites, an
+  interactive VRAM tile browser) and a **WRAM/VRAM memory map**.
+- **Author assets** — hardware-exact **palette** and **tile/sprite** editors
+  (with animation preview), a **tilemap viewer**, and **metasprite + animation C
+  export** with correct OAM tile-name computation.
+- **Test & reproduce** — **record** a play session (or import one from luna-gui),
+  **replay** it deterministically, and save it as a committed, CI-runnable
+  **gameplay regression test** (`make test`).
+- **Hear it & ship it** — render the game's **audio** to a `.wav` you play in the
+  editor; **validate** the ROM header/checksum and **deploy** to a flashcart SD.
+- **AI, OpenSNES-aware** — one command makes Copilot / Claude Code / Cursor query
+  the real SDK API and **verify their code in luna**.
 
-## Status
+## Install
 
-All headline capabilities are shipped. Built one component at a time, each
-grounded in up-to-date docs and verified before landing.
+Cooper orchestrates tools it doesn't bundle — **download the prebuilt builds, no
+compiler to install:**
 
-| Component | Status |
-|---|---|
-| **#1 — WLA-DX 65816 syntax highlighting** | ✅ shipped |
-| **#2 — C language support (clangd)** | ✅ shipped |
-| **#3 — Build & preview (make task + luna screenshot)** | ✅ shipped |
-| **#4 — Debugger (DAP ↔ luna)** | ✅ shipped — **source-level C**: breakpoints in `main.c`, typed locals + struct expansion, C-line stepping, data watchpoints, snapshots, disassembly, memory trace |
-| **#5 — Asset editors (palette · tiles/sprites · tilemap viewer)** | ✅ shipped — hardware-exact (BGR555, sprite sizes, `vhopppcc` attributes) |
-| **#6 — AI SDK-aware (AGENTS.md context · luna MCP · OpenSNES MCP)** | ✅ shipped |
+1. **OpenSNES SDK** — the release for your OS/arch from
+   [opensnes/releases](https://github.com/k0b3n4irb/opensnes/releases) (ships its
+   own `cc65816`/`qbe`/`wla`/`gfx4snes`). You only need `make`.
+2. **luna** — the emulator (+ `luna-gui`) from
+   [luna/releases](https://github.com/k0b3n4irb/luna/releases/latest).
+3. **Cooper** — the latest `.vsix` from
+   [cooper/releases](https://github.com/k0b3n4irb/cooper/releases/latest):
+   `code --install-extension cooper-x.y.z.vsix`.
 
-Not yet on the Marketplace — download the `.vsix` from the
-[releases](https://github.com/k0b3n4irb/cooper/releases/latest) (see the
-[User Guide](docs/USER_GUIDE.md)).
+Then point Cooper at the tools once (`cooper.opensnesPath`, `cooper.lunaPath`) and
+run **`Cooper: New Project…`**. Full setup: [User Guide §1–2](docs/USER_GUIDE.md).
+Not on the Marketplace yet — install from the `.vsix`.
 
-## Component #1 — WLA-DX 65816 assembly highlighting
+## Design
 
-Syntax highlighting for the WLA-DX assembly dialect used by OpenSNES hand-written
-ASM (`.asm`, `.inc`):
+The architecture and every dated decision live in [`docs/`](docs/):
 
-- the full **WDC 65816 instruction set** (92 mnemonics),
-- **200 WLA-DX directives** (`.SECTION`/`.ENDS`, `.DB`/`.DW`, `.RAMSECTION`,
-  `.ACCU`/`.INDEX`, `.IFDEF`/`.ELSE`/`.ENDIF`, …), case-insensitive,
-- `$hex` / `%binary` / decimal literals, `;` line comments, `"`/`'` strings,
-  column-0 labels, indexed registers.
-
-The directive set is generated from the WLA-DX assembler's own parser
-(`compiler/wla-dx/phase_1.c`) — the source of truth — so it tracks the real
-dialect, not a generic 65816 grammar.
-
-### Try it locally
-
-Open this folder in VS Code and press <kbd>F5</kbd> (Extension Development Host),
-then open any `lib/source/*.asm` from the OpenSNES repo.
-
-## Component #2 — C language support (clangd)
-
-C completion, navigation, and hover for OpenSNES code, via the official **clangd**
-extension (bundled — Cooper is an extension pack that installs
-`llvm-vs-code-extensions.vscode-clangd` for you). Cooper supplies the OpenSNES
-clangd configuration and the honest caveat that clangd's host target reports
-`int` as 4 bytes when the SNES target uses 2 — so the **`cc65816` build is the
-authority**, clangd is for completion/navigation.
-
-Run **Cooper: Configure clangd** from the Command Palette to generate the
-`.clangd` automatically — it finds the SDK via the `cooper.opensnesPath` setting,
-the project Makefile's `OPENSNES` line, or by searching parent folders (falling
-back to a folder picker).
-
-Setup and the full caveat: [`docs/clangd.md`](docs/clangd.md). The config was
-validated against the whole example corpus (56/56 `main.c` parse clean).
-
-> This component introduced Cooper's **TypeScript + esbuild** foundation. Pure
-> logic (SDK detection, `.clangd` rendering) lives in `src/clangdConfig.ts` with
-> no `vscode` import, unit-tested under Node (`npm test`).
+- [`01-architecture.md`](docs/01-architecture.md) — the "ring": a shared contract
+  (compiler debug-info + luna as the backend), everything else a thin client.
+- [`02-debugger-dap-luna.md`](docs/02-debugger-dap-luna.md) — the DAP ↔ luna
+  debugger.
+- [`03-debug-info-format.md`](docs/03-debug-info-format.md) — the debug-info
+  format (an extended WLA `.sym`).
+- [`DECISIONS.md`](docs/DECISIONS.md) — the dated decision log (D-001…).
 
 ## License
 

@@ -1,11 +1,14 @@
 # Cooper — User Guide
 
 Cooper is a VS Code extension that turns VS Code into an **IDE for making SNES
-games** with the OpenSNES SDK and the luna emulator: C support, one-click build &
-run, and a real **debugger** (breakpoints, registers, memory, live PPU viewers).
+games** with the OpenSNES SDK and the luna emulator: C support, one-click build,
+play, a source-level **debugger**, asset editors, tests, and shipping.
 
-> Status: this guide tracks the shipped extension (v0.24.x). Sections marked
-> **(coming)** are not implemented yet.
+> This is the **reference** — every command, setting and gotcha. Learning by
+> doing? Start with the **[Tutorials](TUTORIALS.md)** (use-case walkthroughs).
+>
+> Status: tracks the shipped extension (v0.45.x). Sections marked **(coming)**
+> are not implemented yet.
 
 ---
 
@@ -44,7 +47,7 @@ architecture and unzip them.** You only need `make` and a text editor.
   <https://github.com/k0b3n4irb/luna/releases/latest>, unzip, and point
   `cooper.lunaPath` at the `luna` binary **or** the folder it unzips into.
 - **clangd** — you do **not** install this yourself: the bundled *clangd*
-  extension downloads the language server in one click (see §8). (clangd is
+  extension downloads the language server in one click (see §9). (clangd is
   standalone — no separate `clang` needed for IntelliSense.)
 
 > **Source-level C debugging** (highlight your `main.c` line, typed locals, struct
@@ -267,7 +270,7 @@ highlighted line).
 
 ---
 
-## 7b. Ship to real hardware
+## 8. Ship to real hardware
 
 - **Cooper: Validate ROM** — checks the internal header the way the console
   does: title, checksum + complement (recomputed from the image), ROM size,
@@ -277,7 +280,7 @@ highlighted line).
   `cooper.deployPath` (your flashcart's SD card mount — asked once, then
   remembered). Eject, insert, play on the real thing.
 
-## 8. C IntelliSense
+## 9. C IntelliSense
 
 Open a `.c` file in an OpenSNES project and Cooper **writes a `.clangd`
 automatically** (it never overwrites an existing one). With clangd installed,
@@ -292,7 +295,7 @@ clangd**.
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -307,7 +310,7 @@ clangd**.
 
 ---
 
-## 10. Asset editors — palette
+## 11. Asset editors — palette
 
 **Right-click an indexed `.png`** in the Explorer → **Edit Palette (SNES BGR555)**
 (or run **Cooper: Edit Palette**). You get a hardware-accurate palette editor:
@@ -357,7 +360,7 @@ the real per-cell attributes (**sub-palette**, **H/V flip**). This is a *viewer*
 for **authoring** tilemaps, use **Tiled** (`.tmj`) — the SDK converts it with
 `tmx2snes` in the build.
 
-## 11. Make your AI OpenSNES-aware
+## 12. Make your AI OpenSNES-aware
 
 Run **Cooper: Configure AI (OpenSNES context)**. It:
 
@@ -376,12 +379,17 @@ OpenSNES C, looks up the real API instead of guessing, and verifies in luna.
 
 Reload the window (or start agent mode) so your assistant picks up the MCP servers.
 
-## 12. What's next
+## 13. What's next
 
-Cooper's core is complete — build/run, source-level debugger, asset editors +
-tilemap viewer, and an OpenSNES-aware AI (context + luna + SDK MCP). Ongoing
-polish: a live BG viewer from luna, richer asset editing, and Marketplace/OpenVSX
+The full workflow ships today — create/build/**play**, source-level debugger
+(snapshots, disassembly, memory trace, profiler, replay), asset editors +
+metasprite/anim export, gameplay tests on `make test`, audio audition, ROM
+validation + flashcart deploy, and an OpenSNES-aware AI.
+
+On the horizon: a **visual metasprite composer** for non-rectangular layouts,
+audio **tracker round-trip** + per-entry SFX audition, **usb2snes** over-the-wire
+deploy (FXPak), luna-gui **live reload** in watch mode, and Marketplace/OpenVSX
 publishing.
-- **AI helper** — an OpenSNES-aware assistant that verifies in luna.
 
-See `docs/DECISIONS.md` and `.claude/notes/roadmap.md` for the full plan.
+See `docs/DECISIONS.md` (dated decision log) and `.claude/notes/roadmap.md` for
+the full plan.
