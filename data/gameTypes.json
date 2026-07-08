@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "note": "Cooper game-type presets. Editable data — add/tune types here without recompiling. Each type prefills the New Game wizard; the user can adjust everything (or pick 'custom'). graphics.mode = SNES BG mode 0..7; graphics.objSize = OBSEL pair id 0..5 (0=8/16,1=8/32,2=8/64,3=16/32,4=16/64,5=32/64). build flags map to the Makefile USE_* knobs; the sound/sram/superfx/sa1 LIB_MODULES are added by those flags, so `modules` lists only the graphics/logic modules (deps auto-resolve at build).",
+  "types": [
+    {
+      "id": "platformer",
+      "name": "Platformer / Action",
+      "blurb": "Side-scrolling action — Mario, Mega Man, Donkey Kong Country.",
+      "graphics": { "mode": 1, "objSize": 3 },
+      "build": { "sound": true, "sram": true },
+      "modules": ["console", "background", "sprite", "dma", "input", "map", "scene", "anim", "collision", "hdma"]
+    },
+    {
+      "id": "rpg",
+      "name": "RPG (turn-based)",
+      "blurb": "Story, menus and battles — Final Fantasy, Chrono Trigger, Dragon Quest.",
+      "graphics": { "mode": 1, "objSize": 3 },
+      "build": { "sound": true, "sram": true },
+      "modules": ["console", "background", "sprite", "dma", "input", "text", "map", "object", "scene", "anim"]
+    },
+    {
+      "id": "shmup",
+      "name": "Shoot 'em up",
+      "blurb": "Bullets and bosses — Gradius, R-Type, Axelay.",
+      "graphics": { "mode": 1, "objSize": 3 },
+      "build": { "sound": true },
+      "modules": ["console", "background", "sprite", "dma", "input", "anim", "collision", "hdma"]
+    },
+    {
+      "id": "fighting",
+      "name": "Fighting / Versus",
+      "blurb": "Big characters trading blows — Street Fighter II, Killer Instinct.",
+      "graphics": { "mode": 1, "objSize": 5 },
+      "build": { "sound": true },
+      "modules": ["console", "background", "sprite", "dma", "input", "anim"]
+    },
+    {
+      "id": "racing",
+      "name": "Racing (Mode 7)",
+      "blurb": "A rotating, scaling track — F-Zero, Mario Kart, Top Gear.",
+      "graphics": { "mode": 7, "objSize": 3 },
+      "build": { "sound": true },
+      "modules": ["console", "background", "sprite", "dma", "input", "mode7", "hdma", "math", "fixed32"]
+    },
+    {
+      "id": "puzzle",
+      "name": "Puzzle",
+      "blurb": "One screen, tight rules — Tetris, Puyo Puyo, Panel de Pon.",
+      "graphics": { "mode": 1, "objSize": 0 },
+      "build": { "sound": true },
+      "modules": ["console", "background", "sprite", "dma", "input"]
+    },
+    {
+      "id": "adventure",
+      "name": "Action-adventure",
+      "blurb": "Explore a top-down/side world — Zelda: A Link to the Past, Secret of Mana.",
+      "graphics": { "mode": 1, "objSize": 3 },
+      "build": { "sound": true, "sram": true },
+      "modules": ["console", "background", "sprite", "dma", "input", "map", "object", "scene", "anim", "collision"]
+    },
+    {
+      "id": "custom",
+      "name": "Custom — I'll choose everything",
+      "blurb": "Start minimal and pick your own mode, chips and modules.",
+      "graphics": { "mode": 1, "objSize": 0 },
+      "build": { "sound": true },
+      "modules": ["console"],
+      "custom": true
+    }
+  ]
+}

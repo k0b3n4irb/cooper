@@ -583,6 +583,41 @@ check('validateSpriteImage: 24px sprite under OBSEL 16/32 rejected; 16px OK',
 check('validateSpriteImage: 17 colours rejected (sprites are 4bpp)', SM.validateSpriteImage(0, 8, 17).ok === false);
 try { fs.unlinkSync(tmpSm); } catch {}
 
+// --- C6: game-type presets (shipped data) validated vs the real SDK modules ---
+console.log('\n=== gameTypes.json: presets vs SDK reality ===');
+const tmpGt2 = path.join(os.tmpdir(), `cooper_gametypes_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'gameTypes.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpGt2 });
+const GT2 = require(tmpGt2);
+const gtJson = fs.readFileSync(path.join(__dirname, '..', 'data', 'gameTypes.json'), 'utf8');
+const types = GT2.parseGameTypes(gtJson);
+check('the shipped gameTypes.json parses + validates', Array.isArray(types) && types.length === 8);
+check('includes the validated genres + custom',
+    ['platformer', 'rpg', 'shmup', 'fighting', 'racing', 'puzzle', 'adventure', 'custom'].every((id) => types.some((t) => t.id === id)));
+check('sound is ON by default across ALL types (user rule)', types.every((t) => t.build.sound === true));
+check('racing is Mode 7; fighting uses the big 32/64 sprites',
+    types.find((t) => t.id === 'racing').graphics.mode === 7 && types.find((t) => t.id === 'fighting').graphics.objSize === 5);
+// cross-check every listed module exists in the real SDK build dir
+// module NAME set = the linkable objects <mod>.o / <mod>-asm.o (asm-only modules
+// have only the -asm.o form), stripped to the base name.
+const realModules = new Set(fs.existsSync(path.join(OPENSNES, 'lib', 'build', 'lorom'))
+    ? fs.readdirSync(path.join(OPENSNES, 'lib', 'build', 'lorom')).filter((f) => f.endsWith('.o')).map((f) => f.replace(/-asm\.o$/, '').replace(/\.o$/, ''))
+    : []);
+if (!realModules.size) {
+    skipped('SDK lib/build not available');
+} else {
+    const allListed = [...new Set(types.flatMap((t) => t.modules))];
+    const unknown = allListed.filter((m) => !realModules.has(m));
+    check('every module in gameTypes.json is a real SDK lib module', unknown.length === 0);
+    if (unknown.length) { console.log('  unknown modules:', unknown.join(', ')); }
+    // flag-driven modules must NOT be listed (they come from build.* toggles)
+    const flagDriven = ['snesmod', 'sram', 'superfx', 'sa1'];
+    check('flag-driven modules (snesmod/sram/superfx/sa1) are NOT in modules lists',
+        types.every((t) => !t.modules.some((m) => flagDriven.includes(m))));
+}
+check('validation rejects an out-of-range mode', (() => { try { GT2.parseGameTypes('{"types":[{"id":"x","name":"X","blurb":"b","graphics":{"mode":9,"objSize":0},"build":{"sound":true},"modules":["console"]}]}'); return false; } catch { return true; } })());
+check('validation rejects a missing sound flag', (() => { try { GT2.parseGameTypes('{"types":[{"id":"x","name":"X","blurb":"b","graphics":{"mode":1,"objSize":0},"build":{},"modules":["console"]}]}'); return false; } catch { return true; } })());
+try { fs.unlinkSync(tmpGt2); } catch {}
+
 // --- C6 spine: hybrid graphics-config resolution (pure, real example .c) ---
 console.log('\n=== graphicsConfig: parse code + override precedence ===');
 const tmpGc = path.join(os.tmpdir(), `cooper_graphicscfg_${process.pid}.cjs`);

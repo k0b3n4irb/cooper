@@ -1159,6 +1159,35 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-066 — Guided "New Game" wizard: game-type presets → generated project (2026-07-08)
+- **Decision (user, 2026-07-08):** a guided **Create New Game** flow — survey the
+  **game type** (which prefills a sensible SNES profile), let the user adjust via
+  **checkboxes** (sound, SA-1, SuperFX, SRAM, HiROM…), plus a **custom** type for
+  the 10% who know what they want. Philosophy: **guide the 90% who want guiding,
+  free the 10% who master it.** Prefills feed the mode/constraint spine (D-065).
+- **Fully grounded/buildable:** the Makefile exposes exactly the needed knobs —
+  `USE_SA1`/`USE_SUPERFX` (auto-switch header/memmap/cartridge type),
+  `USE_HIROM`/`USE_FASTROM`/`USE_SRAM`+`SRAM_SIZE`, `USE_SNESMOD`+`SOUNDBANK_SRC`,
+  and `LIB_MODULES` with auto-resolved deps (`make/common.mk`). `snesmod`/`sram`/
+  `superfx`/`sa1` modules are added BY those flags, so the presets list only the
+  graphics/logic modules.
+- **Modular by design (user rule "stay modular to evolve"):** the catalogue is
+  **data** — `data/gameTypes.json` (shipped in the vsix, editable without a
+  recompile). 8 types (platformer, rpg, shmup, fighting, racing=Mode7,
+  puzzle, adventure, custom), each with `{graphics:{mode,objSize}, build:{sound
+  (ON everywhere), sram…}, modules[]}`. Pure `gameTypes.ts` parses + validates.
+- **Verified:** the shipped JSON validates, sound is on across all types, racing
+  is Mode 7 / fighting uses 32/64 sprites, and **every listed module is
+  cross-checked against the real SDK `lib/build` objects** (unknown module →
+  test fails), flag-driven modules excluded from the lists.
+- **Next slices (agreed direction):** (1) a **pure generator** `config → Makefile
+  + starter main.c + .cooper/graphics.json`, verified by actually **building**
+  the generated project; (2) the wizard UI; (3) a **modular starter/snippet
+  library** (a base `main.c` per type + graphics/sound/effects snippets). Drift
+  guard for embedded code (the D-050 concern): keep starters minimal and
+  **CI-compile them against the current SDK** so any API drift fails a test, not
+  the user's build.
+
 ### D-065 — Mode-driven SNES constraint model = the spine of the C6 editors (2026-07-08)
 - **Decision (user, 2026-07-08):** the asset editors are built **in-editor** but
   are **SNES-perfect, not generic**: the project picks a **BG mode** (+ an OBSEL
