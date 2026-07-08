@@ -89,7 +89,17 @@ server`) — one click, no terminal.
 
 ---
 
-### Your first project — `Cooper: New Project…`
+### Start a new game — `Cooper: Create New Game…`
+
+The guided way in (also the 🎮 button on the empty dashboard): pick a **game
+type** (platformer, RPG, shmup, fighting, racing, puzzle, adventure — or
+*custom*). Cooper prefills a sensible SNES profile (BG mode, sprite sizes, the
+right library modules, sound on), lets you tweak the **hardware features** with
+checkboxes (SRAM save, SA-1, SuperFX, HiROM, FastROM), then generates the
+project — Makefile, a starter `main.c` for that mode, `.cooper/graphics.json` —
+builds it, and opens it. You're one **Run** away from a booting game.
+
+### Or start from an SDK example — `Cooper: New Project…`
 
 No project yet? Don't copy files around: run **Cooper: New Project…** (also
 offered on the dashboard when no project is open). Pick a **real SDK example**

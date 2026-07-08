@@ -4,6 +4,21 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.47.0] — 2026-07-08
+
+### Added — Create New Game (guided)
+
+- **Cooper: Create New Game…** (and a 🎮 button on the empty dashboard) — pick a
+  **game type** (platformer, RPG, shmup, fighting, racing, puzzle, adventure, or
+  custom); Cooper prefills the SNES profile (BG mode, sprite sizes, library
+  modules, sound), you tweak the hardware features with checkboxes, and it
+  generates the Makefile + a starter `main.c` for your mode + `.cooper/
+  graphics.json`, builds, and opens the project. From "new game" to a booting
+  ROM in a few clicks — code-first, nothing hidden.
+- Under the hood: a pure project generator verified by **building all eight game
+  types** against the real SDK (which caught real linker-module gaps in the
+  presets).
+
 ## [0.46.0] — 2026-07-08
 
 ### Added — graphics mode (the SNES constraint spine)

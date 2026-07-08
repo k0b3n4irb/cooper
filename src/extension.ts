@@ -27,6 +27,8 @@ import { renderTileEditorHtml } from './tileEditor';
 import { gridMetasprite, emitMetasprite, emitAnimClip } from './metasprite';
 import { BG_MODES, OBJ_SIZE_PAIRS } from './snesModes';
 import { resolveGraphics, serializeOverride, ResolvedGraphics, GRAPHICS_CONFIG_REL } from './graphicsConfig';
+import { parseGameTypes } from './gameTypes';
+import { renderMakefile, renderStarterMainC, ProjectSpec } from './projectGen';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
 import { mergeVscodeMcp, mergeProjectMcp } from './mcpConfig';
@@ -102,6 +104,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.showDisasm', () => showDisasm()),
         vscode.commands.registerCommand('cooper.traceMemory', () => traceMemory()),
         vscode.commands.registerCommand('cooper.newProject', () => newProject()),
+        vscode.commands.registerCommand('cooper.createNewGame', () => createNewGame(context)),
         vscode.commands.registerCommand('cooper.debugHere', (name: string) => debugHere(name)),
         vscode.commands.registerCommand('cooper.watch', () => toggleWatch(context)),
         vscode.commands.registerCommand('cooper.showMemoryMap', () => showMemoryMap()),
@@ -883,6 +886,7 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
         switch (m.command) {
             case 'build': await runBuild(); break;
             case 'new': await newProject(); break;
+            case 'newgame': await createNewGame(context); break;
             case 'play': await playInLunaGui(); break;
             case 'debug': startLunaDebug((await resolveProjectInfo())); break;
             case 'palette': await showPalette(); break;
@@ -1638,6 +1642,143 @@ async function newProject(): Promise<void> {
     if (pick) {
         await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dest), pick === 'Open in New Window');
     }
+}
+
+/** First-build a freshly created project, then offer to open it. Shared by the
+ *  copy-example scaffolder and the New Game generator. */
+async function firstBuildAndOpen(name: string, dest: string, sdkPath: string): Promise<void> {
+    const built = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Cooper: first build of ${name}…` },
+        async () => {
+            try {
+                await execFileAsync('make', [`OPENSNES=${sdkPath}`], { cwd: dest, timeout: 120000 });
+                return true;
+            } catch (e) {
+                log(`new game: first build failed — ${String((e as { stderr?: string }).stderr ?? e)}`);
+                return false;
+            }
+        },
+    );
+    const pick = await vscode.window.showInformationMessage(
+        built ? `Cooper: "${name}" created and built — open it and press Run.`
+            : `Cooper: "${name}" created (the first build failed — open it and see the Build output).`,
+        'Open Project', 'Open in New Window',
+    );
+    if (pick) {
+        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dest), pick === 'Open in New Window');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Create New Game (D-066) — the guided wizard: survey a game type → prefilled
+// SNES profile → adjust flags → (custom: pick mode) → generate + build + open.
+// ---------------------------------------------------------------------------
+
+async function createNewGame(context: vscode.ExtensionContext): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('cooper');
+    const sdk = detectSdk({
+        configured: cfg.get<string>('opensnesPath')?.trim() || undefined,
+        projectDir: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
+    });
+    if (!sdk) {
+        failWithDownload('sdk', 'the OpenSNES SDK is needed to create a game — download it, set cooper.opensnesPath, then retry.');
+        return;
+    }
+    let types;
+    try {
+        types = parseGameTypes(fs.readFileSync(context.asAbsolutePath('data/gameTypes.json'), 'utf8'));
+    } catch (e) {
+        fail(`could not load the game-type presets: ${(e as Error).message}`);
+        return;
+    }
+
+    // 1. Survey — the game type.
+    const typePick = await vscode.window.showQuickPick(
+        types.map((t) => ({ label: t.name, detail: t.blurb, t })),
+        { placeHolder: 'What kind of game? (prefills a sensible SNES profile — you can adjust everything)', matchOnDetail: true },
+    );
+    if (!typePick) {
+        return;
+    }
+    const type = typePick.t;
+
+    // 2. Name.
+    const name = await vscode.window.showInputBox({
+        prompt: 'Project name (folder + ROM name)', value: type.id,
+        validateInput: validateProjectName,
+    });
+    if (!name) {
+        return;
+    }
+
+    // 3. Graphics — custom picks mode + sprite size; presets use their default
+    //    (changeable later via "Set Graphics Mode").
+    let graphics = { ...type.graphics };
+    if (type.custom) {
+        const modePick = await vscode.window.showQuickPick(
+            BG_MODES.map((m) => ({ label: `Mode ${m.mode}`, detail: m.description, mode: m.mode })),
+            { placeHolder: 'Background mode', matchOnDetail: true });
+        if (!modePick) {
+            return;
+        }
+        const objPick = await vscode.window.showQuickPick(
+            OBJ_SIZE_PAIRS.map((p) => ({ label: `${p.small}px / ${p.large}px sprites`, id: p.id })),
+            { placeHolder: 'Sprite sizes (OBSEL)' });
+        if (!objPick) {
+            return;
+        }
+        graphics = { mode: modePick.mode, objSize: objPick.id };
+    }
+
+    // 4. Build flags — checkboxes, prefilled from the preset.
+    const flagDefs: { key: keyof typeof type.build; label: string; detail: string }[] = [
+        { key: 'sound', label: 'Sound (SNESMOD tracker audio)', detail: 'link the audio engine' },
+        { key: 'sram', label: 'Battery save (SRAM)', detail: 'persistent saves' },
+        { key: 'fastrom', label: 'FastROM', detail: '~33% faster ROM access' },
+        { key: 'hirom', label: 'HiROM', detail: 'large-ROM mapping (64KB banks)' },
+        { key: 'sa1', label: 'SA-1 accelerator chip', detail: 'faster CPU coprocessor' },
+        { key: 'superfx', label: 'SuperFX / GSU chip', detail: 'polygon/bitmap coprocessor' },
+    ];
+    const flagPick = await vscode.window.showQuickPick(
+        flagDefs.map((f) => ({ label: f.label, detail: f.detail, picked: !!type.build[f.key], key: f.key })),
+        { placeHolder: 'Hardware features (space to toggle) — prefilled for this game type', canPickMany: true },
+    );
+    if (flagPick === undefined) {
+        return; // Escape = cancel
+    }
+    const build = { sound: false, sram: false, hirom: false, fastrom: false, sa1: false, superfx: false };
+    for (const p of flagPick) {
+        build[p.key] = true;
+    }
+
+    // 5. Destination.
+    const parent = await vscode.window.showOpenDialog({
+        canSelectFiles: false, canSelectFolders: true, canSelectMany: false,
+        openLabel: 'Create the game here', title: `The "${name}" folder will be created inside…`,
+    });
+    if (!parent?.[0]) {
+        return;
+    }
+    const dest = path.join(parent[0].fsPath, name);
+    if (fs.existsSync(dest)) {
+        fail(`${dest} already exists — pick another name or folder.`);
+        return;
+    }
+
+    // 6. Generate.
+    const spec: ProjectSpec = { name, graphics, build, modules: type.modules };
+    try {
+        fs.mkdirSync(path.join(dest, '.cooper'), { recursive: true });
+        fs.writeFileSync(path.join(dest, 'Makefile'), renderMakefile(spec, sdk.path));
+        fs.writeFileSync(path.join(dest, 'main.c'), renderStarterMainC(spec));
+        fs.writeFileSync(path.join(dest, '.clangd'), renderClangd(sdk.path));
+        fs.writeFileSync(path.join(dest, GRAPHICS_CONFIG_REL), serializeOverride(graphics));
+        log(`new game: ${type.id} → ${dest} (mode ${graphics.mode}, flags ${Object.entries(build).filter(([, v]) => v).map(([k]) => k).join('+') || 'none'})`);
+    } catch (e) {
+        fail(`could not create the game: ${(e as Error).message}`);
+        return;
+    }
+    await firstBuildAndOpen(name, dest, sdk.path);
 }
 
 // ---------------------------------------------------------------------------

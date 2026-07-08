@@ -353,9 +353,9 @@ check('dashboard allows data: images for the preview', dash.includes('img-src vs
 check('dashboard reflects status (luna ready, ROM built)', dash.includes('ready') && dash.includes('built'));
 check('dashboard has a preview image slot', dash.includes('id="preview"'));
 const dashEmpty = D2.renderDashboardHtml({ hasProject: false, projectName: '', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N');
-check('dashboard empty state when no project', dashEmpty.includes('Open an OpenSNES project'));
-check('dashboard empty state offers New Project (nonce-gated script)',
-    dashEmpty.includes('id="new-project"') && dashEmpty.includes('nonce="N"'));
+check('dashboard empty state guides a new game', dashEmpty.includes('Start a new SNES game'));
+check('dashboard empty state offers Create New Game + New Project (nonce-gated script)',
+    dashEmpty.includes('id="new-game"') && dashEmpty.includes('id="new-project"') && dashEmpty.includes('nonce="N"'));
 
 // --- disassembly viewer HTML (pure) ---
 console.log('\n=== disassembly viewer HTML (pure) ===');
@@ -617,6 +617,52 @@ if (!realModules.size) {
 check('validation rejects an out-of-range mode', (() => { try { GT2.parseGameTypes('{"types":[{"id":"x","name":"X","blurb":"b","graphics":{"mode":9,"objSize":0},"build":{"sound":true},"modules":["console"]}]}'); return false; } catch { return true; } })());
 check('validation rejects a missing sound flag', (() => { try { GT2.parseGameTypes('{"types":[{"id":"x","name":"X","blurb":"b","graphics":{"mode":1,"objSize":0},"build":{},"modules":["console"]}]}'); return false; } catch { return true; } })());
 try { fs.unlinkSync(tmpGt2); } catch {}
+
+// --- A1: project generator (pure) + REAL build of generated projects ---
+console.log('\n=== projectGen: Makefile + starter main.c, and they build ===');
+const tmpPg = path.join(os.tmpdir(), `cooper_projectgen_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'projectGen.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPg });
+const PG = require(tmpPg);
+const tmpGtPg = path.join(os.tmpdir(), `cooper_gt_forpg_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'gameTypes.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpGtPg });
+const GTforPG = require(tmpGtPg);
+const allTypes = GTforPG.parseGameTypes(fs.readFileSync(path.join(__dirname, '..', 'data', 'gameTypes.json'), 'utf8'));
+const specOf = (ty) => ({ name: ty.id.replace(/_/g, '-'), graphics: ty.graphics, build: ty.build, modules: ty.modules });
+// pure structure, for every type
+check('romName: upper-cased, ≤21 chars', PG.romName('my cool game!!') === 'MY COOL GAME' && PG.romName('') === 'SNES GAME');
+check('every type renders a Makefile with TARGET/ROM_NAME/LIB_MODULES/common.mk include + OPENSNES ?=',
+    allTypes.every((ty) => { const mk = PG.renderMakefile(specOf(ty), '/sdk'); return mk.includes(`TARGET   := ${ty.id.replace(/_/g, '-')}.sfc`) && /ROM_NAME := \S/.test(mk) && mk.includes('LIB_MODULES := ') && mk.includes('include $(OPENSNES)/make/common.mk') && mk.includes('OPENSNES ?= /sdk') && mk.includes('USE_LIB     := 1'); }));
+check('sound → USE_SNESMOD:=1 (all types have sound on)', allTypes.every((ty) => PG.renderMakefile(specOf(ty), '/sdk').includes('USE_SNESMOD := 1')));
+check('sram flag emits USE_SRAM only when set',
+    PG.renderMakefile(specOf(allTypes.find((t) => t.id === 'rpg')), '/sdk').includes('USE_SRAM    := 1')
+    && !PG.renderMakefile(specOf(allTypes.find((t) => t.id === 'shmup')), '/sdk').includes('USE_SRAM'));
+check('starter main.c: consoleInit + setMode(BG_MODE<n>) + setScreenOn + VBlank loop',
+    allTypes.every((ty) => { const c = PG.renderStarterMainC(specOf(ty)); return c.includes('consoleInit();') && c.includes(`setMode(BG_MODE${ty.graphics.mode}, 0);`) && c.includes('setScreenOn();') && c.includes('WaitForVBlank();'); }));
+check('starter oamInit only when the sprite module is present',
+    PG.renderStarterMainC(specOf(allTypes.find((t) => t.id === 'platformer'))).includes('oamInit(OBJ_SIZE16_L32, 0);')
+    && !PG.renderStarterMainC(specOf(allTypes.find((t) => t.id === 'custom'))).includes('oamInit'));
+// REAL build: the 3 types that link-broke before grounding the module sets are the
+// regression guards (rpg=object needs sprite_dynamic, racing=Mode7, custom=minimal base).
+if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk'))) {
+    skipped('SDK make not available');
+} else {
+    for (const id of ['rpg', 'racing', 'custom']) {
+        const ty = allTypes.find((t) => t.id === id);
+        const dir = path.join(os.tmpdir(), `cooper_gen_${process.pid}_${id}`);
+        try {
+            fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(path.join(dir, 'Makefile'), PG.renderMakefile(specOf(ty), OPENSNES));
+            fs.writeFileSync(path.join(dir, 'main.c'), PG.renderStarterMainC(specOf(ty)));
+            const r = cp.spawnSync('make', [], { cwd: dir, encoding: 'utf8', timeout: 180000 });
+            check(`generated "${id}" project builds a .sfc with plain make`,
+                r.status === 0 && fs.existsSync(path.join(dir, `${ty.id.replace(/_/g, '-')}.sfc`)));
+            if (r.status !== 0) { console.log((r.stdout || '').split('\n').slice(-5).join('\n')); }
+        } finally {
+            try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+        }
+    }
+}
+try { fs.unlinkSync(tmpPg); fs.unlinkSync(tmpGtPg); } catch {}
 
 // --- C6 spine: hybrid graphics-config resolution (pure, real example .c) ---
 console.log('\n=== graphicsConfig: parse code + override precedence ===');

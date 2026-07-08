@@ -248,21 +248,22 @@ Before it: **P2.2b** data breakpoints (0.5.0); **P2.2a** memory view (0.4.0);
 
 ## Current focus
 
-**🎨 The GUI layer (user priority — "a graphical IDE like GitLens, not 1000
-keyboard shortcuts; beautiful and easy").** Backend (debugger + viewers) is
-feature-complete; the work now is **making it feel like an IDE**, not more
-capability. Plan chosen from 3 SVG mockups (`/tmp/cooper_ui_{1,2,3}.png`):
-- ✅ **Sidebar (0.11.0)** — the clickable backbone. Done.
-- 🔜 **Webview dashboard / Home** (mockup #2) — big Build/Run/Debug buttons, live
-  preview thumbnail, palette/sprite/tile cards. The "beau" wow. Webview-heavy but
-  integration-testable.
-- 🔜 **CodeLens + inline actions** (mockup #3) — "▶ Debug here · 👁 watch" above
-  functions; editor-title Build/Run/Debug buttons. Finishing polish.
-- Also: one-click clangd download surfaced proactively; build-before-debug.
+**🎮 The guided creation flow + mode-driven SNES-perfect editors** (Phase A→B of
+the vision, `roadmap.md`; user direction 2026-07-08). Positioning locked:
+**code-first + guided, NOT a no-code GB Studio clone** — lower the ramp
+(wizard/presets/snippets/constraints) without hiding code or capping the ceiling.
+- ✅ **Constraint spine** (`snesModes.ts`, D-065) + hybrid config
+  (`graphicsConfig.ts`, `Set Graphics Mode…`).
+- ✅ **Game-type presets** (`data/gameTypes.json`, D-066) + **project generator**
+  (`projectGen.ts`) + **`Create New Game…`** wizard (D-067). Generator verified
+  by building all 8 game types.
+- 🔜 **A3** starter/snippet library (data-driven, CI-compiled).
+- 🔜 **B** palette/tile editors go mode-aware; then the tilemap editor
+  (supersedes D-042).
+- ▶ **Dogfood** a real small game in parallel — reality prioritises the Workshop.
 
-North star: **open project → it just works, and looks good.** See
-[[cooper-simplicity-over-features]]. Deferred: viewer selectors; multi-bp
-continue; source-level (P7, G0 flags).
+North star: **open Cooper → guided to a running game → grows into a real
+toolchain.** See [[cooper-simplicity-over-features]].
 
 ## Foundations in place
 

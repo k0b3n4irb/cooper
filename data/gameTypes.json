@@ -16,7 +16,7 @@
       "blurb": "Story, menus and battles — Final Fantasy, Chrono Trigger, Dragon Quest.",
       "graphics": { "mode": 1, "objSize": 3 },
       "build": { "sound": true, "sram": true },
-      "modules": ["console", "background", "sprite", "dma", "input", "text", "map", "object", "scene", "anim"]
+      "modules": ["console", "sprite", "sprite_dynamic", "sprite_lut", "dma", "input", "background", "text", "map", "object", "scene", "anim"]
     },
     {
       "id": "shmup",
@@ -37,10 +37,10 @@
     {
       "id": "racing",
       "name": "Racing (Mode 7)",
-      "blurb": "A rotating, scaling track — F-Zero, Mario Kart, Top Gear.",
+      "blurb": "A rotating, scaling track — F-Zero, Mario Kart, Top Gear. Add the fixed32/math modules when you implement the perspective transforms.",
       "graphics": { "mode": 7, "objSize": 3 },
       "build": { "sound": true },
-      "modules": ["console", "background", "sprite", "dma", "input", "mode7", "hdma", "math", "fixed32"]
+      "modules": ["console", "dma", "background", "sprite", "input", "mode7"]
     },
     {
       "id": "puzzle",
@@ -56,15 +56,15 @@
       "blurb": "Explore a top-down/side world — Zelda: A Link to the Past, Secret of Mana.",
       "graphics": { "mode": 1, "objSize": 3 },
       "build": { "sound": true, "sram": true },
-      "modules": ["console", "background", "sprite", "dma", "input", "map", "object", "scene", "anim", "collision"]
+      "modules": ["console", "sprite", "sprite_dynamic", "sprite_lut", "dma", "input", "background", "map", "object", "scene", "anim", "collision"]
     },
     {
       "id": "custom",
       "name": "Custom — I'll choose everything",
-      "blurb": "Start minimal and pick your own mode, chips and modules.",
+      "blurb": "Start from a minimal but bootable base and pick your own mode, chips and modules.",
       "graphics": { "mode": 1, "objSize": 0 },
       "build": { "sound": true },
-      "modules": ["console"],
+      "modules": ["console", "background", "dma", "input"],
       "custom": true
     }
   ]

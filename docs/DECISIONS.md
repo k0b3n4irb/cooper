@@ -1159,6 +1159,28 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-067 — Project generator + Create New Game wizard (D-066 slice 1-2, 2026-07-08)
+- **Decision:** a **pure generator** `src/projectGen.ts` turns a resolved spec
+  (`{name, graphics, build, modules}`) into a Makefile (`USE_*` flags +
+  `LIB_MODULES` + `OPENSNES ?=` + `common.mk`) and a **minimal drift-safe starter
+  `main.c`** (consoleInit → setMode → oamInit-when-sprite → setMainScreen-when-bg
+  → setScreenOn → VBlank loop). `Cooper: Create New Game…` is the guided wizard:
+  survey the game type → prefilled profile → flag checkboxes → (custom picks
+  mode+OBSEL) → generate + `.cooper/graphics.json` + first-build + open. Offered
+  on the dashboard empty state (🎮 Create New Game) beside New Project.
+  Complements D-050's copy-an-example scaffolder; this *generates* from config.
+- **Grounded by BUILDING the output (the load-bearing test):** generating +
+  `make`-building all 8 game types caught real link errors that plausible presets
+  hid — `object` needs `sprite_dynamic`+`sprite_lut` (where `oambuffer` lives;
+  confirmed vs `games/mapandobjects`); a console-only base doesn't link
+  (`clearNmiFlag` is in `dma`); the racing preset's `fixed32`+`math`+`hdma` combo
+  fails to link, and the SDK's own Mode 7 example uses none of them. `gameTypes.json`
+  module lists were corrected to the link-verified sets; the starter only calls
+  API whose module is present.
+- **Verified:** pure tests (Makefile/starter structure per type) + **real `make`
+  builds** of the three types that had link-broken (rpg/racing/custom) as
+  regression guards. 396 Node + 10 integration.
+
 ### D-066 — Guided "New Game" wizard: game-type presets → generated project (2026-07-08)
 - **Decision (user, 2026-07-08):** a guided **Create New Game** flow — survey the
   **game type** (which prefills a sensible SNES profile), let the user adjust via
