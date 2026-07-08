@@ -64,6 +64,11 @@ Studio (different console, opposite philosophy).
 - 🔜 A3 **starter + snippet library** (data-driven, CI-compiled): a richer base
   `main.c` per genre; graphics/sound/effects snippets with a small manifest
   (title, required modules, insertion point).
+  - **Spearhead (from dogfood #1, `dogfood-01.md`): `Cooper: Add Sprite…`** — the
+    art→code scaffolder. From a PNG: run gfx4snes, generate the `data.asm` incbin
+    bridge, wire the Makefile rule/ASMSRC, insert the C snippet (`extern` +
+    `dmaCopyVram`/`dmaCopyCGram`/`oamSet` with the tile number COMPUTED). This is
+    the cliff the dogfood hit (F1/F2/F4) and the highest-value onramp slice.
 
 ### Phase B — Mode-aware asset Workshop
 - 🔜 B1 palette + tile editors **read the resolved config** and enforce/teach
