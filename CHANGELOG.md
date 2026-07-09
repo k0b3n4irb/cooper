@@ -4,6 +4,21 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.51.2] — 2026-07-09
+
+### Changed — verified against OpenSNES v0.29.1 (two upstream fixes consumed)
+
+- **SDK pin → v0.29.1**, which lands the two bugs Cooper filed:
+  - **#99** (cc65816 `u8` read-modify-write through a pointer misread for structs
+    outside page zero). Re-verified the whole two-tier suite on the fixed
+    compiler — 438 → 439 green, builds/debug-info/`make test`/luna all intact
+    (the `consoleInit` +4-instruction rebaseline changed nothing observable).
+  - **#100** (`gfx4snes -T` now emits real 8×8 OAM char-names, not block
+    indices). Cooper already computed these itself (0.51.0/0.51.1); now **CI
+    cross-checks Cooper's `sheetFrameTiles` against `gfx4snes -T`'s own table**
+    (2×2 sheet → 0,2,4,6), so the two can never silently diverge. Cooper keeps
+    computing them (pure/offline), validated by the now-authoritative tool.
+
 ## [0.51.1] — 2026-07-09
 
 ### Fixed — Export Metasprite tile names on non-128px-wide sheets

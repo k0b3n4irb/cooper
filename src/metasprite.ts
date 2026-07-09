@@ -2,9 +2,11 @@
 //
 // The OpenSNES library (sprite.h, opensnes#97) delegates the metasprite `tile`
 // computation to the editor: `tile` is an 8x8 OAM **character-name** offset for
-// the sheet as it sits in VRAM, NOT a block index. gfx4snes `-T` currently
-// emits block indices and renders wrong for 16/32px blocks (opensnes#100), so
-// Cooper computes names from the sheet geometry itself.
+// the sheet as it sits in VRAM, NOT a block index. gfx4snes `-T` used to emit
+// block indices (wrong for 16/32px blocks, opensnes#100); **fixed in SDK
+// v0.29.1** — it now emits the same positional char-names Cooper computes. Cooper
+// keeps computing them itself (pure/offline, no subprocess), and CI cross-checks
+// our numbers against `gfx4snes -T`'s own table so the two can never diverge.
 //
 // The char-name uses the SAME grounded truth as Add Sprite → sheets
 // (`sheetFrameTile`): gfx4snes packs cells **row-major into 16-tile-wide VRAM

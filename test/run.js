@@ -769,6 +769,19 @@ if (!fs.existsSync(path.join(OPENSNES, 'bin', 'gfx4snes')) || !fs.existsSync(pat
         check('sheet frame tiles match gfx4snes reality (2×2 → cells 1,2,3,4)',
             tiles.length === 4 && tiles.every((t, n) => tileColor(t) === n + 1));
 
+        // (1b) opensnes#100 dividend (fixed in v0.29.1): gfx4snes -T now emits
+        // real 8×8 char-names — cross-check Cooper's computation against the
+        // now-authoritative tool table, not just our own .pic decode.
+        cp.spawnSync(path.join(OPENSNES, 'bin', 'gfx4snes'), ['-s', '16', '-T', '-X', '32', '-Y', '32', '-p', '-i', pngPath], { cwd: dir });
+        const metaInc = path.join(dir, 'res', 'sheet_meta.inc');
+        if (fs.existsSync(metaInc)) {
+            const toolTiles = [...fs.readFileSync(metaInc, 'utf8').matchAll(/METASPR_ITEM\(\s*\d+\s*,\s*\d+\s*,\s*(\d+)/g)].map((m) => Number(m[1]));
+            check('sheetFrameTiles matches gfx4snes -T char-names (#100 fixed): [0,2,4,6]',
+                JSON.stringify(toolTiles) === JSON.stringify(tiles));
+        } else {
+            check('gfx4snes -T emitted a metasprite table', false);
+        }
+
         // (2) a scaffolded sheet builds
         const spec = { name: 'shtest', graphics: { mode: 1, objSize: 3 }, build: { sound: false }, modules: ['console', 'background', 'sprite', 'dma', 'input'] };
         let mk = PGsh.renderMakefile(spec, OPENSNES);

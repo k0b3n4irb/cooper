@@ -1159,6 +1159,25 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-072 — Consume opensnes v0.29.1 dividends (#99, #100; 2026-07-09)
+- **Context:** the two bugs Cooper filed shipped in SDK **v0.29.1**: #99 (cc65816
+  `u8` RMW-through-pointer misread outside page zero — reached `consoleInit`) and
+  #100 (`gfx4snes -T` emitted block indices, not 8×8 char-names).
+- **Verify-before-consume (the dividend rule):** confirmed both fixes are real in
+  the delivered binaries **before** changing anything. #99: ran Cooper's full
+  two-tier suite against the local v0.29.1 build — green, nothing regressed by the
+  `consoleInit` rebaseline. #100: ran `gfx4snes -s16 -T -X32 -Y32` on a solid 2×2
+  16px grid → `METASPR_ITEM` tiles `0,2,4,6`, exactly Cooper's `sheetFrameTiles`.
+- **Consumed:** (a) bumped CI `OPENSNES_REF` → `v0.29.1`; (b) added a CI
+  cross-check asserting `sheetFrameTiles` equals `gfx4snes -T`'s emitted table —
+  Cooper's char-name math (D-071/0.51.1) is now locked to the authoritative tool
+  and can't silently drift. Kept Cooper's own computation (pure/offline, no
+  subprocess at command time); #100 also confirmed the formula I reverse-derived
+  matches the SDK author's implementation `(p/bpr)*(sub*16)+(p%bpr)*sub`.
+- **Not done (deliberately):** did NOT rip out Cooper's computation to shell out
+  to `gfx4snes -T` — that would add a subprocess + parse where a tested pure
+  function already gives the same answer.
+
 ### D-071 — Add Sprite → multi-frame sheets (dogfood #2 F8, 2026-07-08)
 - **Context:** dogfood #2 F8 — a sheet of several frames (ship + star, or anim
   frames) needs each frame's OAM tile number, and those are NOT frame-index: for
