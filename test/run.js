@@ -1342,6 +1342,11 @@ try { fs.unlinkSync(tmpOM); } catch {}
         try {
             await m.connect(lunaBin, aimDir);
             check('connected; serverInfo.name present', !!m.serverInfo.name);
+            // feature-detection (§ thin-client hygiene): version + real tool presence
+            check('version() is reported (starts with a digit)', /^\d/.test(m.version));
+            check('hasTool: a core tool is present, a bogus one is not',
+                m.hasTool('load_rom') === true && m.hasTool('__nope__') === false);
+            console.log(`  luna ${m.version} — v1.8 input capture ${m.hasTool('start_input_capture') ? 'present' : 'absent'}`);
             await m.loadRom(ri.rom);
             const cpu0 = await m.cpu();
             check('state.cpu has a numeric pc', typeof cpu0.pc === 'number');

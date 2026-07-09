@@ -4,6 +4,24 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.52.0] — 2026-07-09
+
+### Added — luna feature-detection (thin-client hardening) + v1.8 verified
+
+- Cooper now **feature-detects** the connected luna's tool surface: at connect it
+  reads `tools/list` and exposes `hasTool(name)`, so optional tools are gated on
+  real presence instead of best-effort try/catch. Prompted by the Luna team's
+  report (§6): Cooper read `serverInfo.version` but never used it — and that
+  string turns out to be the MCP-server crate version (`0.8.5`, identical on luna
+  v1.7 and v1.8), not the luna release, so `hasTool` is the only reliable
+  capability signal (e.g. `start_input_capture` ⇒ luna ≥ 1.8).
+- **Verified against luna v1.8** end-to-end (441 tests green) as well as the
+  SDK-bundled **v1.7** — version-agnostic and graceful. Cooper keeps running on
+  v1.7 and lights up v1.8 tools when `cooper.lunaPath` points at a v1.8 binary.
+  This is the groundwork for consuming v1.8's programmatic input capture and
+  `--input @file`, and for the Luna-side engine deliverables (peek_oam, async
+  stop events, source-level ingestion, native `luna dap`).
+
 ## [0.51.2] — 2026-07-09
 
 ### Changed — verified against OpenSNES v0.29.1 (two upstream fixes consumed)

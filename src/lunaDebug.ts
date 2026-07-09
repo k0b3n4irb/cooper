@@ -233,10 +233,15 @@ export class LunaDebugSession extends LoggingDebugSession {
             this.sym = parseSym(fs.readFileSync(symPath, 'utf8'));
             this.sendEvent(new OutputEvent(`Loaded symbols: ${path.basename(symPath)} (${this.sym.labels.length} labels)\n`, 'console'));
             // Also load it into luna itself, so disassembly/traces annotate symbols
-            // and address-taking tools accept `symbol:` (best-effort, luna ≥ 1.6).
-            try {
-                await this.mcp.loadSymbols(symPath);
-            } catch { /* older luna: Cooper-side resolution still works */ }
+            // and address-taking tools accept `symbol:`. Feature-detected: gate on
+            // the tool's presence, and surface a real failure instead of hiding it.
+            if (this.mcp.hasTool('load_symbols')) {
+                try {
+                    await this.mcp.loadSymbols(symPath);
+                } catch (e) {
+                    this.sendEvent(new OutputEvent(`luna load_symbols failed (Cooper-side resolution still works): ${String((e as Error).message ?? e)}\n`, 'console'));
+                }
+            }
             // Source-level: join the .sym addr-to-line with the `; @cline` markers
             // in the generated asm (built with wla -i / wlalink -A + patched cproc).
             if (this.sym.hasLineInfo) {

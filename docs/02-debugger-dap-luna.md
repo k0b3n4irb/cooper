@@ -399,3 +399,32 @@ AUJOURD'HUI, sans aucune RFE luna.** Les RFEs §7 deviennent des **amélioration
   `state`/`peek_*`, snapshot via `screenshot`).
 - **Source-level (P2.4 / P7)** reste gated sur **G0** (flags build `-i`/`-A`) — localisé,
   pas un mur.
+
+## 11. Rapport équipe Luna → roadmap moteur (2026-07-09)
+
+L'ingénieur en chef Luna a produit un rapport (grounded `fichier:ligne` des deux
+dépôts) proposant de **rapatrier dans le moteur** les responsabilités SNES que
+Cooper porte aujourd'hui dans son adapter TS. Priorisé :
+
+| Prio | Livrable **Luna** (leur build ; Cooper consomme livré) | Ferme |
+|---|---|---|
+| P0 | `peek_oam` (calqué sur `peek_cgram`) | OAM trimballé dans chaque `state()` |
+| P1 | Watch **mirror-folded** natif (`bp_add_mem`) | faux-négatif data-BP (`$7E`/`$00`/`$80` miroirs) |
+| P1 | **Events async** : `pause` + `run` illimité + notif `stopped` | `max_steps` obligatoire, Continue/Pause chunké — *le manque #1 structurant* |
+| P2 | Ingestion `.sym` v3 (addr↔ligne, `[frames]`/`[types]`) + `resolve_line`/`resolve_pc`/`locals` | join source fait dans `sym.ts` (coord. compilo G0–G4) |
+| P2 | Profiler agrégé natif | `profiler.ts` agrège 40k events côté adapter |
+| P3 | **`luna dap` natif** + GUI-attach | debug verrouillé à VS Code |
+
+**Chemin critique** : events async → ingestion source-level → `luna dap`.
+
+**Fait côté Cooper (D-073, v0.52.0)** : la seule action pur-Cooper du rapport
+(§6 — durcir le contrat thin-client). Cooper **feature-détecte** désormais la
+surface d'outils (`LunaMcp.hasTool`, via `tools/list` au connect) et gate les
+outils optionnels sur leur présence réelle. **Correction terrain** : le
+`serverInfo.version` du handshake est la version du crate `luna-mcp-server`
+(`0.8.5`, **identique en v1.7 et v1.8**), pas la release luna → gater sur la
+string est inutile, `hasTool` est le seul signal fiable. Cooper est
+**v1.8-vérifié** (441 tests verts) tout en tournant sur le v1.7 bundlé du SDK.
+Prochaines consommations Cooper (gated `hasTool`) : `start_input_capture`/
+`take_input_capture` (record programmatique) et `--input @fichier`. Rapport
+archivé : voir le résumé ci-dessus (l'original était `/tmp/…`, éphémère).

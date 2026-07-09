@@ -117,6 +117,13 @@ build; hardware truth comes from luna); **off-the-shelf everywhere except** C4
   `state.ppu.oam_full`), no async stop events (`max_steps` mandatory), and
   mem-watch is **bank-exact, not mirror-folded**. See
   `docs/02-debugger-dap-luna.md` §10 (MÀJ 2026-07-06).
+  **Cooper feature-detects the tool surface** (`LunaMcp.hasTool` via `tools/list`
+  at connect, D-073) and is **v1.8-verified** (v1.8 adds `start_input_capture`/
+  `take_input_capture` → 41 tools) while still running on the SDK's v1.7. NB:
+  `serverInfo.version` is the MCP-server crate (`0.8.5`, same on v1.7/v1.8), NOT
+  the luna release — gate on `hasTool`, never that string. The Luna team's
+  engine roadmap (peek_oam, async events, mirror-fold, source-level, `luna dap`)
+  is in `docs/02` §11.
 - All OpenSNES example Makefiles use `OPENSNES := $(shell cd ../../.. && pwd)`.
 - The OpenSNES SDK lives at `../opensnes` relative to this repo; luna source at
   `../luna`; the pinned luna binary at `../opensnes/tools/luna-test/bin/luna`.

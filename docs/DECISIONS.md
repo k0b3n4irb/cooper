@@ -1159,6 +1159,36 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-073 — Luna feature-detection + v1.8 verification (Luna team report, 2026-07-09)
+- **Context:** the Luna chief-engineer report (`/tmp/luna_pour_cooper_rapport.md`)
+  proposed a Luna→Cooper roadmap (peek_oam, mirror-folded watch, async stop
+  events, source-level `.sym` v3 ingestion, native profiler, `luna dap`) and
+  flagged one pure-Cooper gap (§6): Cooper reads `serverInfo.version` at the
+  handshake but **never uses it** — compat is best-effort try/catch. Verified all
+  the report's Cooper-side claims against the real code (they hold).
+- **Decision:** add real **feature-detection** to `LunaMcp`: at `connect()`, call
+  `tools/list` once and cache the tool-name set; expose `hasTool(name)` (+ a
+  `version` accessor). Gate OPTIONAL tools on presence, not on a version string.
+  Made the one real probe explicit (`lunaDebug` `load_symbols` now
+  `if (hasTool(...))` + surfaces a real failure instead of swallowing it).
+- **Grounded finding (corrects the report's §6):** `serverInfo.version` is the
+  **MCP-server crate version (`0.8.5`) — identical on luna v1.7 AND v1.8** — NOT
+  the luna release. So a version-string guard is meaningless; **`hasTool` is the
+  only reliable capability signal** (e.g. `start_input_capture` ⇒ luna ≥ 1.8).
+  Relayed to the Luna team; a real `capabilities`/`version` MCP tool (report §5.4)
+  would let Cooper report the luna release too.
+- **Verified on BOTH binaries** (SDK's bundled `tools/luna-test/bin/luna` is
+  gitignored → safe temporary swap): full suite **441 green on v1.8**
+  (`input capture present`) and **441 green on v1.7** (`input capture absent`) —
+  version-agnostic, graceful. Cooper is now **v1.8-verified**; it still runs on
+  the SDK-bundled v1.7 and lights up v1.8 tools when a user points
+  `cooper.lunaPath` at one.
+- **Next (enabled by this):** consume v1.8's `start_input_capture`/
+  `take_input_capture` (programmatic recording) and `--input @file`, each gated
+  on `hasTool`. The Luna-side engine items (peek_oam, async events, source-level,
+  dap) are the Luna team's build; Cooper consumes on delivery (the #99/#100
+  dividend pattern).
+
 ### D-072 — Consume opensnes v0.29.1 dividends (#99, #100; 2026-07-09)
 - **Context:** the two bugs Cooper filed shipped in SDK **v0.29.1**: #99 (cc65816
   `u8` RMW-through-pointer misread outside page zero — reached `consoleInit`) and

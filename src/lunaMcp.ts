@@ -72,6 +72,27 @@ export class LunaMcp {
     private readonly defaultTimeout: number;
     private readonly onLog: (line: string) => void;
     serverInfo: { name?: string; version?: string } = {};
+    /** Tool names the connected luna advertises (from tools/list at connect). */
+    private toolNames = new Set<string>();
+
+    /**
+     * The MCP *server* version the handshake reports (the `luna-mcp-server` crate,
+     * e.g. "0.8.5") — NOT the luna binary release (1.8.0). Informational only:
+     * feature-gate on `hasTool`, which reflects the real surface, not this string.
+     */
+    get version(): string {
+        return this.serverInfo.version ?? '';
+    }
+
+    /**
+     * Whether the connected luna advertises a tool. Thin-client hygiene: the SDK
+     * bundles one luna but a user may point `cooper.lunaPath` at another, so gate
+     * OPTIONAL tools (v1.8 input capture, future additions) on real presence, not
+     * on a version string. Core tools are always assumed; use this for extras.
+     */
+    hasTool(name: string): boolean {
+        return this.toolNames.has(name);
+    }
 
     constructor(opts: { timeoutMs?: number; onLog?: (line: string) => void } = {}) {
         this.defaultTimeout = opts.timeoutMs ?? 30000;
@@ -110,6 +131,20 @@ export class LunaMcp {
         }) as { serverInfo?: { name?: string; version?: string } };
         this.serverInfo = init?.serverInfo ?? {};
         this.notify('notifications/initialized', {});
+
+        // Feature-detect the tool surface once (§ thin-client hygiene). tools/list
+        // is stable across luna ≥ 1.6; if it's missing/empty, hasTool() → false and
+        // callers fall back to their pre-existing behaviour.
+        try {
+            const list = await this.request('tools/list', {}) as { tools?: { name?: string }[] };
+            this.toolNames = new Set((list?.tools ?? []).map((t) => t.name).filter((n): n is string => !!n));
+        } catch {
+            this.toolNames = new Set();
+        }
+        // Note: serverInfo.version is the MCP-server crate version (~0.8.x), not the
+        // luna release, so it's logged but never used to gate — hasTool() is the
+        // real capability signal (e.g. start_input_capture ⇒ luna ≥ 1.8).
+        this.onLog(`luna mcp: ${this.serverInfo.name ?? 'luna'} (server ${this.serverInfo.version ?? '?'}) — ${this.toolNames.size} tools`);
     }
 
     private onData(chunk: string): void {
