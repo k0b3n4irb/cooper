@@ -1175,10 +1175,11 @@ rationale and the docs that grounded it. Newest last.
   16-tile-wide VRAM bands** (`-o 16`). The tile of frame N is
   `band*(16*cellNames) + pos*cellNames`, `cellNames=cellPx/8`,
   `cellsPerBand=16/cellNames`. Verified: 2×2 16px → 0,2,4,6; a 10-frame 16px
-  strip crosses to 32 at frame 8. **Note:** this exposes that metasprite's
-  `charName()` (D-064) is only correct for 128px-wide sheets (where a sheet-row
-  equals a band); non-128px metasprite sheets are a latent bug — follow-up, not
-  in this slice.
+  strip crosses to 32 at frame 8. **Note:** this exposed that metasprite's
+  `charName()` (D-064) was only correct for 128px-wide sheets (where a sheet-row
+  equals a band); non-128px metasprite sheets were a latent bug — **fixed in
+  0.51.1**: `charName` now delegates to `sheetFrameTile` (the single source of
+  truth) and is verified against real gfx4snes output for narrow sheets too.
 - **Pure `spriteScaffold.ts`** gains `sheetFrameTile`/`sheetFrameTiles`/
   `sheetSnippet`; glue branches single vs sheet.
 - **Verified by closing the loop in CI:** the computed frame tiles are asserted

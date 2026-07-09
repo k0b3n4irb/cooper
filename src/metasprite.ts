@@ -6,10 +6,15 @@
 // emits block indices and renders wrong for 16/32px blocks (opensnes#100), so
 // Cooper computes names from the sheet geometry itself.
 //
-// Char-name of the cell at grid (col,row) on a sheet `sheetWidthPx` wide, cells
-// `cellPx` square (worked examples verified against the SDK's hand-authored
-// .inc: 32px/128px → col*4 + row*64; 16px/128px → col*2 + row*32):
-//   name = col*(cellPx/8) + row*(cellPx/8)*(sheetWidthPx/8)
+// The char-name uses the SAME grounded truth as Add Sprite → sheets
+// (`sheetFrameTile`): gfx4snes packs cells **row-major into 16-tile-wide VRAM
+// bands** (`-o 16`). The cell at grid (col,row) is row-major index
+// `row*(sheetWidthPx/cellPx) + col`. (Before D-071 this used
+// `col*cellNames + row*(sheetWidthPx/8)*cellNames`, which is only correct when
+// the sheet is 128px wide — i.e. one sheet-row == one band. Fixed to the band
+// formula, verified against real gfx4snes output.)
+
+import { sheetFrameTile } from './spriteScaffold';
 
 export const OBJ_FLIPX = 0x40;
 export const OBJ_FLIPY = 0x80;
@@ -19,11 +24,11 @@ export const objPrio = (prio: number): number => (prio & 0x03) << 4;
 export interface MetaItem { dx: number; dy: number; tile: number; attr: number; }
 export interface CellRef { col: number; row: number; flipX?: boolean; flipY?: boolean; }
 
-/** 8x8 OAM character-name of a `cellPx`-square cell at grid (col,row). */
+/** 8x8 OAM character-name of a `cellPx`-square cell at grid (col,row), for a
+ *  sheet `sheetWidthPx` wide as gfx4snes (`-o 16`) lays it in VRAM. */
 export function charName(col: number, row: number, cellPx: number, sheetWidthPx: number): number {
-    const cellNames = cellPx / 8;             // names spanned horizontally by one cell
-    const rowStride = (sheetWidthPx / 8) * cellNames; // names to drop one cell-row
-    return col * cellNames + row * rowStride;
+    const cols = Math.floor(sheetWidthPx / cellPx);   // cells per sheet-row
+    return sheetFrameTile(row * cols + col, cellPx);   // row-major index → band-packed tile
 }
 
 export interface GridMetaOpts {

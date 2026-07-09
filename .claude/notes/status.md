@@ -19,7 +19,9 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   Every snippet CI-compiled against the real SDK (anti-drift).
 - **0.51 (D-071):** **Add Sprite → multi-frame sheets** — computes each frame's
   OAM tile (`<base>_tiles[]`), verified against real gfx4snes in CI (kills F8).
-  Follow-up noted: metasprite `charName()` only correct at 128px sheet width.
+- **0.51.1:** fixed metasprite `charName()` for non-128px sheets (the debt 0.51
+  exposed) — now shares `sheetFrameTile`, verified vs gfx4snes. Independent of
+  opensnes#100 (which will later let Cooper drop the computation entirely).
 - **Dogfood:** #1 (stardodge) and #2 (**Star Catcher** — original art +
   gameplay + score + original synthesised SFX, verified in luna). Frictions in
   `dogfood-01.md`/`dogfood-02.md` drive the Workshop priority.

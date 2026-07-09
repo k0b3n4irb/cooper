@@ -950,6 +950,12 @@ const MS = require(tmpMs);
 check('charName matches SDK docs: (2,1)->72, (0,2)->128, (3,2)->140',
     MS.charName(2, 1, 32, 128) === 72 && MS.charName(0, 2, 32, 128) === 128 && MS.charName(3, 2, 32, 128) === 140);
 check('charName 16px/128px: (1,0)->2, (0,1)->32', MS.charName(1, 0, 16, 128) === 2 && MS.charName(0, 1, 16, 128) === 32);
+// D-071 fix: NARROW sheets must band-pack too (was col*cellNames + row*sheetTiles*cellNames,
+// only right at 128px). A 32px-wide 16px sheet's 2nd row is 4,6 — NOT 8,10.
+check('charName band-correct for a narrow sheet: (0,1)@16/32->4, (1,1)->6 (matches gfx4snes reality)',
+    MS.charName(0, 1, 16, 32) === 4 && MS.charName(1, 1, 16, 32) === 6);
+check('gridMetasprite on a 32px-wide sheet band-packs to 0,2,4,6',
+    MS.gridMetasprite({ sheetWidthPx: 32, cellPx: 16, startCol: 0, startRow: 0, cols: 2, rows: 2 }).map((i) => i.tile).join(',') === '0,2,4,6');
 const gm = MS.gridMetasprite({ sheetWidthPx: 128, cellPx: 32, startCol: 0, startRow: 0, cols: 2, rows: 2, pal: 0, prio: 2 });
 check('gridMetasprite emits CHAR-NAMES 0,4,64,68 (not block indices 0,1,2,3)',
     gm.map((i) => i.tile).join(',') === '0,4,64,68');

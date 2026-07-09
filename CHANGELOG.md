@@ -4,6 +4,20 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.51.1] — 2026-07-09
+
+### Fixed — Export Metasprite tile names on non-128px-wide sheets
+
+- **Metasprite `charName` was only correct for a 128px-wide sheet** (the case its
+  worked examples were verified against). On any other sheet width the second and
+  later cell-rows got wrong OAM tile numbers — because gfx4snes packs cells
+  row-major into 16-tile-wide VRAM bands, not by sheet-row. Fixed to the same
+  band formula Add Sprite → sheets uses (0.51.0), now the single source of truth,
+  and **verified against real gfx4snes output** in CI. A 32px-wide 16px sheet's
+  second row is now 4,6 (was 8,10); 128px sheets are unchanged. This closes the
+  debt flagged in 0.51.0 — independent of the upstream gfx4snes `-T` fix
+  (opensnes#100), which will later let Cooper drop the computation entirely.
+
 ## [0.51.0] — 2026-07-08
 
 ### Added — Add Sprite now handles multi-frame sheets
