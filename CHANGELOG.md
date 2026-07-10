@@ -4,6 +4,20 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.53.0] — 2026-07-10
+
+### Added — Create New Game gives you a moving hero, not a black screen
+
+- The generated starter now puts a **controllable placeholder character** on a
+  genre-tinted backdrop: **New Game → Run → you're already moving something**
+  (D-pad), instead of the old blank screen (dogfood friction F3/F13). Each genre
+  gets its own flavour from `data/starters.json` — movement (side-scroller vs
+  top-down/4-way), backdrop colour, and a next-step hint — and the placeholder
+  sprite is wired through the same Add-Sprite pipeline, so you just replace
+  `res/hero.png` with your own art (via **Add Sprite**) when you're ready.
+  Verified by building rpg/racing/custom to a `.sfc` and, in luna, watching the
+  generated hero move (OAM X 120 → 236 holding Right).
+
 ## [0.52.0] — 2026-07-09
 
 ### Added — luna feature-detection (thin-client hardening) + v1.8 verified

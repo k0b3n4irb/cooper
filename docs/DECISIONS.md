@@ -1159,6 +1159,29 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-074 — Per-genre starters: New Game → you already move a hero (A3, 2026-07-10)
+- **Context:** dogfood friction F3/F13 — the generated starter set a BG mode then
+  a **black screen**; the distance to "something moving" was entirely manual. The
+  onramp's clearest missing win.
+- **Decision:** `renderStarterMainC` now emits a **controllable placeholder hero**
+  on a genre-tinted backdrop: `consoleInit`/`setMode`/`setColor(backdrop)`, load a
+  16px placeholder sprite, `setMainScreen(LAYER_OBJ)`, and a D-pad loop
+  (`padHeld` → `oamSet`). Per-genre flavour is **data** (`data/starters.json`:
+  `move` horizontal|fourway, `backdrop`, a next-step `hint`), parsed by pure
+  `starters.ts`. The placeholder art (`data/starters/hero.png`, an original 16×16
+  buddy) is wired through the **same Add-Sprite pipeline** (gfx4snes handles the
+  tile layout); loaded at a fixed 16px size (the project's objSize is for the
+  user's real sprites). `createNewGame` unions `STARTER_MODULES`
+  (console/sprite/dma/input) onto the genre's so the mover always links.
+- **Why a placeholder sprite (not a code-drawn tile):** reusing the Add-Sprite
+  path means gfx4snes gets the 16×16 tile arrangement right for free, and the
+  user replaces `res/hero.png` with their own art via the same command.
+- **Verified end-to-end:** pure tests (catalogue valid, hero-mover for every
+  genre, fourway adds vertical / horizontal doesn't); **rpg/racing/custom each
+  build a `.sfc`**; and in luna the generated shmup shows the hero on its backdrop
+  and it **moves** (OAM X 120 → 236 holding Right). New Game → Run = you're
+  already playing.
+
 ### D-073 — Luna feature-detection + v1.8 verification (Luna team report, 2026-07-09)
 - **Context:** the Luna chief-engineer report (`/tmp/luna_pour_cooper_rapport.md`)
   proposed a Luna→Cooper roadmap (peek_oam, mirror-folded watch, async stop

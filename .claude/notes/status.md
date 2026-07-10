@@ -21,6 +21,11 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   OAM tile (`<base>_tiles[]`), verified against real gfx4snes in CI (kills F8).
 - **0.51.1:** fixed metasprite `charName()` for non-128px sheets (the debt 0.51
   exposed) — now shares `sheetFrameTile`, verified vs gfx4snes.
+- **0.52.0 (D-073):** luna **feature-detection** (`hasTool`), v1.8-verified; the
+  Luna team's engine roadmap for Cooper archived in `docs/02` §11.
+- **0.53.0 (D-074):** **per-genre starters** (A3) — New Game → Run already moves a
+  placeholder hero on a genre backdrop (kills F3/F13). `data/starters.json` +
+  `hero.png`, wired via Add-Sprite; verified building + moving in luna.
 - **0.51.2 (D-072):** consumed **opensnes v0.29.1** — the two bugs Cooper filed
   (#99 cc65816 RMW; #100 gfx4snes -T char-names). Verified both real in the
   delivered binaries first, bumped CI pin, cross-checked `sheetFrameTiles` vs the

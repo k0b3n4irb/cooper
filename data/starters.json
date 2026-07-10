@@ -1,0 +1,10 @@
+[
+  { "genre": "platformer", "move": "horizontal", "backdrop": [12, 18, 28], "hint": "Next: add gravity + a jump (KEY_A), and a ground BG. See Insert Snippet." },
+  { "genre": "rpg",        "move": "fourway",    "backdrop": [6, 16, 8],   "hint": "Next: a tile map to walk on + NPCs. Add Sprite for your hero, Insert Snippet for collision." },
+  { "genre": "shmup",      "move": "fourway",    "backdrop": [2, 4, 12],   "hint": "Next: fire a shot (KEY_A) + falling enemies. Add Sound for the shot." },
+  { "genre": "fighting",   "move": "horizontal", "backdrop": [16, 10, 8],  "hint": "Next: a second fighter + health bars. Insert Snippet for hit collision." },
+  { "genre": "racing",     "move": "fourway",    "backdrop": [10, 10, 12], "hint": "Next: a Mode 7 track under the car. See the SDK mode7 example." },
+  { "genre": "puzzle",     "move": "fourway",    "backdrop": [4, 4, 10],   "hint": "Next: a grid of pieces + drop logic on a BG." },
+  { "genre": "adventure",  "move": "fourway",    "backdrop": [6, 14, 10],  "hint": "Next: a map of rooms + items. Add Sprite for your hero, Insert Snippet for collision." },
+  { "genre": "custom",     "move": "fourway",    "backdrop": [8, 8, 10],   "hint": "Your call — Add Sprite, Add Sound, and Insert Snippet build it up." }
+]

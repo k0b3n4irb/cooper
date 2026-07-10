@@ -96,8 +96,13 @@ type** (platformer, RPG, shmup, fighting, racing, puzzle, adventure — or
 *custom*). Cooper prefills a sensible SNES profile (BG mode, sprite sizes, the
 right library modules, sound on), lets you tweak the **hardware features** with
 checkboxes (SRAM save, SA-1, SuperFX, HiROM, FastROM), then generates the
-project — Makefile, a starter `main.c` for that mode, `.cooper/graphics.json` —
-builds it, and opens it. You're one **Run** away from a booting game.
+project — Makefile, a starter `main.c`, `.cooper/graphics.json` — builds it, and
+opens it. **Press Run and you're already moving a character**: the starter puts a
+placeholder hero on a genre-tinted backdrop that you steer with the D-pad (4-way
+for top-down/space games, left-right for side-scrollers) — not a black screen.
+When you have your own art, **Add Sprite** on your PNG (or just replace
+`res/hero.png`) swaps the placeholder out. The starter's comments point at the
+next step for your genre (jump, shots, a tile map, …).
 
 ### Or start from an SDK example — `Cooper: New Project…`
 

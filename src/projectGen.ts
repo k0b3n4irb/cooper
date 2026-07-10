@@ -13,6 +13,7 @@
 
 import { GraphicsConfig } from './snesModes';
 import { GameTypeBuild } from './gameTypes';
+import { Starter, DEFAULT_STARTER } from './starters';
 
 export interface ProjectSpec {
     name: string;
@@ -21,8 +22,8 @@ export interface ProjectSpec {
     modules: string[]; // graphics/logic LIB_MODULES (flag-driven ones come from build)
 }
 
-/** OBJ_SIZE_* macro names by OBSEL id (sprite.h #define order). */
-const OBJ_SIZE_MACRO = ['OBJ_SIZE8_L16', 'OBJ_SIZE8_L32', 'OBJ_SIZE8_L64', 'OBJ_SIZE16_L32', 'OBJ_SIZE16_L64', 'OBJ_SIZE32_L64'];
+/** Modules the hero-mover starter needs to link (added on top of the genre's). */
+export const STARTER_MODULES = ['console', 'sprite', 'dma', 'input'];
 
 /** SNES internal ROM title: upper-case, ≤21 chars (matches newProject.ts). */
 export function romName(projectName: string): string {
@@ -69,37 +70,51 @@ include $(OPENSNES)/make/common.mk
 }
 
 /**
- * Render a minimal starter main.c: init the console, set the chosen BG mode,
- * init sprites (when the sprite module is in play), enable BG1 + the screen, and
- * run a VBlank-synced loop. Uses only stable core API (no drift surface); the
- * user fills the loop in.
+ * Render the starter main.c: a CONTROLLABLE placeholder hero on a genre-tinted
+ * backdrop, so "New Game → Run" already moves something (A3 / dogfood F3/F13),
+ * not a black screen. The `hero` sprite is wired by the caller through the
+ * Add-Sprite pipeline (extern from data.asm, gfx4snes handles the tile layout);
+ * loaded at a fixed 16px size — the project's objSize is for the user's real
+ * sprites. Uses only stable core API (consoleInit/setMode/setColor/oam/padHeld).
  */
-export function renderStarterMainC(spec: ProjectSpec): string {
-    // Only call API whose module the generated project actually links.
-    const usesSprites = spec.modules.includes('sprite');
-    const usesBg = spec.modules.includes('background');
-    const lines: string[] = [];
-    lines.push('#include <snes.h>');
-    lines.push('');
-    lines.push('int main(void) {');
-    lines.push('    consoleInit();');
-    lines.push(`    setMode(BG_MODE${spec.graphics.mode}, 0);`);
-    if (usesSprites) {
-        lines.push(`    oamInit(${OBJ_SIZE_MACRO[spec.graphics.objSize]}, 0);`);
+export function renderStarterMainC(spec: ProjectSpec, starter: Starter = DEFAULT_STARTER): string {
+    const [r, g, b] = starter.backdrop;
+    const L: string[] = [];
+    L.push('#include <snes.h>');
+    L.push('');
+    L.push('// Placeholder hero — Cooper generated this so New Game → Run already moves');
+    L.push('// something. Replace it with your own art via "Cooper: Add Sprite".');
+    L.push('extern u8 hero[], hero_end[];');
+    L.push('extern u8 hero_pal[], hero_pal_end[];');
+    L.push('');
+    L.push('int main(void) {');
+    L.push('    u16 x = 120, y = 96;');
+    L.push('');
+    L.push('    consoleInit();');
+    L.push(`    setMode(BG_MODE${spec.graphics.mode}, 0);`);
+    L.push(`    setColor(0, RGB(${r}, ${g}, ${b}));   // ${starter.genre} backdrop`);
+    L.push('');
+    L.push('    oamInitGfxSet(hero, hero_end - hero, hero_pal, hero_pal_end - hero_pal, 0, 0x0000, OBJ_SIZE16_L32);');
+    L.push('    setMainScreen(LAYER_OBJ);');
+    L.push('');
+    L.push('    WaitForVBlank();');
+    L.push('    setScreenOn();');
+    L.push('');
+    L.push('    while (1) {');
+    L.push('        u16 pad = padHeld(0);');
+    L.push('        if ((pad & KEY_LEFT)  && x > 0)   x -= 2;');
+    L.push('        if ((pad & KEY_RIGHT) && x < 240) x += 2;');
+    if (starter.move === 'fourway') {
+        L.push('        if ((pad & KEY_UP)    && y > 0)   y -= 2;');
+        L.push('        if ((pad & KEY_DOWN)  && y < 208) y += 2;');
     }
-    lines.push('');
-    lines.push('    // TODO: load your tiles / palette / sprites here (see the Cooper snippets).');
-    lines.push('');
-    if (usesBg) {
-        lines.push('    setMainScreen(LAYER_BG1);');
-    }
-    lines.push('    setScreenOn();');
-    lines.push('');
-    lines.push('    while (1) {');
-    lines.push('        // TODO: your per-frame game logic.');
-    lines.push('        WaitForVBlank();');
-    lines.push('    }');
-    lines.push('    return 0;');
-    lines.push('}');
-    return lines.join('\n') + '\n';
+    L.push('');
+    L.push('        oamSet(0, x, y, 0, 0, 2, 0);   // frame 0 = the hero');
+    L.push('        oamSetSize(0, OBJ_SMALL);');
+    L.push(`        // ${starter.hint}`);
+    L.push('        WaitForVBlank();');
+    L.push('    }');
+    L.push('    return 0;');
+    L.push('}');
+    return L.join('\n') + '\n';
 }

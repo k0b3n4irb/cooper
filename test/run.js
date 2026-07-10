@@ -624,11 +624,28 @@ const tmpPg = path.join(os.tmpdir(), `cooper_projectgen_${process.pid}.cjs`);
 esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'projectGen.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPg });
 const PG = require(tmpPg);
 const tmpGtPg = path.join(os.tmpdir(), `cooper_gt_forpg_${process.pid}.cjs`);
+const tmpStaPg = path.join(os.tmpdir(), `cooper_sta_forpg_${process.pid}.cjs`);
+const tmpSsPg = path.join(os.tmpdir(), `cooper_ss_forpg_${process.pid}.cjs`);
 esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'gameTypes.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpGtPg });
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'starters.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpStaPg });
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'spriteScaffold.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpSsPg });
 const GTforPG = require(tmpGtPg);
+const STA = require(tmpStaPg);
+const SSpg = require(tmpSsPg);
 const allTypes = GTforPG.parseGameTypes(fs.readFileSync(path.join(__dirname, '..', 'data', 'gameTypes.json'), 'utf8'));
-const specOf = (ty) => ({ name: ty.id.replace(/_/g, '-'), graphics: ty.graphics, build: ty.build, modules: ty.modules });
-// pure structure, for every type
+const STARTERS = STA.parseStarters(fs.readFileSync(path.join(__dirname, '..', 'data', 'starters.json'), 'utf8'));
+const heroPng = path.join(__dirname, '..', 'data', 'starters', 'hero.png');
+// createNewGame unions the hero-mover's modules onto the genre's.
+const specOf = (ty) => ({ name: ty.id.replace(/_/g, '-'), graphics: ty.graphics, build: ty.build, modules: [...new Set([...ty.modules, ...PG.STARTER_MODULES])] });
+const starterOf = (ty) => STA.starterFor(STARTERS, ty.id);
+
+// starter catalogue (pure)
+check('parseStarters: one valid entry per game type', STARTERS.length === allTypes.length
+    && STARTERS.every((s) => (s.move === 'horizontal' || s.move === 'fourway') && s.backdrop.length === 3 && s.backdrop.every((v) => v >= 0 && v <= 31)));
+check('starterFor falls back to a neutral default for an unknown genre', STA.starterFor(STARTERS, '__nope__').genre === 'custom');
+check('parseStarters rejects a bad move / backdrop', (() => { try { STA.parseStarters('[{"genre":"x","move":"diag","backdrop":[0,0,0],"hint":""}]'); return false; } catch { return true; } })());
+
+// Makefiles, for every type
 check('romName: upper-cased, ≤21 chars', PG.romName('my cool game!!') === 'MY COOL GAME' && PG.romName('') === 'SNES GAME');
 check('every type renders a Makefile with TARGET/ROM_NAME/LIB_MODULES/common.mk include + OPENSNES ?=',
     allTypes.every((ty) => { const mk = PG.renderMakefile(specOf(ty), '/sdk'); return mk.includes(`TARGET   := ${ty.id.replace(/_/g, '-')}.sfc`) && /ROM_NAME := \S/.test(mk) && mk.includes('LIB_MODULES := ') && mk.includes('include $(OPENSNES)/make/common.mk') && mk.includes('OPENSNES ?= /sdk') && mk.includes('USE_LIB     := 1'); }));
@@ -636,33 +653,38 @@ check('sound → USE_SNESMOD:=1 (all types have sound on)', allTypes.every((ty) 
 check('sram flag emits USE_SRAM only when set',
     PG.renderMakefile(specOf(allTypes.find((t) => t.id === 'rpg')), '/sdk').includes('USE_SRAM    := 1')
     && !PG.renderMakefile(specOf(allTypes.find((t) => t.id === 'shmup')), '/sdk').includes('USE_SRAM'));
-check('starter main.c: consoleInit + setMode(BG_MODE<n>) + setScreenOn + VBlank loop',
-    allTypes.every((ty) => { const c = PG.renderStarterMainC(specOf(ty)); return c.includes('consoleInit();') && c.includes(`setMode(BG_MODE${ty.graphics.mode}, 0);`) && c.includes('setScreenOn();') && c.includes('WaitForVBlank();'); }));
-check('starter oamInit only when the sprite module is present',
-    PG.renderStarterMainC(specOf(allTypes.find((t) => t.id === 'platformer'))).includes('oamInit(OBJ_SIZE16_L32, 0);')
-    && !PG.renderStarterMainC(specOf(allTypes.find((t) => t.id === 'custom'))).includes('oamInit'));
-// REAL build: the 3 types that link-broke before grounding the module sets are the
-// regression guards (rpg=object needs sprite_dynamic, racing=Mode7, custom=minimal base).
-if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk'))) {
-    skipped('SDK make not available');
+// starter main.c = the hero mover (A3): externs hero, backdrop, load, D-pad loop
+check('starter main.c: hero externs + setColor backdrop + oamInitGfxSet + padHeld loop, for every type',
+    allTypes.every((ty) => { const c = PG.renderStarterMainC(specOf(ty), starterOf(ty)); return c.includes('extern u8 hero[], hero_end[];') && c.includes('setColor(0, RGB(') && c.includes('oamInitGfxSet(hero,') && c.includes('padHeld(0)') && c.includes(`setMode(BG_MODE${ty.graphics.mode}, 0);`) && c.includes('setScreenOn();'); }));
+check('fourway starter adds vertical movement; horizontal (platformer) does not',
+    PG.renderStarterMainC(specOf(allTypes.find((t) => t.id === 'rpg')), starterOf(allTypes.find((t) => t.id === 'rpg'))).includes('KEY_UP')
+    && !PG.renderStarterMainC(specOf(allTypes.find((t) => t.id === 'platformer')), starterOf(allTypes.find((t) => t.id === 'platformer'))).includes('KEY_UP'));
+// REAL build: wire the placeholder hero exactly as Create New Game does, then make.
+if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !fs.existsSync(heroPng)) {
+    skipped('SDK make / hero.png not available');
 } else {
     for (const id of ['rpg', 'racing', 'custom']) {
         const ty = allTypes.find((t) => t.id === id);
         const dir = path.join(os.tmpdir(), `cooper_gen_${process.pid}_${id}`);
         try {
-            fs.mkdirSync(dir, { recursive: true });
-            fs.writeFileSync(path.join(dir, 'Makefile'), PG.renderMakefile(specOf(ty), OPENSNES));
-            fs.writeFileSync(path.join(dir, 'main.c'), PG.renderStarterMainC(specOf(ty)));
+            fs.mkdirSync(path.join(dir, 'res'), { recursive: true });
+            fs.copyFileSync(heroPng, path.join(dir, 'res', 'hero.png'));
+            let mk = PG.renderMakefile(specOf(ty), OPENSNES);
+            mk = SSpg.ensureAsmSrc(mk, 'data.asm');
+            mk = SSpg.appendGfxRule(mk, 'res/hero.png', 16);
+            fs.writeFileSync(path.join(dir, 'Makefile'), mk);
+            fs.writeFileSync(path.join(dir, 'data.asm'), SSpg.upsertDataAsm('', 'hero', 'res/hero.png'));
+            fs.writeFileSync(path.join(dir, 'main.c'), PG.renderStarterMainC(specOf(ty), starterOf(ty)));
             const r = cp.spawnSync('make', [], { cwd: dir, encoding: 'utf8', timeout: 180000 });
-            check(`generated "${id}" project builds a .sfc with plain make`,
+            check(`generated "${id}" project builds a .sfc — you already move a hero`,
                 r.status === 0 && fs.existsSync(path.join(dir, `${ty.id.replace(/_/g, '-')}.sfc`)));
-            if (r.status !== 0) { console.log((r.stdout || '').split('\n').slice(-5).join('\n')); }
+            if (r.status !== 0) { console.log((r.stdout || '').split('\n').slice(-6).join('\n')); }
         } finally {
             try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
         }
     }
 }
-try { fs.unlinkSync(tmpPg); fs.unlinkSync(tmpGtPg); } catch {}
+try { fs.unlinkSync(tmpPg); fs.unlinkSync(tmpGtPg); fs.unlinkSync(tmpStaPg); fs.unlinkSync(tmpSsPg); } catch {}
 
 // --- A3 spearhead: Add Sprite scaffolder (pure) + REAL build with a sprite ---
 console.log('\n=== spriteScaffold: art→code wiring, and it builds + shows ===');

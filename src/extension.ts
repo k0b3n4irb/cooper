@@ -29,7 +29,8 @@ import { BG_MODES, OBJ_SIZE_PAIRS, objSizePair, validateSpriteImage } from './sn
 import { resolveGraphics, serializeOverride, ResolvedGraphics, GRAPHICS_CONFIG_REL } from './graphicsConfig';
 import { parseGameTypes } from './gameTypes';
 import { parseSnippets, snippetText, ensureModules, missingIncludes, lastIncludeLine } from './snippets';
-import { renderMakefile, renderStarterMainC, ProjectSpec } from './projectGen';
+import { renderMakefile, renderStarterMainC, ProjectSpec, STARTER_MODULES } from './projectGen';
+import { parseStarters, starterFor } from './starters';
 import { symbolBase, loadSnippet, ensureAsmSrc, appendGfxRule, upsertDataAsm, sheetFrameTiles, sheetSnippet } from './spriteScaffold';
 import { decodeWav } from './wav';
 import { buildIt, sfxSymbol, sfxSnippet, ensureSoundbank } from './soundScaffold';
@@ -1995,15 +1996,36 @@ async function createNewGame(context: vscode.ExtensionContext): Promise<void> {
         return;
     }
 
-    // 6. Generate.
-    const spec: ProjectSpec = { name, graphics, build, modules: type.modules };
+    // 6. Generate — a genre starter that already moves a placeholder hero.
+    let starter;
     try {
+        starter = starterFor(parseStarters(fs.readFileSync(context.asAbsolutePath('data/starters.json'), 'utf8')), type.id);
+    } catch (e) {
+        fail(`could not load the starter presets: ${(e as Error).message}`);
+        return;
+    }
+    // The hero-mover needs sprite/input/dma — union them onto the genre's modules.
+    const modules = [...type.modules];
+    for (const m of STARTER_MODULES) {
+        if (!modules.includes(m)) {
+            modules.push(m);
+        }
+    }
+    const spec: ProjectSpec = { name, graphics, build, modules };
+    try {
+        fs.mkdirSync(path.join(dest, 'res'), { recursive: true });
         fs.mkdirSync(path.join(dest, '.cooper'), { recursive: true });
-        fs.writeFileSync(path.join(dest, 'Makefile'), renderMakefile(spec, sdk.path));
-        fs.writeFileSync(path.join(dest, 'main.c'), renderStarterMainC(spec));
+        // Wire the placeholder hero through the Add-Sprite pipeline (16px sprite).
+        fs.copyFileSync(context.asAbsolutePath(path.join('data', 'starters', 'hero.png')), path.join(dest, 'res', 'hero.png'));
+        let mk = renderMakefile(spec, sdk.path);
+        mk = ensureAsmSrc(mk, 'data.asm');
+        mk = appendGfxRule(mk, 'res/hero.png', 16);
+        fs.writeFileSync(path.join(dest, 'Makefile'), mk);
+        fs.writeFileSync(path.join(dest, 'data.asm'), upsertDataAsm('', 'hero', 'res/hero.png'));
+        fs.writeFileSync(path.join(dest, 'main.c'), renderStarterMainC(spec, starter));
         fs.writeFileSync(path.join(dest, '.clangd'), renderClangd(sdk.path));
         fs.writeFileSync(path.join(dest, GRAPHICS_CONFIG_REL), serializeOverride(graphics));
-        log(`new game: ${type.id} → ${dest} (mode ${graphics.mode}, flags ${Object.entries(build).filter(([, v]) => v).map(([k]) => k).join('+') || 'none'})`);
+        log(`new game: ${type.id} → ${dest} (mode ${graphics.mode}, ${starter.move} hero, flags ${Object.entries(build).filter(([, v]) => v).map(([k]) => k).join('+') || 'none'})`);
     } catch (e) {
         fail(`could not create the game: ${(e as Error).message}`);
         return;
