@@ -68,3 +68,8 @@ See `lib/include/snes/types.h` for the full explanation.
 
 **Rule of thumb:** prefer the fixed-width types (`u8`/`u16`/…) in game code —
 they're unambiguous to both clangd and the compiler.
+
+**Cooper surfaces this for you (C2 v2, D-077).** Hovering a plain `int`/`long` in
+an OpenSNES project shows a reminder that it's 2/4 bytes on the SNES (not 4/8) and
+suggests the fixed-width type. It's hover-only (never a diagnostic), so it can't
+misfire — it just adds the SNES truth next to clangd's host-target hover.

@@ -70,6 +70,24 @@ check('renderClangd includes lib/include path',
 check('renderClangd includes -std=gnu11', rendered.includes('-std=gnu11'));
 check('renderClangd has no -D__OPENSNES__', !rendered.includes('__OPENSNES__'));
 
+// --- C2 v2: the int=2 hover (pure) — surfaces what clangd's host target hides ---
+const tmpIS = path.join(os.tmpdir(), `cooper_intsize_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'intSizeHint.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpIS });
+const ISZ = require(tmpIS);
+check('intSizeHint: plain int → warns 2 bytes + suggests u16/s16', (() => {
+    const h = ISZ.intSizeHint('    int timer;', 5); return h && /2 bytes on the SNES/.test(h.markdown) && /u16.*s16/.test(h.markdown) && h.start === 4 && h.end === 7;
+})());
+check('intSizeHint: plain long → warns 4 bytes + suggests u32/s32', (() => {
+    const h = ISZ.intSizeHint('long big;', 1); return h && /4 bytes on the SNES/.test(h.markdown) && /u32.*s32/.test(h.markdown);
+})());
+check('intSizeHint: fixed-width u16 is SAFE → no hint', ISZ.intSizeHint('u16 score;', 1) === null);
+check('intSizeHint: short/char are same size → no hint', ISZ.intSizeHint('short s;', 1) === null && ISZ.intSizeHint('char c;', 1) === null);
+check('intSizeHint: word-boundary — `interval` (contains "int") → no hint', ISZ.intSizeHint('u16 interval;', 6) === null);
+check('intSizeHint: hovering the "int" inside sizeof(int) warns', (() => { const h = ISZ.intSizeHint('x = sizeof(int);', 12); return h && /2 bytes/.test(h.markdown); })());
+check('wordAt: identifies the token under the cursor (and just past it)',
+    ISZ.wordAt('int x;', 0).word === 'int' && ISZ.wordAt('int x;', 3).word === 'int' && ISZ.wordAt('  ;', 2) === null);
+try { fs.unlinkSync(tmpIS); } catch {}
+
 // --- close the loop: the GENERATED flags must actually parse a real example ---
 console.log('\n=== generated config actually parses an example (clang) ===');
 const flags = [...rendered.matchAll(/- "([^"]+)"/g)].map((m) => m[1]);

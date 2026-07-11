@@ -36,6 +36,7 @@ import { decodeWav } from './wav';
 import { buildIt, sfxSymbol, sfxSnippet, ensureSoundbank } from './soundScaffold';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
+import { intSizeHint } from './intSizeHint';
 import { mergeVscodeMcp, mergeProjectMcp, lunaEntry, opensnesEntry } from './mcpConfig';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, functionDefLines, TreeNode, ProjectInfo } from './sidebar';
@@ -84,6 +85,11 @@ export function activate(context: vscode.ExtensionContext): void {
     const codeLens = new CooperCodeLensProvider();
     context.subscriptions.push(
         output,
+        // C2 v2: passively surface the int=2 caveat clangd can't (host target).
+        vscode.languages.registerHoverProvider(
+            [{ language: 'c', scheme: 'file' }],
+            { provideHover: (doc, pos) => intSizeHover(doc, pos) },
+        ),
         vscode.commands.registerCommand('cooper.showLog', () => output?.show(true)),
         vscode.commands.registerCommand('cooper.configureClangd', () => configureClangd()),
         vscode.commands.registerCommand('cooper.build', () => runBuild()),
@@ -2421,6 +2427,20 @@ class LunaConfigProvider implements vscode.DebugConfigurationProvider {
 // ---------------------------------------------------------------------------
 // Configure clangd (Component #3) — unchanged logic.
 // ---------------------------------------------------------------------------
+
+/** Hover on a plain `int`/`long` in an OpenSNES project C file: surface the
+ *  cc65816 size the host-targeted clangd gets wrong (C2 v2). Passive — augments
+ *  clangd's hover, never adds a diagnostic. */
+function intSizeHover(doc: vscode.TextDocument, pos: vscode.Position): vscode.Hover | undefined {
+    if (!findProjectDir(path.dirname(doc.uri.fsPath))) {
+        return undefined; // SNES-specific truth — only inside an OpenSNES project
+    }
+    const hint = intSizeHint(doc.lineAt(pos.line).text, pos.character);
+    if (!hint) {
+        return undefined;
+    }
+    return new vscode.Hover(new vscode.MarkdownString(hint.markdown), new vscode.Range(pos.line, hint.start, pos.line, hint.end));
+}
 
 // Projects auto-configured this session (dedupe; keyed by project dir).
 const autoConfigured = new Set<string>();

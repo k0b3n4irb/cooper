@@ -4,6 +4,19 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.56.0] — 2026-07-11
+
+### Added — C support v2: the `int`=2 hover (what clangd can't tell you)
+
+- Hover a plain **`int`** (or **`long`**) in an OpenSNES project's C and Cooper
+  now reminds you it's **2 bytes on the SNES, not 4** (`long`: 4, not 8), and
+  suggests the fixed-width type (`u16`/`s16`, `u32`/`s32`). clangd runs the host
+  target (there is no clang target for the 65816), so it silently mis-sizes plain
+  `int`/`long` — this surfaces the truth right where you'd trip on it. **Passive
+  by design**: it only adds a hover note (never a diagnostic/squiggle), so it can
+  never misfire; it just augments clangd's own hover. Only inside OpenSNES
+  projects, and never on the safe fixed-width types or same-size `short`/`char`.
+
 ## [0.55.0] — 2026-07-11
 
 ### Added — C7: the AI verify loop (`build_and_run`) + complete AI wiring

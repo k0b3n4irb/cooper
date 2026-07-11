@@ -1159,6 +1159,23 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-077 — C2 v2: the int=2 hover (surface clangd's host-target lie, 2026-07-11)
+- **Context:** the one documented C-support gap (`docs/clangd.md`): clangd runs
+  the HOST clang (`int`=4, `long`=8) and there's no 65816 target, so it silently
+  mis-sizes plain `int`/`long` (2/4 on cc65816). A footgun, but passive.
+- **Decision:** a **HoverProvider** on OpenSNES-project C files that, on a plain
+  `int`/`long` token, adds a note — "`int` is 2 bytes on the SNES, not 4; prefer
+  `u16`/`s16`". Chose **hover** over a lint/diagnostic on reliability grounds (the
+  user asked for the soundest option): a hover only *augments* clangd's hover and
+  can NEVER misfire, whereas a homegrown lint without a real C AST would risk
+  false-positive squiggles. Scoped to OpenSNES projects (the truth is
+  SNES-specific); silent on the safe fixed-width types and same-size
+  `short`/`char`; word-boundary matched (`interval` never triggers).
+- **Pure `intSizeHint.ts`** (`wordAt`/`intSizeHint`) unit-tested; thin
+  `intSizeHover` glue. Grounded in `docs/clangd.md` + `lib/include/snes/types.h`.
+- **Verified:** 458 Node (int/long warn, u16/short/char/`interval` don't,
+  sizeof(int) warns) + 10 integration.
+
 ### D-076 — C7 verify loop: build_and_run + complete the AI MCP wiring (2026-07-11)
 - **Context:** C7 (make any AI OpenSNES-expert) had shipped the SDK context
   (AGENTS.md), the SDK-query MCP server (`opensnesMcp`), and luna-as-MCP. But the
