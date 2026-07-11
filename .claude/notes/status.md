@@ -30,6 +30,10 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   `start/takeInputCapture` end-to-end (round-trip verified on v1.8, no-op on v1.7).
   Foundation for C7 agent-recording + gui play-then-capture (both gated on
   C7-loop / Luna async events).
+- **0.55.0 (D-076):** **C7 verify loop** — `build_and_run` (make + luna → build
+  errors OR screenshot + state) on the OpenSNES MCP; **registered both AI servers**
+  (opensnes was bundled but never wired); AGENTS.md teaches the loop. The AI now
+  verifies on cycle-accurate hardware, not by reasoning.
 - **0.51.2 (D-072):** consumed **opensnes v0.29.1** — the two bugs Cooper filed
   (#99 cc65816 RMW; #100 gfx4snes -T char-names). Verified both real in the
   delivered binaries first, bumped CI pin, cross-checked `sheetFrameTiles` vs the

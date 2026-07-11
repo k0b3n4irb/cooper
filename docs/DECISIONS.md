@@ -1159,6 +1159,31 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-076 — C7 verify loop: build_and_run + complete the AI MCP wiring (2026-07-11)
+- **Context:** C7 (make any AI OpenSNES-expert) had shipped the SDK context
+  (AGENTS.md), the SDK-query MCP server (`opensnesMcp`), and luna-as-MCP. But the
+  **verify loop** — "write C → build → run → read framebuffer/state → self-correct"
+  — was missing, and grounding surfaced a real gap: **the opensnes MCP server was
+  bundled but never registered** for the AI (`mcpConfig` only wrote `luna`), so its
+  SDK-query tools were unreachable.
+- **Decision:** (1) add **`build_and_run`** to the opensnes MCP — one call that
+  runs `make` AND runs the ROM on luna, returning the build errors OR **a
+  screenshot (image content the AI SEES) + a PPU/CPU state summary**; optional
+  `input` drives the joypad. This is the C7 differentiator: the AI verifies on
+  cycle-accurate hardware, not by reasoning. (2) **Register both servers**
+  (`opensnes` + `luna`) — generalised `mcpConfig` to a server-map; `opensnes` is
+  registered whenever the SDK is found (its `build_and_run` resolves luna at call
+  time), `luna` when its binary is found. (3) **AGENTS.md teaches the loop**:
+  `lookup_api`/`hardware_constraint` to avoid guessing, then `build_and_run`, then
+  self-correct *from what you SEE*.
+- **Pure/side-effecting split:** the doc tools stay in the pure `handleMessage`
+  dispatch; `build_and_run` is an async handler (spawns make + luna) run outside it,
+  with pure helpers (`tailLines`/`summarizeState`) unit-tested and the whole thing
+  e2e-tested (working project → image + state; broken C → build errors).
+- **Verified:** 451 Node tests incl. the build_and_run e2e + both-servers config +
+  AGENTS loop; 10 integration. The server bundles standalone (no `vscode` in
+  `dist/opensnes-mcp.js`).
+
 ### D-075 — Consume luna v1.8 input capture (foundation, verified; 2026-07-11)
 - **Context:** the Luna team's report (§2.6) flagged v1.8's programmatic input
   capture (`start_input_capture`/`take_input_capture`) and `--input @file` as

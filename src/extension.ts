@@ -36,7 +36,7 @@ import { decodeWav } from './wav';
 import { buildIt, sfxSymbol, sfxSnippet, ensureSoundbank } from './soundScaffold';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
-import { mergeVscodeMcp, mergeProjectMcp } from './mcpConfig';
+import { mergeVscodeMcp, mergeProjectMcp, lunaEntry, opensnesEntry } from './mcpConfig';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, functionDefLines, TreeNode, ProjectInfo } from './sidebar';
 import { renderDashboardHtml, DashboardState } from './dashboard';
@@ -845,20 +845,31 @@ function registerLunaMcp(dir: string): string {
     const cfg = vscode.workspace.getConfiguration('cooper');
     const sdk = detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: dir });
     const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
-    if (!luna) {
+
+    // Build the server set: opensnes (SDK docs + build_and_run verify) when the SDK
+    // is known; luna (emulator control) when its binary is found. Both are optional.
+    const servers: Record<string, { type: 'stdio'; command: string; args: string[] }> = {};
+    if (sdk) {
+        // extension.js and opensnes-mcp.js are siblings in dist/.
+        servers.opensnes = opensnesEntry(path.join(__dirname, 'opensnes-mcp.js'), sdk.path);
+    }
+    if (luna) {
+        servers.luna = lunaEntry(luna);
+    }
+    if (Object.keys(servers).length === 0) {
         return '';
     }
-    const write = (file: string, merge: (existing: string | null, cmd: string) => string): void => {
+    const write = (file: string, merge: (existing: string | null) => string): void => {
         try {
             const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
-            fs.writeFileSync(file, merge(existing, luna));
+            fs.writeFileSync(file, merge(existing));
         } catch { /* unparseable (JSONC/comments) — leave it, don't clobber */ }
     };
     const vscodeDir = path.join(dir, '.vscode');
     fs.mkdirSync(vscodeDir, { recursive: true });
-    write(path.join(vscodeDir, 'mcp.json'), (e, c) => mergeVscodeMcp(e, c));
-    write(path.join(dir, '.mcp.json'), (e, c) => mergeProjectMcp(e, c));
-    return ' + luna MCP (.vscode/mcp.json, .mcp.json)';
+    write(path.join(vscodeDir, 'mcp.json'), (e) => mergeVscodeMcp(e, servers));
+    write(path.join(dir, '.mcp.json'), (e) => mergeProjectMcp(e, servers));
+    return ` + AI MCP servers (${Object.keys(servers).join(' + ')})`;
 }
 
 // ---------------------------------------------------------------------------

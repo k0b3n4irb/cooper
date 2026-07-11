@@ -457,14 +457,18 @@ Run **Cooper: Configure AI (OpenSNES context)**. It:
   SNES/OpenSNES rules — the `int`=2 gotcha, colour/sprite/tilemap hardware limits,
   the build/run/luna workflow — so any assistant (Copilot, Claude Code, Cursor…)
   writes correct OpenSNES C; and
-- **registers luna as an MCP server** (`.vscode/mcp.json` + `.mcp.json`) so the AI
-  can *drive the emulator* — peek VRAM/memory, read state, screenshot — and
-  **verify its own changes on real hardware**, not by guessing.
+- **registers two MCP servers** (`.vscode/mcp.json` + `.mcp.json`): **`opensnes`**
+  (query the *installed SDK* — `lookup_api`, `search_api`, `list_headers`,
+  `hardware_constraint` — and the verify loop below) and **`luna`** (drive the
+  emulator: peek VRAM/memory, read state, breakpoints).
 
-Cooper also ships an **OpenSNES MCP server**: your assistant can query the
-*installed SDK* directly — exact function signatures (`lookup_api`), symbol search
-(`search_api`), header list, and hardware constraints. So it writes correct
-OpenSNES C, looks up the real API instead of guessing, and verifies in luna.
+**The verify loop (the differentiator).** The `opensnes` server exposes
+**`build_and_run`**: in one call it `make`s your project and runs the ROM on luna,
+handing the AI **the build errors, or a screenshot of what it renders plus PPU/CPU
+state**. So your assistant *sees* what its code draws on cycle-accurate hardware
+and self-corrects — it can't just guess that it works. (Pass `input` to drive the
+joypad and check gameplay.) `AGENTS.md` teaches this loop: look up the API, call
+`build_and_run`, fix from what you actually see.
 
 Reload the window (or start agent mode) so your assistant picks up the MCP servers.
 

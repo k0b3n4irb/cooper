@@ -16,21 +16,27 @@ export function lunaEntry(command: string, args: string[] = ['mcp']): McpStdio {
     return { type: 'stdio', command, args };
 }
 
-/** Merge a `luna` server into a `.vscode/mcp.json` (key `servers`), preserving any
- *  existing servers. `existing` is the current file text (or null). Returns pretty
- *  JSON text. Throws if `existing` isn't valid JSON (caller handles JSONC/comments). */
-export function mergeVscodeMcp(existing: string | null, command: string, args: string[] = ['mcp']): string {
+/** The OpenSNES SDK-docs + `build_and_run` verify server: `node <mcp.js> <sdk>`. */
+export function opensnesEntry(mcpJsPath: string, sdkPath: string, node = 'node'): McpStdio {
+    return { type: 'stdio', command: node, args: [mcpJsPath, sdkPath] };
+}
+
+/** Merge a set of named servers into a config object under `key`, preserving any
+ *  existing servers. `existing` is the current file text (or null). */
+function mergeInto(existing: string | null, key: 'servers' | 'mcpServers', servers: Record<string, McpStdio>): string {
     const obj = existing && existing.trim() ? JSON.parse(existing) : {};
-    obj.servers = (obj.servers && typeof obj.servers === 'object') ? obj.servers : {};
-    obj.servers.luna = lunaEntry(command, args);
+    obj[key] = (obj[key] && typeof obj[key] === 'object') ? obj[key] : {};
+    Object.assign(obj[key], servers);
     return JSON.stringify(obj, null, 2) + '\n';
 }
 
-/** Merge a `luna` server into a `.mcp.json` (key `mcpServers`) for Claude Code /
- *  Cursor, preserving existing servers. */
-export function mergeProjectMcp(existing: string | null, command: string, args: string[] = ['mcp']): string {
-    const obj = existing && existing.trim() ? JSON.parse(existing) : {};
-    obj.mcpServers = (obj.mcpServers && typeof obj.mcpServers === 'object') ? obj.mcpServers : {};
-    obj.mcpServers.luna = lunaEntry(command, args);
-    return JSON.stringify(obj, null, 2) + '\n';
+/** `.vscode/mcp.json` (key `servers`) for VS Code / Copilot. Throws on invalid
+ *  JSON (caller handles JSONC/comments). */
+export function mergeVscodeMcp(existing: string | null, servers: Record<string, McpStdio>): string {
+    return mergeInto(existing, 'servers', servers);
+}
+
+/** `.mcp.json` (key `mcpServers`) for Claude Code / Cursor. */
+export function mergeProjectMcp(existing: string | null, servers: Record<string, McpStdio>): string {
+    return mergeInto(existing, 'mcpServers', servers);
 }

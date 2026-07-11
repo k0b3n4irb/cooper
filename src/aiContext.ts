@@ -42,6 +42,22 @@ Cooper VS Code extension. These are hardware facts — follow them exactly.
   peek_memory/peek_vram/state/screenshot/run_until_pc, etc.). **Verify visual and
   state results in luna, not by reasoning** — it is cycle-accurate.
 
+## Your MCP tools (Cooper wired these into this project)
+
+Two MCP servers are registered for you in \`.mcp.json\` / \`.vscode/mcp.json\`:
+
+- **\`opensnes\`** — the SDK + the verify loop:
+  - **\`build_and_run\`** — the one you'll use most: it runs \`make\` AND runs the
+    ROM on luna, returning **the build errors OR a screenshot of what it renders
+    plus PPU/CPU state**. Call it after every meaningful edit to *see* the result
+    on cycle-accurate hardware and self-correct. Pass \`input\` (e.g.
+    \`"10:0x100,40:0"\`) to drive the joypad.
+  - **\`lookup_api\`** (exact signature/doc of an SDK symbol), **\`search_api\`**,
+    **\`list_headers\`**, **\`hardware_constraint\`** — query the *installed* SDK
+    instead of guessing an API.
+- **\`luna\`** — fine-grained emulator control (breakpoints, stepping, \`state\`,
+  \`peek_vram\`/\`peek_memory\`, traces) when you need to debug deeper than a frame.
+
 ## SNES hardware constraints (enforce these)
 
 ### Colour / CGRAM
@@ -81,12 +97,16 @@ Cooper VS Code extension. These are hardware facts — follow them exactly.
 
 ## How to work here
 
-1. Write / edit C using the fixed-width types and the constraints above.
-2. **Build with \`make\`** and fix any compiler/linker errors (they surface in the
-   Problems panel).
-3. **Run in luna and observe** — screenshot the framebuffer, read \`state\` /
-   \`peek_vram\` / \`peek_memory\` — then self-correct. Ground every "does it work?"
-   in luna's output, because \`int\`=2 and the PPU rules make host intuition wrong.
+1. Write / edit C using the fixed-width types and the constraints above; use
+   \`lookup_api\`/\`hardware_constraint\` instead of guessing an SDK signature or rule.
+2. **Call \`build_and_run\`.** If it returns build errors, fix them and repeat. If
+   it builds, it hands you a **screenshot + state** — actually look at the frame.
+3. **Self-correct from what you SEE**, not from what you expect: is the sprite
+   where you put it? the right colours? the screen on (not forced-blank)? Use
+   \`input\` to drive the game and re-run; drop to the \`luna\` tools
+   (\`peek_vram\`/\`state\`/breakpoints) when a frame isn't enough. Ground every
+   "does it work?" in luna's output — \`int\`=2 and the PPU rules make host
+   intuition wrong.
 `;
 }
 

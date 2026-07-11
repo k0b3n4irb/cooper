@@ -1304,20 +1304,28 @@ check('AGENTS.md documents BGR555 + CGRAM layout', md.includes('BGR555') && md.i
 check('AGENTS.md documents sprite sizes (OBSEL) + assets (gfx4snes)', md.includes('OBSEL') && md.includes('gfx4snes'));
 check('AGENTS.md points at luna for verification', md.includes('luna'));
 check('AGENTS.md names the project', md.includes('shmup'));
+check('AGENTS.md teaches the build_and_run verify loop + both MCP servers (C7)',
+    md.includes('build_and_run') && md.includes('`opensnes`') && md.includes('`luna`') && md.includes('lookup_api'));
 const ci = AI.renderCopilotInstructions();
 check('copilot-instructions points at AGENTS.md + int caveat', ci.includes('AGENTS.md') && ci.includes('2 bytes'));
 try { fs.unlinkSync(tmpAI); } catch {}
 
-// MCP config (C7 part 2): register luna for the AI, per-assistant keys
+// MCP config (C7): register BOTH luna + the opensnes verify server for the AI
 const tmpMC = path.join(os.tmpdir(), `cooper_mc_${process.pid}.cjs`);
 esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'mcpConfig.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpMC });
 const MC = require(tmpMC);
-const vc = JSON.parse(MC.mergeVscodeMcp(null, '/bin/luna'));
-check('mergeVscodeMcp: key "servers" + luna stdio (VS Code/Copilot)', vc.servers.luna.type === 'stdio' && vc.servers.luna.command === '/bin/luna' && JSON.stringify(vc.servers.luna.args) === '["mcp"]');
-const vcM = JSON.parse(MC.mergeVscodeMcp('{"servers":{"other":{"type":"http","url":"x"}}}', '/bin/luna'));
+const lunaSrv = MC.lunaEntry('/bin/luna');
+const opensnesSrv = MC.opensnesEntry('/ext/dist/opensnes-mcp.js', '/sdk');
+check('lunaEntry / opensnesEntry: stdio commands', lunaSrv.command === '/bin/luna' && JSON.stringify(lunaSrv.args) === '["mcp"]'
+    && opensnesSrv.command === 'node' && JSON.stringify(opensnesSrv.args) === JSON.stringify(['/ext/dist/opensnes-mcp.js', '/sdk']));
+const vc = JSON.parse(MC.mergeVscodeMcp(null, { luna: lunaSrv, opensnes: opensnesSrv }));
+check('mergeVscodeMcp: key "servers" + BOTH luna & opensnes (VS Code/Copilot)',
+    vc.servers.luna.command === '/bin/luna' && vc.servers.opensnes.command === 'node' && vc.servers.opensnes.type === 'stdio');
+const vcM = JSON.parse(MC.mergeVscodeMcp('{"servers":{"other":{"type":"http","url":"x"}}}', { luna: lunaSrv }));
 check('mergeVscodeMcp: preserves existing servers', !!vcM.servers.other && !!vcM.servers.luna);
-const pc = JSON.parse(MC.mergeProjectMcp(null, '/bin/luna'));
-check('mergeProjectMcp: key "mcpServers" (Claude Code / Cursor)', pc.mcpServers.luna.command === '/bin/luna' && JSON.stringify(pc.mcpServers.luna.args) === '["mcp"]');
+const pc = JSON.parse(MC.mergeProjectMcp(null, { luna: lunaSrv, opensnes: opensnesSrv }));
+check('mergeProjectMcp: key "mcpServers" + both servers (Claude Code / Cursor)',
+    pc.mcpServers.luna.command === '/bin/luna' && pc.mcpServers.opensnes.command === 'node');
 try { fs.unlinkSync(tmpMC); } catch {}
 
 // OpenSNES MCP (C7 part 3): SDK querying + the server dispatch, vs the real SDK
@@ -1338,16 +1346,55 @@ esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'opensnesMcp
 const OM = require(tmpOM);
 check('MCP initialize returns serverInfo', OM.handleMessage(OPENSNES, { id: 1, method: 'initialize', params: {} }).result.serverInfo.name === 'opensnes');
 check('MCP notifications/initialized has no reply', OM.handleMessage(OPENSNES, { method: 'notifications/initialized' }) === null);
-check('MCP tools/list lists the 4 tools', OM.handleMessage(OPENSNES, { id: 2, method: 'tools/list' }).result.tools.length === 4);
+const toolNames = OM.handleMessage(OPENSNES, { id: 2, method: 'tools/list' }).result.tools.map((t) => t.name);
+check('MCP tools/list includes the 4 SDK tools + build_and_run (C7 verify)',
+    ['lookup_api', 'search_api', 'list_headers', 'hardware_constraint', 'build_and_run'].every((n) => toolNames.includes(n)));
 const mcall = OM.handleMessage(OPENSNES, { id: 3, method: 'tools/call', params: { name: 'lookup_api', arguments: { symbol: 'oamSet' } } });
 check('MCP tools/call lookup_api returns the signature', /oamSet/.test(mcall.result.content[0].text));
 check('MCP unknown method -> JSON-RPC error', !!OM.handleMessage(OPENSNES, { id: 4, method: 'bogus' }).error);
+// pure verify helpers
+check('tailLines keeps the last non-empty lines', OM.tailLines('a\n\nb\nc\n', 2) === 'b\nc');
+check('summarizeState surfaces forced-blank + sprite0 + PC',
+    (() => { const s = OM.summarizeState({ ppu: { forced_blank: true, bg_mode: 1, oam_full: [40, 50, 2, 0] }, cpu: { pc: 0x8123 } }); return s.includes('FORCED BLANK') && s.includes('sprite0 @(40,50)') && s.includes('8123'); })());
 try { fs.unlinkSync(tmpOM); } catch {}
 
 // ===========================================================================
 // P2.1a — the hand-rolled luna MCP client, end-to-end against the real binary.
 // ===========================================================================
 (async () => {
+    // --- C7: build_and_run closes the loop (make + luna) — the verify primitive ---
+    console.log('\n=== C7 verify: build_and_run (make + luna → image + state) ===');
+    const tmpOM2 = path.join(os.tmpdir(), `cooper_om2_${process.pid}.cjs`);
+    const tmpPgV = path.join(os.tmpdir(), `cooper_pg_forv_${process.pid}.cjs`);
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'opensnesMcp.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpOM2 });
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'projectGen.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPgV });
+    const OMv = require(tmpOM2);
+    const PGv = require(tmpPgV);
+    if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !B.resolveLunaPath({ sdkPath: OPENSNES })) {
+        skipped('SDK make / luna not available');
+    } else {
+        const vdir = path.join(os.tmpdir(), `cooper_verify_e2e_${process.pid}`);
+        try {
+            fs.mkdirSync(vdir, { recursive: true });
+            const spec = { name: 'verify', graphics: { mode: 1, objSize: 0 }, build: { sound: false }, modules: ['console', 'background', 'dma'] };
+            fs.writeFileSync(path.join(vdir, 'Makefile'), PGv.renderMakefile(spec, OPENSNES));
+            fs.writeFileSync(path.join(vdir, 'main.c'),
+                '#include <snes.h>\nint main(void){ consoleInit(); setMode(BG_MODE1,0); setColor(0, RGB(4,8,20)); WaitForVBlank(); setScreenOn(); while(1){ WaitForVBlank(); } return 0; }\n');
+            const okR = await OMv.buildAndRun(OPENSNES, { project_dir: vdir, steps: 1000000 });
+            check('build_and_run: working project → not error, text + framebuffer image',
+                !okR.isError && okR.content.some((c) => c.type === 'text' && /BUILD OK/.test(c.text)) && okR.content.some((c) => c.type === 'image' && (c.data || '').length > 100));
+            // break the C and confirm it reports the build error instead
+            fs.writeFileSync(path.join(vdir, 'main.c'), '#include <snes.h>\nint main(void){ nope_not_valid; return 0; }\n');
+            fs.rmSync(path.join(vdir, 'verify.sfc'), { force: true });
+            const badR = await OMv.buildAndRun(OPENSNES, { project_dir: vdir, steps: 1000000 });
+            check('build_and_run: broken project → isError with the build output',
+                badR.isError === true && badR.content.some((c) => c.type === 'text' && /BUILD FAILED/.test(c.text)));
+        } finally {
+            try { fs.rmSync(vdir, { recursive: true, force: true }); } catch {}
+        }
+    }
+    try { fs.unlinkSync(tmpOM2); fs.unlinkSync(tmpPgV); } catch {}
+
     console.log('\n=== luna MCP client: end-to-end debug loop ===');
     const tmpM = path.join(os.tmpdir(), `cooper_lunamcp_${process.pid}.cjs`);
     esbuild.buildSync({

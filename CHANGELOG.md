@@ -4,6 +4,24 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.55.0] — 2026-07-11
+
+### Added — C7: the AI verify loop (`build_and_run`) + complete AI wiring
+
+- **`build_and_run`** — a new tool on Cooper's OpenSNES MCP server that closes the
+  loop for an AI assistant: it runs `make` **and** runs the ROM on the luna
+  emulator, returning the build errors **or a screenshot of what it renders plus
+  PPU/CPU state**. So an AI (Claude Code, Copilot, Cursor…) can *see* what its code
+  draws on cycle-accurate hardware and self-correct — the C7 differentiator. Pass
+  `input` to drive the joypad and verify gameplay.
+- **Both AI servers are now registered.** `Cooper: Configure AI` previously wired
+  only the `luna` MCP server; it now also registers the **`opensnes`** server
+  (SDK-query tools + `build_and_run`) that was shipped but never hooked up. Your
+  AI gets `lookup_api`/`search_api`/`list_headers`/`hardware_constraint` +
+  `build_and_run`.
+- **AGENTS.md teaches the loop** — query the SDK instead of guessing, call
+  `build_and_run`, then self-correct from what you actually see in the frame.
+
 ## [0.54.0] — 2026-07-11
 
 ### Added — consume luna v1.8 input capture (verified plumbing)
