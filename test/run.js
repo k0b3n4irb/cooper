@@ -381,8 +381,14 @@ console.log('\n=== Cooper dashboard HTML (pure) ===');
 const tmpD2 = path.join(os.tmpdir(), `cooper_dash_${process.pid}.cjs`);
 esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'dashboard.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpD2 });
 const D2 = require(tmpD2);
-const dash = D2.renderDashboardHtml({ hasProject: true, projectName: 'shmup_1942', romBuilt: true, sdkName: 'opensnes', lunaFound: true }, 'vscode-csp', 'NONCE0');
-check('dashboard has Build/Run/Play/Debug + viewer cards + refresh + New Game (10 actions)', (dash.match(/data-cmd=/g) || []).length === 10);
+const dashState = { hasProject: true, projectName: 'shmup_1942', romBuilt: true, sdkName: 'opensnes', lunaFound: true, watchOn: false, hasArt: false, hasSound: false, hasTests: false, hasAi: false };
+const dash = D2.renderDashboardHtml(dashState, 'vscode-csp', 'NONCE0');
+check('dashboard has Build/Run/Play/Debug + cards + refresh + New Game + next-step (11 actions)', (dash.match(/data-cmd=/g) || []).length === 11);
+// UX-2 Mission Control: the next-step banner follows the game-making order
+check('next step: built + no art → suggests New Sprite', dash.includes('NEXT&nbsp;STEP') && dash.includes('data-cmd="newsprite"'));
+check('next step: art+sound+tests+AI all present → suggests shipping (Validate ROM)',
+    D2.renderDashboardHtml({ ...dashState, hasArt: true, hasSound: true, hasTests: true, hasAi: true }, 'c', 'N').includes('data-cmd="validate"'));
+check('next step: not built → suggests Build', D2.renderDashboardHtml({ ...dashState, romBuilt: false }, 'c', 'N').includes('data-cmd="build"'));
 check('dashboard offers New Game even WITH a project open', dash.includes('data-cmd="newgame"'));
 check('dashboard has the Play button (luna-gui)', dash.includes('data-cmd="play"'));
 check('dashboard has a real status refresh (not the preview button)', dash.includes('data-cmd="refresh"'));
@@ -391,10 +397,31 @@ check('dashboard script gated by a nonce (CSP)', dash.includes("script-src 'nonc
 check('dashboard allows data: images for the preview', dash.includes('img-src vscode-csp data:'));
 check('dashboard reflects status (luna ready, ROM built)', dash.includes('ready') && dash.includes('built'));
 check('dashboard has a preview image slot', dash.includes('id="preview"'));
-const dashEmpty = D2.renderDashboardHtml({ hasProject: false, projectName: '', romBuilt: false, sdkName: null, lunaFound: false }, 'csp', 'N');
+const dashEmpty = D2.renderDashboardHtml({ hasProject: false, projectName: '', romBuilt: false, sdkName: null, lunaFound: false, watchOn: false, hasArt: false, hasSound: false, hasTests: false, hasAi: false }, 'csp', 'N');
 check('dashboard empty state guides a new game', dashEmpty.includes('Start a new SNES game'));
 check('dashboard empty state offers Create New Game + New Project (nonce-gated script)',
     dashEmpty.includes('id="new-game"') && dashEmpty.includes('id="new-project"') && dashEmpty.includes('nonce="N"'));
+
+// --- UX-2: the status-bar heartbeat (pure missionControl) ---
+const tmpMCtl = path.join(os.tmpdir(), `cooper_mctl_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'missionControl.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpMCtl });
+const MCTL = require(tmpMCtl);
+check('statusBarText: no project → plain Cooper badge', MCTL.statusBarText({ projectName: null }).text === '$(game) Cooper');
+check('statusBarText: built project shows pass icon; watch adds the eye', (() => {
+    const b = MCTL.statusBarText({ projectName: 'shmup', romBuilt: true, lunaFound: true, watchOn: true });
+    return b.text.includes('shmup') && b.text.includes('$(pass-filled)') && b.text.includes('$(eye)');
+})());
+check('statusBarText: missing luna surfaces a warning', MCTL.statusBarText({ projectName: 'x', romBuilt: false, lunaFound: false, watchOn: false }).text.includes('$(warning)'));
+check('nextStep order: build → art → sound → tests → AI → ship', (() => {
+    const base = { projectName: 'g', romBuilt: true, lunaFound: true, watchOn: false, hasArt: true, hasSound: true, hasTests: true, hasAi: true };
+    return MCTL.nextStep({ ...base, romBuilt: false }).cmd === 'build'
+        && MCTL.nextStep({ ...base, hasArt: false }).cmd === 'newsprite'
+        && MCTL.nextStep({ ...base, hasSound: false }).cmd === 'addsound'
+        && MCTL.nextStep({ ...base, hasTests: false }).cmd === 'rectest'
+        && MCTL.nextStep({ ...base, hasAi: false }).cmd === 'configai'
+        && MCTL.nextStep(base).cmd === 'validate';
+})());
+try { fs.unlinkSync(tmpMCtl); } catch {}
 
 // --- disassembly viewer HTML (pure) ---
 console.log('\n=== disassembly viewer HTML (pure) ===');

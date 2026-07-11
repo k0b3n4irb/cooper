@@ -4,6 +4,24 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.60.0] — 2026-07-11
+
+### Changed — UX-2: the studio feel (status bar, calm, Mission Control)
+
+- **A permanent Cooper status-bar item** — the studio's heartbeat: your game's
+  name, built ✓ / not built, watch-mode eye, a warning if luna is missing.
+  Always visible, click = the dashboard. You never wonder "did it build?" again.
+- **Toast diet (−65%)**: routine confirmations ("palette saved", "sprite wired",
+  "snapshot saved"…) no longer pop up — they flash briefly in the status bar and
+  land in the log. Popups are reserved for real decisions and errors. The editor
+  stays quiet while you work.
+- **The dashboard is now Mission Control**: a **NEXT STEP** banner always tells
+  you the one thing that would move your game forward — Build it → give it art
+  (New Sprite) → give it sound → record a gameplay test → configure your AI →
+  ship it (Validate ROM). The guided experience is ambient, not a wizard you
+  have to find. Plus a touch of SNES-studio flair (pad-colour accents, a
+  console-bezel frame around the preview) — theme-aware, still native VS Code.
+
 ## [0.59.0] — 2026-07-11
 
 ### Changed — UX-1: one coherent surface (the UX audit, phase 1)

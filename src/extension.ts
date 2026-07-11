@@ -37,6 +37,7 @@ import { buildIt, sfxSymbol, sfxSnippet, ensureSoundbank } from './soundScaffold
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
 import { intSizeHint } from './intSizeHint';
+import { statusBarText } from './missionControl';
 import { mergeVscodeMcp, mergeProjectMcp, lunaEntry, opensnesEntry } from './mcpConfig';
 import { parseSym } from './sym';
 import { buildTreeModel, userFunctions, functionDefLines, TreeNode, ProjectInfo } from './sidebar';
@@ -50,6 +51,14 @@ const MAKE_TASK_TYPE = 'cooper-make';
 // MCP), every timeout and every surfaced error lands here so "nothing happens"
 // is always diagnosable (View → Output → Cooper, or `Cooper: Show Log`).
 let output: vscode.OutputChannel | undefined;
+let cooperStatus: vscode.StatusBarItem | undefined;
+
+/** UX-2 toast diet: routine success goes to a transient status-bar flash + the
+ *  log — never a popup. Toasts are reserved for decisions and errors. */
+function flash(msg: string): void {
+    log(msg);
+    vscode.window.setStatusBarMessage(`$(check) Cooper: ${msg}`, 5000);
+}
 
 /** Append a timestamped line to the Cooper log. */
 function log(msg: string): void {
@@ -83,8 +92,14 @@ export function activate(context: vscode.ExtensionContext): void {
     log(`Cooper activated (v${(context.extension.packageJSON as { version?: string }).version ?? '?'})`);
     const tree = new CooperTreeProvider();
     const codeLens = new CooperCodeLensProvider();
+    // UX-2: the studio's heartbeat — a permanent status-bar item (click = dashboard).
+    cooperStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
+    cooperStatus.command = 'cooper.home';
+    cooperStatus.text = '$(game) Cooper';
+    cooperStatus.show();
     context.subscriptions.push(
         output,
+        cooperStatus,
         // C2 v2: passively surface the int=2 caveat clangd can't (host target).
         vscode.languages.registerHoverProvider(
             [{ language: 'c', scheme: 'file' }],
@@ -173,6 +188,20 @@ class CooperTreeProvider implements vscode.TreeDataProvider<TreeNode> {
         this.info = await resolveProjectInfo();
         this.roots = buildTreeModel(this.info);
         this.emitter.fire();
+        // keep the studio heartbeat in sync (UX-2)
+        if (cooperStatus) {
+            const cfg = vscode.workspace.getConfiguration('cooper');
+            const sdk = this.info.projectDir ? detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: this.info.projectDir }) : null;
+            const st = statusBarText({
+                projectName: this.info.romName ? this.info.romName.replace(/\.(sfc|smc)$/i, '') : (this.info.projectDir ? path.basename(this.info.projectDir) : null),
+                romBuilt: this.info.romBuilt,
+                lunaFound: !!resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path }),
+                watchOn: !!watchState,
+                hasArt: false, hasSound: false, hasTests: false, hasAi: false, // not used by statusBarText
+            });
+            cooperStatus.text = st.text;
+            cooperStatus.tooltip = st.tooltip;
+        }
     }
 
     getChildren(node?: TreeNode): TreeNode[] {
@@ -296,10 +325,10 @@ async function breakOnSymbol(name?: string): Promise<void> {
     );
     if (existing) {
         vscode.debug.removeBreakpoints([existing]);
-        void vscode.window.showInformationMessage(`Cooper: removed breakpoint on ${name}()`);
+        flash(`removed breakpoint on ${name}()`);
     } else {
         vscode.debug.addBreakpoints([new vscode.FunctionBreakpoint(name)]);
-        void vscode.window.showInformationMessage(`Cooper: breakpoint set on ${name}() — Continue (F5) to hit it.`);
+        flash(`breakpoint set on ${name}() — Continue (F5) to hit it`);
     }
 }
 
@@ -390,8 +419,8 @@ async function setGraphicsMode(): Promise<void> {
     fs.writeFileSync(ovPath, serializeOverride(config));
     log(`graphics: mode ${config.mode}, OBSEL ${config.objSize} → ${ovPath}`);
     const m = BG_MODES[config.mode];
-    void vscode.window.showInformationMessage(
-        `Cooper: Mode ${config.mode} (${m.layers.map((l) => `BG${l.bg} ${l.bpp}bpp`).join(', ')}), sprites ${OBJ_SIZE_PAIRS[config.objSize].name}. Saved to .cooper/graphics.json — the asset editors now enforce it.`);
+    flash(
+        `Mode ${config.mode} (${m.layers.map((l) => `BG${l.bg} ${l.bpp}bpp`).join(', ')}), sprites ${OBJ_SIZE_PAIRS[config.objSize].name}. Saved to .cooper/graphics.json — the asset editors now enforce it.`);
 }
 
 /** Edit the palette of an indexed PNG (the source `gfx4snes` consumes) — a BGR555
@@ -424,7 +453,7 @@ async function editPalette(uri?: vscode.Uri): Promise<void> {
                 const out = writePalette(fs.readFileSync(file), m.palette.map((v) => bgr555ToRgb8(v)));
                 fs.writeFileSync(file, out);
                 void panel.webview.postMessage({ type: 'saved' });
-                void vscode.window.showInformationMessage(`Cooper: palette saved to ${path.basename(file)} — Build to regenerate the .pal.`);
+                flash(`palette saved to ${path.basename(file)} — Build to regenerate the .pal`);
             } catch (e) {
                 void vscode.window.showErrorMessage(`Cooper: save failed — ${(e as Error).message}`);
             }
@@ -475,7 +504,7 @@ async function editTiles(uri?: vscode.Uri): Promise<void> {
             try {
                 fs.writeFileSync(file, writeIndexedPixels(fs.readFileSync(file), m.indices));
                 void panel.webview.postMessage({ type: 'saved' });
-                void vscode.window.showInformationMessage(`Cooper: tiles saved to ${path.basename(file)} — Build to regenerate the .pic.`);
+                flash(`tiles saved to ${path.basename(file)} — Build to regenerate the .pic`);
             } catch (e) {
                 void vscode.window.showErrorMessage(`Cooper: save failed — ${(e as Error).message}`);
             }
@@ -577,8 +606,8 @@ async function addSprite(uri?: vscode.Uri): Promise<void> {
     log(`add sprite: ${pngRel} as ${what} → Makefile + data.asm wired; snippet for '${base}' on the clipboard`);
     const doc = await vscode.workspace.openTextDocument({ language: 'c', content: snippet });
     await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
-    void vscode.window.showInformationMessage(
-        `Cooper: wired ${pngRel} as a ${what} — Makefile rule + data.asm bridge done. The C is on your clipboard (and shown here). Build to see it.`);
+    flash(
+        `wired ${pngRel} as a ${what} — Makefile rule + data.asm bridge done. The C is on your clipboard (and shown here). Build to see it.`);
 }
 
 /** A ready-to-paint 16-colour starter palette (index 0 = transparent). Edit it
@@ -630,8 +659,8 @@ async function newSprite(): Promise<void> {
     }
     log(`new sprite: res/${name.trim()}.png (${sizePick.s}×${sizePick.s}, blank 16-colour canvas)`);
     await editTiles(vscode.Uri.file(pngPath));
-    void vscode.window.showInformationMessage(
-        `Cooper: created res/${name.trim()}.png (${sizePick.s}×${sizePick.s}). Draw it here, tweak colours with "Edit Palette", then "Add Sprite" to put it in the game.`);
+    flash(
+        `created res/${name.trim()}.png (${sizePick.s}×${sizePick.s}). Draw it here, tweak colours with "Edit Palette", then "Add Sprite" to put it in the game.`);
 }
 
 /**
@@ -683,8 +712,8 @@ async function addSoundEffect(uri?: vscode.Uri): Promise<void> {
     const doc = await vscode.workspace.openTextDocument({ language: 'c', content: snippet });
     await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
     const note = built.truncated ? ` (trimmed to ${durMs}ms to fit SPC sample RAM)` : '';
-    void vscode.window.showInformationMessage(
-        `Cooper: wired ${itRel} → ${symbol}${note}. The C to play it is on your clipboard (and shown here). Build to hear it.`);
+    flash(
+        `wired ${itRel} → ${symbol}${note}. The C to play it is on your clipboard (and shown here). Build to hear it.`);
 }
 
 /**
@@ -744,8 +773,8 @@ async function insertSnippet(context: vscode.ExtensionContext): Promise<void> {
             b.insert(at, '\n' + snip.code);
         });
         log(`insert snippet: ${snip.id} at cursor${missing.length ? ` (+${missing.length} include)` : ''}${wired ? '; LIB_MODULES wired' : ''}`);
-        void vscode.window.showInformationMessage(
-            `Cooper: inserted "${snip.title}"${wired ? ` and wired ${snip.modules.join(' ')} into the Makefile` : ''}. Build to use it.`);
+        flash(
+            `inserted "${snip.title}"${wired ? ` and wired ${snip.modules.join(' ')} into the Makefile` : ''}. Build to use it.`);
         return;
     }
 
@@ -755,8 +784,8 @@ async function insertSnippet(context: vscode.ExtensionContext): Promise<void> {
     const doc = await vscode.workspace.openTextDocument({ language: 'c', content: body });
     await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
     log(`insert snippet: ${snip.id} → clipboard + tab${wired ? '; LIB_MODULES wired' : ''}`);
-    void vscode.window.showInformationMessage(
-        `Cooper: "${snip.title}" is on your clipboard (and shown here)${wired ? `; wired ${snip.modules.join(' ')} into the Makefile` : ''}.`);
+    flash(
+        `"${snip.title}" is on your clipboard (and shown here)${wired ? `; wired ${snip.modules.join(' ')} into the Makefile` : ''}.`);
 }
 
 /**
@@ -1183,12 +1212,21 @@ async function dashboardState(): Promise<DashboardState> {
     const cfg = vscode.workspace.getConfiguration('cooper');
     const sdk = info.projectDir ? detectSdk({ configured: cfg.get<string>('opensnesPath')?.trim() || undefined, projectDir: info.projectDir }) : null;
     const luna = resolveLunaPath({ configured: cfg.get<string>('lunaPath')?.trim() || undefined, sdkPath: sdk?.path });
+    // Mission Control signals (cheap fs probes; drive the "next step" banner).
+    const dir = info.projectDir;
+    const hasArt = !!dir && fs.existsSync(path.join(dir, 'res')) && fs.readdirSync(path.join(dir, 'res')).some((f) => f.endsWith('.png'));
+    const hasSound = !!dir && ((fs.existsSync(path.join(dir, 'sfx')) && fs.readdirSync(path.join(dir, 'sfx')).some((f) => f.endsWith('.it')))
+        || (fs.existsSync(path.join(dir, 'Makefile')) && /^\s*SOUNDBANK_SRC\s*:?=\s*\S/m.test(fs.readFileSync(path.join(dir, 'Makefile'), 'utf8'))));
+    const hasTests = !!dir && fs.existsSync(path.join(dir, 'test', 'manifest.toml'));
+    const hasAi = !!dir && fs.existsSync(path.join(dir, 'AGENTS.md'));
     return {
         hasProject: !!info.projectDir,
         projectName: info.romName ? info.romName.replace(/\.(sfc|smc)$/i, '') : (info.projectDir ? path.basename(info.projectDir) : ''),
         romBuilt: info.romBuilt,
         sdkName: info.sdkName,
         lunaFound: !!luna,
+        watchOn: !!watchState,
+        hasArt, hasSound, hasTests, hasAi,
     };
 }
 
@@ -1212,6 +1250,12 @@ async function showHome(context: vscode.ExtensionContext): Promise<void> {
             case 'palette': await showPalette(); break;
             case 'oam': await showOam(); break;
             case 'vram': await showVram(); break;
+            // Mission Control next-step routes (UX-2)
+            case 'newsprite': await newSprite(); break;
+            case 'addsound': await addSoundEffect(); break;
+            case 'rectest': await recordGameplayTest(); break;
+            case 'configai': await configureAI(); break;
+            case 'validate': await validateRom(); break;
             case 'run': {
                 const png = await generatePreviewPng(context);
                 if (png) {
@@ -1306,8 +1350,8 @@ async function recordManifestTest(projectDir: string, t: ManifestTest): Promise<
     log(`gameplay test: recorded ${t.name}${t.input ? ` (${t.input})` : ''}`);
     const doc = await vscode.workspace.openTextDocument(path.join(projectDir, MANIFEST_REL));
     await vscode.window.showTextDocument(doc);
-    void vscode.window.showInformationMessage(
-        `Cooper: test "${t.name}" recorded in test/manifest.toml (baseline captured). Run it with "Run Gameplay Tests" or commit it — CI runs \`make test\`.`);
+    flash(
+        `test "${t.name}" recorded in test/manifest.toml (baseline captured). Run it with "Run Gameplay Tests" or commit it — CI runs \`make test\`.`);
 }
 
 async function recordGameplayTest(): Promise<void> {
@@ -1531,7 +1575,7 @@ async function deployRom(): Promise<void> {
         const target = fs.statSync(dest).isDirectory() ? path.join(dest, path.basename(rom)) : dest;
         fs.copyFileSync(rom, target);
         log(`deploy: ${rom} → ${target}`);
-        void vscode.window.showInformationMessage(`Cooper: deployed ${path.basename(rom)} → ${target}`);
+        flash(`deployed ${path.basename(rom)} → ${target}`);
     } catch (e) {
         fail(`deploy failed: ${(e as Error).message} (is the SD card mounted at ${dest}?)`);
     }
@@ -1644,7 +1688,7 @@ async function importRecording(context: vscode.ExtensionContext): Promise<void> 
         }
         try {
             const r = await session.customRequest('cooperReplay', { script }) as { frames: number };
-            void vscode.window.showInformationMessage(`Cooper: replayed the recording to frame ${r.frames}.`);
+            flash(`replayed the recording to frame ${r.frames}`);
         } catch (e) {
             fail(`replay failed: ${String(e)}`);
         }
@@ -2186,7 +2230,7 @@ async function saveSnapshot(context: vscode.ExtensionContext): Promise<void> {
         const file = path.join(snapshotsDir(context), `${name}.lunastate`);
         fs.writeFileSync(file, r.stateBase64, 'utf8');
         log(`snapshot: saved ${name} (${r.bytes} bytes) → ${file}`);
-        void vscode.window.showInformationMessage(`Cooper: snapshot "${name}" saved (${Math.round(r.bytes / 1024)} KB).`);
+        flash(`snapshot "${name}" saved (${Math.round(r.bytes / 1024)} KB)`);
     } catch (e) {
         fail(`could not save the snapshot: ${String(e)}`);
     }
@@ -2213,7 +2257,7 @@ async function restoreSnapshot(context: vscode.ExtensionContext): Promise<void> 
         const stateBase64 = fs.readFileSync(path.join(dir, `${picked}.lunastate`), 'utf8');
         await session.customRequest('cooperLoadState', { stateBase64 });
         log(`snapshot: restored ${picked}`);
-        void vscode.window.showInformationMessage(`Cooper: snapshot "${picked}" restored.`);
+        flash(`snapshot "${picked}" restored`);
     } catch (e) {
         fail(`could not restore "${picked}": ${String(e)} (snapshots only load against the same ROM build)`);
     }

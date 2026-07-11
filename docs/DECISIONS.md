@@ -1159,6 +1159,32 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-080 — UX-2: ambient state + calm + Mission Control (2026-07-11)
+- **Context:** phase 2 of the UX audit, sharpened by the user's stated vision:
+  *"que l'utilisateur oublie qu'il est sur VS Code et se sente immergé dans un
+  environnement de développement de jeux SNES — tout doit être intuitif."*
+- **Decision:**
+  1. **Permanent status-bar item** (`$(game) <name> ✓/…/👁/⚠`, click = dashboard)
+     updated on every tree refresh — the studio's heartbeat. Pure
+     `missionControl.statusBarText`.
+  2. **Toast diet:** 15 of 23 info toasts (pure confirmations, no buttons) →
+     `flash()` = 5s status-bar message + log. Kept: decision toasts (buttons) and
+     the two instructional ones (clangd restart, AGENTS.md). −65%, meets the
+     audit's target.
+  3. **Dashboard → Mission Control:** a NEXT STEP banner driven by pure
+     `missionControl.nextStep(state)` — one suggestion at a time in the order a
+     game comes together (build → art → sound → tests → AI → ship), computed
+     from cheap fs probes (res/*.png, sfx/*.it|SOUNDBANK_SRC, test/manifest.toml,
+     AGENTS.md). The guided 90% path becomes ambient instead of modal.
+  4. **Immersion, kept native:** SNES pad-colour accents + a console-bezel
+     preview frame — CSS on theme variables only; explicitly NOT a custom UI
+     toolkit (the audit's garde-fou).
+- **Deferred to UX-2.5/3 (honest):** the shared webview stylesheet across ALL
+  webviews (dashboard got the treatment; palette/tiles/profiler still have their
+  own CSS), and the Marketplace listing work (UX-3).
+- **Verified:** pure tests for statusBarText + nextStep ordering + the banner in
+  the rendered dashboard; 472 Node + 10 integration.
+
 ### D-079 — UX-1: information architecture on the game-making cycle (2026-07-11)
 - **Context:** the UX audit (`/tmp/cooper_uiux_rapport.md`, commissioned after
   "il y en a un peu partout") measured the sprawl: 39 commands, sidebar exposing

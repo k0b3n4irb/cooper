@@ -53,8 +53,13 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   — sidebar retells the game-making cycle (CREATE category surfaces the 31
   palette-only commands; DEBUG collapsed = pro bench), 39 titles renamed to a
   6-verb taxonomy (IDs unchanged), icons everywhere, `.c`/`.sfc` context menus,
-  settings descriptions. **Next: UX-2** (status bar, toast diet, Mission Control
-  dashboard, shared webview stylesheet) then UX-3 (Marketplace listing).
+  settings descriptions.
+- **0.60.0 (D-080):** **UX-2** — permanent status-bar heartbeat, toast diet
+  (23→8 info toasts, −65%), dashboard → **Mission Control** (ambient NEXT STEP:
+  build → art → sound → tests → AI → ship), SNES-studio flair on theme vars.
+  User vision: "oublier VS Code, être immergé dans un studio SNES."
+  **Deferred:** shared stylesheet across all webviews (UX-2.5); **next: UX-3**
+  (Marketplace listing, screenshots, onboarding timing).
 - **0.51.2 (D-072):** consumed **opensnes v0.29.1** — the two bugs Cooper filed
   (#99 cc65816 RMW; #100 gfx4snes -T char-names). Verified both real in the
   delivered binaries first, bumped CI pin, cross-checked `sheetFrameTiles` vs the

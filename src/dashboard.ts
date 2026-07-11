@@ -1,13 +1,15 @@
-// Pure HTML for the Cooper "Home" dashboard webview — no `vscode` import, so the
-// markup is Node-testable. The glue (panel, messaging, preview) lives in
-// extension.ts. Styled with VS Code theme variables so it matches the user's theme.
+// Pure HTML for Cooper's "Mission Control" dashboard webview — no `vscode`
+// import, so the markup is Node-testable. The glue (panel, messaging, preview)
+// lives in extension.ts. Styled with VS Code theme variables so it matches the
+// user's theme, with light SNES-studio flair (pad-colour accents, console-bezel
+// preview) — the immersion is ambient, never a different UI toolkit (UX-2).
 
-export interface DashboardState {
+import { nextStep, StudioState } from './missionControl';
+
+export interface DashboardState extends Omit<StudioState, 'projectName'> {
     hasProject: boolean;
     projectName: string;
-    romBuilt: boolean;
     sdkName: string | null;
-    lunaFound: boolean;
 }
 
 function escapeHtml(s: string): string {
@@ -55,6 +57,15 @@ export function renderDashboardHtml(s: DashboardState, cspSource: string, nonce:
   .ok { color: var(--vscode-testing-iconPassed, #89d185); }
   .warn { color: var(--vscode-list-warningForeground, #cca700); }
   .empty { color: var(--vscode-descriptionForeground); padding: 40px 0; text-align: center; }
+  /* SNES-studio flair (ambient, theme-aware) */
+  .pads span { display:inline-block; width:9px; height:9px; border-radius:50%; margin-left:4px; }
+  .pad-x{background:#4040c8} .pad-y{background:#40a040} .pad-a{background:#c84040} .pad-b{background:#c8b820}
+  .next { display:flex; align-items:center; gap:14px; margin:0 0 18px; padding:12px 16px;
+          border-left: 3px solid var(--vscode-textLink-foreground);
+          background: var(--vscode-editorWidget-background); border-radius: 4px; }
+  .next-t { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--vscode-descriptionForeground); }
+  .next-h { color: var(--vscode-descriptionForeground); font-size: 12px; }
+  #preview { border-radius: 6px; box-shadow: inset 0 0 24px rgba(0,0,0,.55); border: 6px solid #1c1c22; }
 </style></head><body>`;
 
     if (!s.hasProject) {
@@ -71,9 +82,15 @@ pick a game type and Cooper sets up the project for you:<br><br>
     }
 
     const dot = (ok: boolean, label: string) => `<span class="${ok ? 'ok' : 'warn'}">${label}</span>`;
+    const step = nextStep({ ...s, projectName: s.projectName || null });
     const body = `
-  <h1>COOPER</h1>
+  <h1>COOPER <span class="pads"><span class="pad-x"></span><span class="pad-y"></span><span class="pad-a"></span><span class="pad-b"></span></span></h1>
   <div class="sub">${escapeHtml(s.projectName)}</div>
+  <div class="next">
+    <span class="next-t">NEXT&nbsp;STEP</span>
+    <button class="btn" data-cmd="${step.cmd}">${step.label}</button>
+    <span class="next-h">${escapeHtml(step.hint)}</span>
+  </div>
   <div class="row">
     <button class="btn" data-cmd="build">▶ Build</button>
     <button class="btn" data-cmd="run">▶ Run</button>
