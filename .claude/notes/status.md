@@ -26,6 +26,10 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
 - **0.53.0 (D-074):** **per-genre starters** (A3) — New Game → Run already moves a
   placeholder hero on a genre backdrop (kills F3/F13). `data/starters.json` +
   `hero.png`, wired via Add-Sprite; verified building + moving in luna.
+- **0.54.0 (D-075):** consume luna **v1.8 input capture** — `LunaMcp` drives
+  `start/takeInputCapture` end-to-end (round-trip verified on v1.8, no-op on v1.7).
+  Foundation for C7 agent-recording + gui play-then-capture (both gated on
+  C7-loop / Luna async events).
 - **0.51.2 (D-072):** consumed **opensnes v0.29.1** — the two bugs Cooper filed
   (#99 cc65816 RMW; #100 gfx4snes -T char-names). Verified both real in the
   delivered binaries first, bumped CI pin, cross-checked `sheetFrameTiles` vs the

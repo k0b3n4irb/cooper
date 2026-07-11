@@ -1159,6 +1159,31 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-075 — Consume luna v1.8 input capture (foundation, verified; 2026-07-11)
+- **Context:** the Luna team's report (§2.6) flagged v1.8's programmatic input
+  capture (`start_input_capture`/`take_input_capture`) and `--input @file` as
+  Cooper-side wins to adopt.
+- **Grounded first (the load-bearing finding):** the ONLY v1.8-EXCLUSIVE capability
+  is the capture tools. `--input` (inline) already works on v1.7 (Cooper can pass
+  parsed checkpoints inline anywhere), and `--input @file` — confirmed honored on
+  v1.8 despite not being in `--help` — only saves inline-stringifying, so it's not
+  a real v1.8 dependency. More importantly, **Cooper has no interactive
+  luna-driving flow where capture is non-redundant today**: gameplay tests run
+  through the SDK `make test` harness (D-063, Cooper doesn't drive luna at record),
+  and interactive play lives in luna-gui (import path, D-062). The genuine payoffs
+  — **agent-recorded tests (C7)** and **gui play-then-capture** — are gated on the
+  C7 verify-loop and Luna's async stop events (their roadmap, `docs/02` §11).
+- **Decision:** consume the capture tools as **verified foundation**, not a
+  bolted-on redundant command. `LunaMcp` gains `startInputCapture()`/
+  `takeInputCapture()` (returns `{entries, script_p1, script_p2}`; `script_p1` is a
+  `luna --input`-replayable, gui-interoperable joypad-1 script), gated by callers
+  on `hasTool('start_input_capture')` (D-073).
+- **Verified on BOTH binaries:** on v1.8 Cooper drives input under capture and it
+  round-trips (entries + replayable script); on v1.7 the tools are absent and
+  Cooper feature-detects and skips them — both green (445 tests). The C7 loop and
+  a future gui-attach command consume this plumbing when they land; deliberately
+  NOT reversing D-063 nor adding a redundant recorder.
+
 ### D-074 — Per-genre starters: New Game → you already move a hero (A3, 2026-07-10)
 - **Context:** dogfood friction F3/F13 — the generated starter set a BG mode then
   a **black screen**; the distance to "something moving" was entirely manual. The

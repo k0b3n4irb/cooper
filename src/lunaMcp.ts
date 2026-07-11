@@ -267,6 +267,23 @@ export class LunaMcp {
         return this.callTool('set_joypad', { port, mask });
     }
 
+    // --- input capture (luna ≥ v1.8, issue #83). Gate calls on
+    //     hasTool('start_input_capture'); older luna doesn't advertise these. ---
+
+    /** Start recording `set_joypad` changes as a frame:mask script. */
+    startInputCapture(): Promise<unknown> {
+        return this.callTool('start_input_capture', {});
+    }
+
+    /**
+     * Stop the capture and return luna's recorded input. `script_p1` is a
+     * ready-to-replay joypad-1 `.input` string (gui-interoperable, accepted by
+     * `luna --input @file`); `entries` is the raw per-port frame:mask list.
+     */
+    async takeInputCapture(): Promise<{ entries: unknown[]; script_p1: string; script_p2: string }> {
+        return await this.callTool('take_input_capture', {}) as { entries: unknown[]; script_p1: string; script_p2: string };
+    }
+
     /** Frames elapsed since reset (`state.scheduler.frame_count`). */
     async frameCount(): Promise<number> {
         const s = await this.state();

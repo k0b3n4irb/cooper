@@ -4,6 +4,24 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.54.0] — 2026-07-11
+
+### Added — consume luna v1.8 input capture (verified plumbing)
+
+- `LunaMcp` can now drive luna's **v1.8 input capture** end-to-end
+  (`startInputCapture`/`takeInputCapture`), returning an engine-authored,
+  gui-interoperable, `luna --input`-replayable joypad script — feature-detected
+  via `hasTool`, so it lights up only on luna ≥ 1.8 and no-ops on the SDK's v1.7.
+  Verified round-trip on v1.8 (Cooper drives input, luna returns the recording)
+  and graceful absence on v1.7.
+- Honest scope: this is the **foundation**, not a new user command. Grounding
+  showed the only v1.8-exclusive capability is capture, and Cooper has no
+  interactive luna-driving flow where it's non-redundant today (gameplay tests run
+  through the SDK `make test` harness; interactive play is in luna-gui; inline
+  `--input` already works on v1.7). The real payoffs — agent-recorded regression
+  tests (C7) and gui play-then-capture — consume this once the C7 verify-loop and
+  Luna's async stop events land (see `docs/02` §11).
+
 ## [0.53.0] — 2026-07-10
 
 ### Added — Create New Game gives you a moving hero, not a black screen

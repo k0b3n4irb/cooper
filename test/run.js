@@ -1485,6 +1485,24 @@ try { fs.unlinkSync(tmpOM); } catch {}
                 rw.every((ev) => typeof ev.pc === 'number' && typeof ev.value === 'number' && typeof ev.line === 'number'));
             check('mem trace attributes a write to InitHardware',
                 rw.some((ev) => (S.addrToSymbol(sym, ev.pc) || {}).name === 'InitHardware'));
+
+            // --- D-075: v1.8 input capture, feature-detected (works on v1.8;
+            //     on v1.7 the tools are absent and Cooper skips them). Both pass. ---
+            if (m.hasTool('start_input_capture')) {
+                await m.reset();
+                await m.startInputCapture();
+                for (let f = 0; f < 6; f++) { await m.stepUntilFrame(2000000); }
+                await m.setJoypad(0, 0x0100); // Right
+                for (let f = 0; f < 12; f++) { await m.stepUntilFrame(2000000); }
+                await m.setJoypad(0, 0);
+                for (let f = 0; f < 4; f++) { await m.stepUntilFrame(2000000); }
+                const cap = await m.takeInputCapture();
+                check('v1.8 input capture round-trips driven joypad input (entries + replayable script)',
+                    Array.isArray(cap.entries) && cap.entries.length > 0 && typeof cap.script_p1 === 'string' && cap.script_p1.length > 0);
+            } else {
+                check('luna v1.7: capture tools absent → Cooper feature-detects and does not call them',
+                    m.hasTool('start_input_capture') === false && m.hasTool('take_input_capture') === false);
+            }
         } catch (e) {
             check('MCP end-to-end threw: ' + String((e && e.message) || e), false);
         } finally {

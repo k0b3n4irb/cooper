@@ -425,6 +425,15 @@ outils optionnels sur leur présence réelle. **Correction terrain** : le
 (`0.8.5`, **identique en v1.7 et v1.8**), pas la release luna → gater sur la
 string est inutile, `hasTool` est le seul signal fiable. Cooper est
 **v1.8-vérifié** (441 tests verts) tout en tournant sur le v1.7 bundlé du SDK.
-Prochaines consommations Cooper (gated `hasTool`) : `start_input_capture`/
-`take_input_capture` (record programmatique) et `--input @fichier`. Rapport
-archivé : voir le résumé ci-dessus (l'original était `/tmp/…`, éphémère).
+
+**Consommation v1.8 (D-075, v0.54.0)** : `LunaMcp` pilote maintenant la **capture
+d'input** v1.8 (`startInputCapture`/`takeInputCapture`) de bout en bout —
+round-trip vérifié sur v1.8, no-op gracieux sur v1.7 (gated `hasTool`). C'est le
+**socle** : le grounding a montré que le seul capability *exclusif* v1.8 est la
+capture (l'inline `--input` marche déjà en v1.7, et `--input @fichier` — honoré en
+v1.8 — n'économise que l'inline-stringify), et que Cooper n'a aujourd'hui aucun
+flux interactif pilotant luna où la capture soit non-redondante (gameplay tests =
+harnais `make test` du SDK ; interactif = luna-gui). Les vrais payoffs
+(record d'agent **C7**, **gui play-then-capture**) se branchent dessus quand la
+boucle C7 et les events-async Luna arrivent. Rapport archivé : résumé ci-dessus
+(l'original était `/tmp/…`, éphémère).
