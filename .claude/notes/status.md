@@ -49,6 +49,12 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   with a project open NO surface showed it. Now: **File → New File…**, a `+` on
   the Cooper panel title bar, a dashboard button even with a project, and the
   empty panel shows clickable New Game / New Project instead of a dead-end.
+- **0.59.0 (D-079):** **UX-1** (phase 1 of the UX audit, `/tmp/cooper_uiux_rapport.md`)
+  — sidebar retells the game-making cycle (CREATE category surfaces the 31
+  palette-only commands; DEBUG collapsed = pro bench), 39 titles renamed to a
+  6-verb taxonomy (IDs unchanged), icons everywhere, `.c`/`.sfc` context menus,
+  settings descriptions. **Next: UX-2** (status bar, toast diet, Mission Control
+  dashboard, shared webview stylesheet) then UX-3 (Marketplace listing).
 - **0.51.2 (D-072):** consumed **opensnes v0.29.1** — the two bugs Cooper filed
   (#99 cc65816 RMW; #100 gfx4snes -T char-names). Verified both real in the
   delivered binaries first, bumped CI pin, cross-checked `sheetFrameTiles` vs the

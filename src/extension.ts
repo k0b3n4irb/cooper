@@ -182,7 +182,9 @@ class CooperTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     getTreeItem(node: TreeNode): vscode.TreeItem {
         const item = new vscode.TreeItem(
             node.label,
-            node.kind === 'category' ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None,
+            node.kind === 'category'
+                ? (node.collapsed ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Expanded)
+                : vscode.TreeItemCollapsibleState.None,
         );
         if (node.description) {
             item.description = node.description;

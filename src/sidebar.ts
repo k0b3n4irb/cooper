@@ -19,6 +19,8 @@ export interface TreeNode {
     args?: unknown[];
     children?: TreeNode[];
     contextValue?: string;
+    /** Categories only: start collapsed (progressive disclosure — the pro bench). */
+    collapsed?: boolean;
 }
 
 export interface ProjectInfo {
@@ -90,7 +92,7 @@ export function buildTreeModel(p: ProjectInfo): TreeNode[] {
     if (!p.projectDir) {
         // No dead-end: the guided ways in, clickable right here.
         return [
-            { id: 'newgame', kind: 'action', icon: 'game', label: '🎮 Create New Game (guided)…', commandId: 'cooper.createNewGame' },
+            { id: 'newgame', kind: 'action', icon: 'game', label: '🎮 New Game (guided)…', commandId: 'cooper.createNewGame' },
             { id: 'newproject', kind: 'action', icon: 'new-folder', label: '✨ New Project (from an SDK example)…', commandId: 'cooper.newProject' },
             {
                 id: 'none', kind: 'info', icon: 'info',
@@ -98,32 +100,58 @@ export function buildTreeModel(p: ProjectInfo): TreeNode[] {
             },
         ];
     }
-    const cat = (id: string, label: string, children: TreeNode[]): TreeNode =>
-        ({ id, label, kind: 'category', children });
+    const cat = (id: string, label: string, children: TreeNode[], collapsed = false): TreeNode =>
+        ({ id, label, kind: 'category', children, ...(collapsed ? { collapsed } : {}) });
     const action = (id: string, label: string, icon: string, commandId: string): TreeNode =>
         ({ id, label, kind: 'action', icon, commandId });
 
+    // The tree tells the story of MAKING a game (UX-1, D-079): create → run →
+    // debug → test & ship → AI. The pro bench (DEBUG) starts collapsed —
+    // progressive disclosure; the 10% unfold it once and VS Code remembers.
     return [
-        cat('project', 'PROJECT', [
+        cat('project', 'MY GAME', [
             {
                 id: 'rom', kind: 'info', icon: 'file-binary',
                 label: p.romName ?? '(no TARGET in Makefile)',
                 description: p.romName ? (p.romBuilt ? '✓ built' : 'not built') : undefined,
             },
             { id: 'sdk', kind: 'info', icon: 'folder', label: `SDK: ${p.sdkName ?? 'not found'}` },
+            action('newgame', 'New Game (guided)…', 'add', 'cooper.createNewGame'),
         ]),
-        cat('run', 'BUILD & RUN', [
-            action('build', 'Build (make)', 'play', 'cooper.build'),
-            action('preview', 'Run / Preview', 'device-camera', 'cooper.preview'),
-            action('play', 'Play (luna-gui)', 'game', 'cooper.play'),
+        cat('create', 'CREATE', [
+            action('newsprite', 'New Sprite (draw one)…', 'edit', 'cooper.newSprite'),
+            action('addsprite', 'Add Sprite (from a PNG)…', 'file-media', 'cooper.addSprite'),
+            action('addsound', 'Add Sound Effect (from a WAV)…', 'unmute', 'cooper.addSoundEffect'),
+            action('editpalette', 'Edit Palette', 'symbol-color', 'cooper.editPalette'),
+            action('edittiles', 'Edit Tiles', 'paintcan', 'cooper.editTiles'),
+            action('addsnippet', 'Add Snippet (collision, …)…', 'symbol-snippet', 'cooper.insertSnippet'),
+            action('gfxmode', 'Set Graphics Mode…', 'settings', 'cooper.setGraphicsMode'),
+        ]),
+        cat('run', 'RUN', [
+            action('build', 'Build', 'package', 'cooper.build'),
+            action('preview', 'Run Preview', 'device-camera', 'cooper.preview'),
+            action('play', 'Play (native window)', 'game', 'cooper.play'),
+            action('watch', 'Toggle Watch (rebuild on save)', 'eye', 'cooper.watch'),
+        ]),
+        cat('debug', 'DEBUG', [
             action('debug', 'Debug', 'debug-alt', 'cooper.debug'),
-        ]),
-        cat('viewers', 'PPU VIEWERS', [
+            action('disasm', 'Show Disassembly', 'file-code', 'cooper.showDisasm'),
             action('memmap', 'Memory Map (WRAM/VRAM)', 'graph', 'cooper.showMemoryMap'),
+            action('trace', 'Trace Memory Access…', 'pulse', 'cooper.traceMemory'),
+            action('profile', 'Run Profiler (one frame)', 'dashboard', 'cooper.profileFrame'),
             action('palette', 'Palette (CGRAM)', 'symbol-color', 'cooper.showPalette'),
             action('oam', 'Sprites (OAM)', 'preview', 'cooper.showOam'),
             action('vram', 'Tiles (VRAM)', 'layout', 'cooper.showVram'),
-        ]),
+        ], true),
+        cat('ship', 'TEST & SHIP', [
+            action('rectest', 'Record Gameplay Test…', 'record', 'cooper.recordGameplayTest'),
+            action('runtests', 'Run Gameplay Tests', 'beaker', 'cooper.runGameplayTests'),
+            action('validate', 'Validate ROM', 'verified', 'cooper.validateRom'),
+            action('deploy', 'Deploy ROM (to flashcart)…', 'rocket', 'cooper.deployRom'),
+        ], true),
+        cat('ai', 'AI', [
+            action('configai', 'Configure AI (OpenSNES context)', 'sparkle', 'cooper.configureAI'),
+        ], true),
         cat('symbols', 'SYMBOLS', p.functions.length
             ? p.functions.map((f) => ({
                 id: `sym:${f.name}`, kind: 'symbol' as NodeKind, label: f.name,

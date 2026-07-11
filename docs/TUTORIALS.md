@@ -6,9 +6,9 @@ pointed at your OpenSNES SDK + luna (one-time setup: [User Guide §1–2](USER_G
 
 | # | You want to… | Uses |
 |---|---|---|
-| [1](#1-from-zero-to-a-game-on-screen) | get a game running from nothing | **Create New Game (guided)** · Build · Run · Play |
+| [1](#1-from-zero-to-a-game-on-screen) | get a game running from nothing | **New Game (guided)** · Build · Run · Play |
 | [2](#2-create-a-sprite-and-make-it-walk) | create a sprite and animate it | New Sprite · Palette/Tile editors · Add Sprite |
-| [3](#3-give-it-sound-and-collision) | add a sound effect and collision | Add Sound Effect · Insert Snippet |
+| [3](#3-give-it-sound-and-collision) | add a sound effect and collision | Add Sound Effect · Add Snippet |
 | [4](#4-find-and-fix-a-crash) | find why the game crashes | Breakpoints · Locals · Stepping |
 | [5](#5-why-did-this-variable-change) | catch what corrupts a variable | Data breakpoint · Memory trace |
 | [6](#6-my-game-drops-frames) | find the slow code | Frame profiler |
@@ -22,8 +22,7 @@ pointed at your OpenSNES SDK + luna (one-time setup: [User Guide §1–2](USER_G
 
 **Goal:** go from an empty folder to a game you can already steer.
 
-1. **Command Palette → `Cooper: Create New Game…`** (or click **🎮 Create New
-   Game** on the dashboard — it's also the first step of the *Get Started with
+1. **Command Palette → `Cooper: New Game…`** (or click **🎮 New Game** on the dashboard — it's also the first step of the *Get Started with
    Cooper* walkthrough, Help → Welcome).
 2. **Answer the survey:** what kind of game? (platformer, RPG, shmup, fighting,
    racing, puzzle, adventure — or *custom* if you want to pick everything
@@ -54,15 +53,15 @@ refreshes the preview automatically.
 
 **Goal:** create art from scratch, draw it, and get it moving in the game.
 
-1. **Create the canvas** — **`Cooper: New Sprite (create + draw one)…`**. Pick a
+1. **Create the canvas** — **`Cooper: New Sprite (draw one)…`**. Pick a
    size (8/16/32/64 px — Cooper defaults to your graphics mode's sprite size) and
    a name. You get a fresh blank canvas in `res/`, with a ready 16-colour
    palette, opened straight in the paint editor. (Starting from existing art
-   instead? Right-click any indexed `.png` → **Edit Tiles / Sprites**.)
+   instead? Right-click any indexed `.png` → **Edit Tiles**.)
 2. **Draw** — paint on the zoomable grid (grey lines = 8×8 tiles, blue = the
    sprite cell; index 0 is transparent). For an animation, make the canvas a
    strip and draw the walk frames side by side.
-3. **Colours** — right-click the `.png` → **Edit Palette (SNES BGR555)**. Each
+3. **Colours** — right-click the `.png` → **Edit Palette**. Each
    R/G/B channel is 0–31 (the real hardware gamut); the image recolours live.
 4. **Preview the animation** — in the tile editor, set *from cell*, *frames* and
    *fps*, press ▶: the consecutive cells loop **while you keep painting**.
@@ -92,7 +91,7 @@ library consumes — no hand-counting tile numbers.
    the Makefile, and hands you the C: initialise once (`snesmodInit` — before the
    game loop, it costs a few frames), `snesmodProcess()` each frame, and
    `snesmodPlayEffect(...)` on the event. Paste, **Build**, and you hear it.
-3. **Collision** — **`Cooper: Insert Snippet…`** → pick from the **Collision**
+3. **Collision** — **`Cooper: Add Snippet…`** → pick from the **Collision**
    category: *AABB overlap* (catching/hitting), *AABB with push-out* (walls and
    platforms), or *tile collision* (a box vs the map). Cooper wires the
    `collision` library module into the Makefile and inserts working, SDK-correct
@@ -134,7 +133,7 @@ not `printf` archaeology.
 **Goal:** catch the code that writes a variable it shouldn't.
 
 **The fast way — memory trace:** at a debug stop (or standalone), run **`Cooper:
-Trace Memory Accesses (one frame)…`** and give it the symbol (`player_hp`) or
+Trace Memory Access (one frame)…`** and give it the symbol (`player_hp`) or
 address (`$7E0030`). Cooper records **every read/write to that address over the
 next frame** and shows a table: each access with its **value, PC, and the
 function that did it**, plus the scanline. The rogue writer is right there by
@@ -156,7 +155,7 @@ assignment by hand.
 
 **Goal:** find where the CPU time goes and whether you fit the frame budget.
 
-1. At a debug stop, run **`Cooper: Profile One Frame (CPU)`**.
+1. At a debug stop, run **`Cooper: Run Profiler (one frame)`**.
 2. Cooper traces **every instruction of the next frame** and shows:
    - a **per-function table** — master clocks, instruction count, and % of the
      frame, sorted by cost, attributed to **your** symbols;

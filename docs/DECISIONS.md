@@ -1159,6 +1159,30 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-079 — UX-1: information architecture on the game-making cycle (2026-07-11)
+- **Context:** the UX audit (`/tmp/cooper_uiux_rapport.md`, commissioned after
+  "il y en a un peu partout") measured the sprawl: 39 commands, sidebar exposing
+  8, dashboard mirroring the same 8, **31 commands palette-only** (all authoring,
+  tests, ship, AI), 20 different verbs across titles.
+- **Decision (phase UX-1 of 3):**
+  1. **Sidebar = the game-making cycle** — MY GAME / CREATE / RUN / DEBUG
+     (collapsed: progressive disclosure for the 10%) / TEST & SHIP / AI /
+     SYMBOLS. Pure `sidebar.ts` (`collapsed` flag honored by the provider).
+  2. **Naming taxonomy, 6 canonical verbs** (New/Add/Edit/Show/Run/Set-Configure
+     + precise domain verbs Build/Play/Debug/Record/Import/Replay/Trace/
+     Validate/Deploy/Audition/Toggle). Technical parens out of titles except
+     state-viewer disambiguation (CGRAM/OAM/VRAM). **IDs unchanged** — no
+     keybinding/config breakage; titles only.
+  3. Icons on all 39 commands; context menus completed (`.c` → Add Snippet,
+     `.sfc`/`.smc` → Play/Validate/Deploy); settings descriptions + order.
+  4. Living docs swept to the new titles (CHANGELOG/DECISIONS stay historical).
+- **Acceptance (from the audit):** every command reachable in ≤ 2 clicks outside
+  the palette — met via the seven categories.
+- **Verified:** tree-model tests rewritten to lock the cycle (category order,
+  CREATE contents, DEBUG collapsed, ship/AI present); 465 Node + 10 integration.
+- **Next (UX-2, not this slice):** status bar, toast diet (−60%), dashboard →
+  Mission Control, shared webview stylesheet. Then UX-3 (Marketplace).
+
 ### D-078 — New Sprite: create graphics from scratch (dogfood #1 F5, 2026-07-11)
 - **Context:** user feedback after dogfooding — "I see editors but it's a viewer,
   I can't see how to CREATE graphics." Grounded it: the tile/palette editors are

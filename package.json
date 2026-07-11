@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.58.0",
+  "version": "0.59.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -74,38 +74,45 @@
     "commands": [
       {
         "command": "cooper.configureClangd",
-        "title": "Configure clangd (OpenSNES C support)",
-        "category": "Cooper"
+        "title": "Configure C Support (clangd)",
+        "category": "Cooper",
+        "icon": "$(tools)"
       },
       {
         "command": "cooper.build",
-        "title": "Build (make)",
-        "category": "Cooper"
+        "title": "Build",
+        "category": "Cooper",
+        "icon": "$(package)"
       },
       {
         "command": "cooper.preview",
-        "title": "Preview frame (luna screenshot)",
-        "category": "Cooper"
+        "title": "Run Preview",
+        "category": "Cooper",
+        "icon": "$(device-camera)"
       },
       {
         "command": "cooper.play",
-        "title": "Play (luna-gui)",
-        "category": "Cooper"
+        "title": "Play (native window)",
+        "category": "Cooper",
+        "icon": "$(game)"
       },
       {
         "command": "cooper.showPalette",
         "title": "Show Palette (CGRAM)",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(symbol-color)"
       },
       {
         "command": "cooper.showOam",
         "title": "Show Sprites (OAM)",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(preview)"
       },
       {
         "command": "cooper.showVram",
         "title": "Show Tiles (VRAM)",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(layout)"
       },
       {
         "command": "cooper.refresh",
@@ -115,7 +122,7 @@
       },
       {
         "command": "cooper.home",
-        "title": "Open Dashboard",
+        "title": "Show Dashboard",
         "category": "Cooper",
         "icon": "$(home)"
       },
@@ -123,154 +130,182 @@
         "command": "cooper.openWalkthrough",
         "title": "Get Started",
         "category": "Cooper",
-        "icon": "$(mortar-board)"
+        "icon": "$(book)"
       },
       {
         "command": "cooper.editPalette",
-        "title": "Edit Palette (SNES BGR555)",
-        "category": "Cooper"
+        "title": "Edit Palette",
+        "category": "Cooper",
+        "icon": "$(symbol-color)"
       },
       {
         "command": "cooper.editTiles",
-        "title": "Edit Tiles / Sprites",
-        "category": "Cooper"
+        "title": "Edit Tiles",
+        "category": "Cooper",
+        "icon": "$(paintcan)"
       },
       {
         "command": "cooper.viewTilemap",
-        "title": "View Tilemap (assembled)",
-        "category": "Cooper"
+        "title": "Show Tilemap",
+        "category": "Cooper",
+        "icon": "$(map)"
       },
       {
         "command": "cooper.configureAI",
         "title": "Configure AI (OpenSNES context)",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(sparkle)"
       },
       {
         "command": "cooper.debug",
-        "title": "Debug (luna)",
-        "category": "Cooper"
+        "title": "Debug",
+        "category": "Cooper",
+        "icon": "$(debug-alt)"
       },
       {
         "command": "cooper.breakOnSymbol",
         "title": "Toggle Breakpoint on Function…",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(circle-filled)"
       },
       {
         "command": "cooper.showLog",
         "title": "Show Log",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(output)"
       },
       {
         "command": "cooper.saveSnapshot",
-        "title": "Save Debug Snapshot (luna save-state)",
-        "category": "Cooper"
+        "title": "Save Debug Snapshot",
+        "category": "Cooper",
+        "icon": "$(save)"
       },
       {
         "command": "cooper.restoreSnapshot",
         "title": "Restore Debug Snapshot…",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(history)"
       },
       {
         "command": "cooper.showDisasm",
-        "title": "Show Disassembly (at the stop)",
-        "category": "Cooper"
+        "title": "Show Disassembly",
+        "category": "Cooper",
+        "icon": "$(file-code)"
       },
       {
         "command": "cooper.traceMemory",
-        "title": "Trace Memory Accesses (one frame)…",
-        "category": "Cooper"
+        "title": "Trace Memory Access (one frame)…",
+        "category": "Cooper",
+        "icon": "$(pulse)"
       },
       {
         "command": "cooper.newProject",
-        "title": "New Project…",
-        "category": "Cooper"
+        "title": "New Project (from an SDK example)…",
+        "category": "Cooper",
+        "icon": "$(new-folder)"
       },
       {
         "command": "cooper.watch",
-        "title": "Toggle Watch (rebuild + preview on save)",
-        "category": "Cooper"
+        "title": "Toggle Watch (rebuild on save)",
+        "category": "Cooper",
+        "icon": "$(eye)"
       },
       {
         "command": "cooper.showMemoryMap",
-        "title": "Show Memory Map (WRAM / VRAM)",
-        "category": "Cooper"
+        "title": "Show Memory Map (WRAM/VRAM)",
+        "category": "Cooper",
+        "icon": "$(graph)"
       },
       {
         "command": "cooper.replayInputs",
-        "title": "Replay Inputs (frame:buttons script)…",
-        "category": "Cooper"
+        "title": "Replay Inputs…",
+        "category": "Cooper",
+        "icon": "$(debug-rerun)"
       },
       {
         "command": "cooper.validateRom",
-        "title": "Validate ROM (header / checksum)",
-        "category": "Cooper"
+        "title": "Validate ROM",
+        "category": "Cooper",
+        "icon": "$(verified)"
       },
       {
         "command": "cooper.deployRom",
-        "title": "Deploy ROM (copy to flashcart SD)…",
-        "category": "Cooper"
+        "title": "Deploy ROM (to flashcart)…",
+        "category": "Cooper",
+        "icon": "$(rocket)"
       },
       {
         "command": "cooper.profileFrame",
-        "title": "Profile One Frame (CPU)",
-        "category": "Cooper"
+        "title": "Run Profiler (one frame)",
+        "category": "Cooper",
+        "icon": "$(dashboard)"
       },
       {
         "command": "cooper.audition",
-        "title": "Hear the Game (render audio)…",
-        "category": "Cooper"
+        "title": "Audition Audio (hear the game)…",
+        "category": "Cooper",
+        "icon": "$(unmute)"
       },
       {
         "command": "cooper.recordGameplayTest",
         "title": "Record Gameplay Test…",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(record)"
       },
       {
         "command": "cooper.runGameplayTests",
         "title": "Run Gameplay Tests",
-        "category": "Cooper"
+        "category": "Cooper",
+        "icon": "$(beaker)"
       },
       {
         "command": "cooper.importRecording",
-        "title": "Import Recording (luna-gui .input)…",
-        "category": "Cooper"
+        "title": "Import Recording…",
+        "category": "Cooper",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "cooper.newSprite",
-        "title": "New Sprite (create + draw one)…",
-        "category": "Cooper"
+        "title": "New Sprite (draw one)…",
+        "category": "Cooper",
+        "icon": "$(edit)"
       },
       {
         "command": "cooper.addSprite",
-        "title": "Add Sprite (wire a PNG into the game)…",
-        "category": "Cooper"
+        "title": "Add Sprite (from a PNG)…",
+        "category": "Cooper",
+        "icon": "$(file-media)"
       },
       {
         "command": "cooper.addSoundEffect",
-        "title": "Add Sound Effect (wire a WAV into the game)…",
-        "category": "Cooper"
+        "title": "Add Sound Effect (from a WAV)…",
+        "category": "Cooper",
+        "icon": "$(unmute)"
       },
       {
         "command": "cooper.exportMetasprite",
-        "title": "Export Metasprite / Animation (C)…",
-        "category": "Cooper"
+        "title": "Export Metasprite / Animation…",
+        "category": "Cooper",
+        "icon": "$(symbol-class)"
       },
       {
         "command": "cooper.setGraphicsMode",
-        "title": "Set Graphics Mode (SNES BG mode + sprite sizes)…",
-        "category": "Cooper"
+        "title": "Set Graphics Mode…",
+        "category": "Cooper",
+        "icon": "$(settings)"
       },
       {
         "command": "cooper.createNewGame",
-        "title": "Create New Game (guided)…",
+        "title": "New Game (guided)…",
         "category": "Cooper",
         "shortTitle": "SNES Game (guided)…",
         "icon": "$(add)"
       },
       {
         "command": "cooper.insertSnippet",
-        "title": "Insert Snippet (collision, …)…",
-        "category": "Cooper"
+        "title": "Add Snippet (collision, …)…",
+        "category": "Cooper",
+        "icon": "$(symbol-snippet)"
       }
     ],
     "viewsContainers": {
@@ -321,6 +356,26 @@
           "command": "cooper.addSoundEffect",
           "when": "resourceExtname == .wav",
           "group": "cooper@5"
+        },
+        {
+          "command": "cooper.insertSnippet",
+          "when": "resourceExtname == .c",
+          "group": "cooper@6"
+        },
+        {
+          "command": "cooper.play",
+          "when": "resourceExtname == .sfc || resourceExtname == .smc",
+          "group": "cooper@1"
+        },
+        {
+          "command": "cooper.validateRom",
+          "when": "resourceExtname == .sfc || resourceExtname == .smc",
+          "group": "cooper@2"
+        },
+        {
+          "command": "cooper.deployRom",
+          "when": "resourceExtname == .sfc || resourceExtname == .smc",
+          "group": "cooper@3"
         }
       ],
       "file/newFile": [
@@ -350,6 +405,13 @@
           "when": "view == cooperTree",
           "group": "navigation@3"
         }
+      ],
+      "editor/context": [
+        {
+          "command": "cooper.insertSnippet",
+          "when": "resourceExtname == .c",
+          "group": "cooper@1"
+        }
       ]
     },
     "walkthroughs": [
@@ -373,7 +435,7 @@
           {
             "id": "project",
             "title": "Create your first game (guided)",
-            "description": "Answer a short survey — **what kind of game?** (platformer, RPG, shmup, racing…) — tick the hardware you want (sound, SRAM save, SA-1, SuperFX…), and Cooper generates the whole project: Makefile, libraries, graphics mode, and a starter where **you already move a character with the D-pad**.\n\n[🎮 Create New Game…](command:cooper.createNewGame)\n\nPrefer starting from a real SDK example (breakout, hello_world…)? [New Project…](command:cooper.newProject) — or just open an existing project folder.",
+            "description": "Answer a short survey — **what kind of game?** (platformer, RPG, shmup, racing…) — tick the hardware you want (sound, SRAM save, SA-1, SuperFX…), and Cooper generates the whole project: Makefile, libraries, graphics mode, and a starter where **you already move a character with the D-pad**.\n\n[🎮 New Game…](command:cooper.createNewGame)\n\nPrefer starting from a real SDK example (breakout, hello_world…)? [New Project…](command:cooper.newProject) — or just open an existing project folder.",
             "media": {
               "image": "media/cooper-preview.png",
               "altText": "A freshly built game frame"
@@ -422,7 +484,7 @@
           {
             "id": "create",
             "title": "Make it yours — art, sound, code",
-            "description": "Everything you need to turn the starter into *your* game, no external tools required:\n\n[✏️ New Sprite (create + draw one)…](command:cooper.newSprite) — a blank canvas at your mode's sprite size, opened in the paint editor. Then **Add Sprite** wires it into the game with the tile numbers computed.\n\n[🔊 Add Sound Effect (from a WAV)…](command:cooper.addSoundEffect) — Cooper builds the soundbank and hands you the C to play it.\n\n[🧩 Insert Snippet (collision, …)…](command:cooper.insertSnippet) — working, SDK-correct code (AABB collision, tile collision…), with the Makefile wired for you.",
+            "description": "Everything you need to turn the starter into *your* game, no external tools required:\n\n[✏️ New Sprite (draw one)…](command:cooper.newSprite) — a blank canvas at your mode's sprite size, opened in the paint editor. Then **Add Sprite** wires it into the game with the tile numbers computed.\n\n[🔊 Add Sound Effect (from a WAV)…](command:cooper.addSoundEffect) — Cooper builds the soundbank and hands you the C to play it.\n\n[🧩 Add Snippet (collision, …)…](command:cooper.insertSnippet) — working, SDK-correct code (AABB collision, tile collision…), with the Makefile wired for you.",
             "media": {
               "image": "media/cooper-dashboard.png",
               "altText": "The Cooper dashboard"
@@ -547,18 +609,23 @@
           "type": "string",
           "default": "",
           "scope": "machine-overridable",
-          "markdownDescription": "Absolute path to the OpenSNES SDK root (the folder containing `lib/include/snes.h`). Used to generate the `.clangd` file. If empty, Cooper infers it from the project Makefile's `OPENSNES` line, then by searching parent folders."
+          "markdownDescription": "Absolute path to the OpenSNES SDK root (the folder containing `lib/include/snes.h`). Used to generate the `.clangd` file. If empty, Cooper infers it from the project Makefile's `OPENSNES` line, then by searching parent folders.",
+          "description": "Path to the OpenSNES SDK root (the folder containing lib/include/snes.h). Leave empty to auto-detect from the project Makefile.",
+          "order": 1
         },
         "cooper.autoConfigureClangd": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Automatically write a `.clangd` for C IntelliSense when you open a C file in an OpenSNES project (never overwrites an existing one). Turn off to configure manually with **Cooper: Configure clangd**."
+          "markdownDescription": "Automatically write a `.clangd` for C IntelliSense when you open a C file in an OpenSNES project (never overwrites an existing one). Turn off to configure manually with **Cooper: Configure clangd**.",
+          "description": "Automatically write the project .clangd (C IntelliSense flags) when an OpenSNES project is opened.",
+          "order": 3
         },
         "cooper.lunaPath": {
           "type": "string",
           "default": "",
           "scope": "machine-overridable",
-          "markdownDescription": "Path to the `luna` emulator — the **binary** or the **folder** that contains it (a user release unzips to a folder with `luna`/`luna-gui`). If empty, Cooper uses the SDK's pinned binary at `<sdk>/tools/luna-test/bin/luna`, then `luna` on your PATH."
+          "markdownDescription": "Path to the `luna` emulator — the **binary** or the **folder** that contains it (a user release unzips to a folder with `luna`/`luna-gui`). If empty, Cooper uses the SDK's pinned binary at `<sdk>/tools/luna-test/bin/luna`, then `luna` on your PATH.",
+          "order": 2
         },
         "cooper.preview.steps": {
           "type": "number",

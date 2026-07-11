@@ -4,6 +4,29 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.59.0] — 2026-07-11
+
+### Changed — UX-1: one coherent surface (the UX audit, phase 1)
+
+- **The sidebar now tells the story of making a game**: MY GAME → **CREATE**
+  (New Sprite, Add Sprite, Add Sound Effect, Edit Palette/Tiles, Add Snippet,
+  Set Graphics Mode — all previously reachable only via the palette) → RUN →
+  **DEBUG** (the pro bench, collapsed by default: debugger, disassembly, memory
+  map, trace, profiler, PPU viewers) → **TEST & SHIP** (gameplay tests, validate,
+  deploy) → **AI** → SYMBOLS. Every command is now ≤ 2 clicks from the panel.
+- **Consistent naming across all 39 commands** (6 canonical verbs): *New* creates
+  from scratch, *Add* wires something into the game (Insert Snippet → **Add
+  Snippet**), *Edit* changes a source, *Show* displays state (View Tilemap →
+  **Show Tilemap**, Open Dashboard → **Show Dashboard**), *Run* executes
+  (Profile One Frame → **Run Profiler**, Hear the Game → **Audition Audio**),
+  *Set/Configure* for settings. Technical jargon left the titles (Edit Palette,
+  not "Edit Palette (SNES BGR555)") except where it disambiguates the pro
+  viewers (CGRAM/OAM/VRAM). **Command IDs are unchanged** — keybindings and
+  configs keep working.
+- **Every command has an icon**; right-click menus completed: `.c` files offer
+  **Add Snippet** (explorer + editor), `.sfc`/`.smc` offer **Play / Validate /
+  Deploy**; settings gained the missing descriptions and an order.
+
 ## [0.58.0] — 2026-07-11
 
 ### Fixed — Create New Game is now visible everywhere (it really wasn't)

@@ -65,7 +65,7 @@ export function renderDashboardHtml(s: DashboardState, cspSource: string, nonce:
   </script>`;
         return head + `<h1>COOPER</h1><div class="empty">Start a new SNES game, guided —<br>
 pick a game type and Cooper sets up the project for you:<br><br>
-<button class="btn" id="new-game">🎮 Create New Game…</button><br><br>
+<button class="btn" id="new-game">🎮 New Game…</button><br><br>
 <span class="sub">or start from an SDK example:</span><br>
 <button class="btn alt" id="new-project">✨ New Project…</button></div>` + emptyScript + '</body></html>';
     }

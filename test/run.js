@@ -336,11 +336,27 @@ const ufns = SB.userFunctions([aimMainC], sym);
 check('userFunctions intersects C defs with the .sym (main present)',
     ufns.some((f) => f.name === 'main' && typeof f.addr === 'number'));
 const model = SB.buildTreeModel({ projectDir: '/x', romName: 'game.sfc', romBuilt: true, sdkName: 'opensnes', functions: [{ name: 'foo', addr: 0x8000 }] });
-check('tree has 4 categories', model.length === 4 && model.every((n) => n.kind === 'category'));
-check('PROJECT shows the built ROM', model[0].children.find((c) => c.id === 'rom').description === '✓ built');
-check('Build action runs cooper.build', model[1].children.find((c) => c.id === 'build').commandId === 'cooper.build');
-check('Palette action runs cooper.showPalette', model[2].children.find((c) => c.id === 'palette').commandId === 'cooper.showPalette');
-check('symbol click sets a breakpoint', model[3].children[0].commandId === 'cooper.breakOnSymbol' && model[3].children[0].args[0] === 'foo');
+// UX-1 (D-079): the tree tells the game-making cycle
+const catIds = model.map((n) => n.id);
+check('tree tells the cycle: MY GAME → CREATE → RUN → DEBUG → TEST&SHIP → AI → SYMBOLS',
+    JSON.stringify(catIds) === JSON.stringify(['project', 'create', 'run', 'debug', 'ship', 'ai', 'symbols'])
+    && model.every((n) => n.kind === 'category'));
+const byId = Object.fromEntries(model.map((n) => [n.id, n]));
+check('MY GAME shows the built ROM + a New Game entry', byId.project.children.find((c) => c.id === 'rom').description === '✓ built'
+    && byId.project.children.some((c) => c.commandId === 'cooper.createNewGame'));
+check('CREATE exposes the authoring chain (sprite/sound/palette/tiles/snippet/mode)',
+    ['cooper.newSprite', 'cooper.addSprite', 'cooper.addSoundEffect', 'cooper.editPalette', 'cooper.editTiles', 'cooper.insertSnippet', 'cooper.setGraphicsMode']
+        .every((cmd) => byId.create.children.some((c) => c.commandId === cmd)));
+check('RUN has build/preview/play/watch', ['cooper.build', 'cooper.preview', 'cooper.play', 'cooper.watch']
+    .every((cmd) => byId.run.children.some((c) => c.commandId === cmd)));
+check('DEBUG (pro bench) starts collapsed and holds debugger+profiler+viewers',
+    byId.debug.collapsed === true
+    && ['cooper.debug', 'cooper.profileFrame', 'cooper.showPalette', 'cooper.showOam', 'cooper.showVram', 'cooper.traceMemory']
+        .every((cmd) => byId.debug.children.some((c) => c.commandId === cmd)));
+check('TEST & SHIP holds tests + validate + deploy', ['cooper.recordGameplayTest', 'cooper.runGameplayTests', 'cooper.validateRom', 'cooper.deployRom']
+    .every((cmd) => byId.ship.children.some((c) => c.commandId === cmd)));
+check('AI holds Configure AI', byId.ai.children.some((c) => c.commandId === 'cooper.configureAI') && byId.ai.collapsed === true);
+check('symbol click sets a breakpoint', byId.symbols.children[0].commandId === 'cooper.breakOnSymbol' && byId.symbols.children[0].args[0] === 'foo');
 check('no project -> CLICKABLE ways in (Create New Game first), not a dead-end', (() => {
     const empty = SB.buildTreeModel({ projectDir: null, romName: null, romBuilt: false, sdkName: null, functions: [] });
     return empty[0].kind === 'action' && empty[0].commandId === 'cooper.createNewGame'

@@ -89,7 +89,7 @@ server`) — one click, no terminal.
 
 ---
 
-### Start a new game — `Cooper: Create New Game…`
+### Start a new game — `Cooper: New Game…`
 
 The guided way in (also the 🎮 button on the empty dashboard): pick a **game
 type** (platformer, RPG, shmup, fighting, racing, puzzle, adventure — or
@@ -121,13 +121,23 @@ no commands to memorize.
 
 ![The Cooper sidebar](images/sidebar.png)
 
-- **PROJECT** — your ROM (with a *built* badge) and the detected SDK.
-- **BUILD & RUN** — Build, Run / Preview, Debug.
-- **PPU VIEWERS** — Palette, Sprites, Tiles (from a Run, or live at a debug stop).
-- **SYMBOLS** — *your* functions (parsed from your `.c` and matched to the `.sym`).
-  **Click one to toggle a breakpoint on it.**
+The panel tells the story of *making* your game, top to bottom:
 
-The **🏠** and **↻** buttons in the panel header open the dashboard and refresh.
+- **MY GAME** — your ROM (with a *built* badge), the detected SDK, and **New
+  Game…** to start another.
+- **CREATE** — the authoring chain: New Sprite, Add Sprite, Add Sound Effect,
+  Edit Palette, Edit Tiles, Add Snippet, Set Graphics Mode.
+- **RUN** — Build, Run Preview, Play, Toggle Watch.
+- **DEBUG** *(collapsed — unfold it once, VS Code remembers)* — the pro bench:
+  Debug, Disassembly, Memory Map, Trace Memory, Profiler, and the PPU viewers
+  (Palette/CGRAM, Sprites/OAM, Tiles/VRAM).
+- **TEST & SHIP** — Record/Run Gameplay Tests, Validate ROM, Deploy ROM.
+- **AI** — Configure AI (AGENTS.md + the MCP servers).
+- **SYMBOLS** — *your* functions (parsed from your `.c` and matched to the
+  `.sym`). **Click one to toggle a breakpoint on it.**
+
+The **＋**, **🏠** and **↻** buttons in the panel header start a new game, open
+the dashboard, and refresh.
 
 ## 4. The dashboard ("Home")
 
@@ -233,7 +243,7 @@ The jewel. Workflow:
    **Disassembly** — **Cooper: Show Disassembly** opens the 65816 instructions at
    the stop, disassembled by luna itself and annotated with your symbols
    (`main`, `enemies_update+0x12`…), the current PC highlighted.
-   **Profile a frame** — **Cooper: Profile One Frame (CPU)**: traces every
+   **Profile a frame** — **Cooper: Run Profiler (one frame)**: traces every
    instruction of the next frame and shows **which functions burn your master
    clocks** (table with mclk/instructions/%) plus a per-scanline strip — is
    your game logic fitting the frame budget, and when in the frame does it run?
@@ -246,7 +256,7 @@ The jewel. Workflow:
    until the bug, stop. Then **Cooper: Import Recording…** picks up the newest
    `.input` file and lets you **replay it** or **save it as a gameplay test** —
    the whole "reproduce this bug" loop without typing a script.
-   **Who writes this address?** — **Cooper: Trace Memory Accesses (one frame)…**:
+   **Who writes this address?** — **Cooper: Trace Memory Access (one frame)…**:
    give it a symbol or address (`frame_count`, `$7E0030`) and it records every
    read/write to it over the next frame, each attributed to the function that did
    it (kind, value, PC, scanline). Note: the watch is bank-exact — use the bank
@@ -342,7 +352,7 @@ Cooper reads a sensible default straight from your code's `setMode(...)` /
 
 ### Palette
 
-**Right-click an indexed `.png`** in the Explorer → **Edit Palette (SNES BGR555)**
+**Right-click an indexed `.png`** in the Explorer → **Edit Palette**
 (or run **Cooper: Edit Palette**). You get a hardware-accurate palette editor:
 
 - Colours are **BGR555** — each of R/G/B is **0–31** (the real 15-bit SNES gamut,
@@ -361,7 +371,7 @@ Cooper reads a sensible default straight from your code's `setMode(...)` /
 
 ### Create a sprite (from scratch)
 
-Starting with nothing? **Cooper: New Sprite (create + draw one)…** makes a fresh
+Starting with nothing? **Cooper: New Sprite (draw one)…** makes a fresh
 blank canvas at a SNES sprite size (8/16/32/64, defaulting to your mode's size)
 with a ready 16-colour palette, and opens it in the paint editor below. Draw it,
 adjust colours with **Edit Palette**, then **Add Sprite** to put it in the game.
@@ -370,7 +380,7 @@ adjust colours with **Edit Palette**, then **Add Sprite** to put it in the game.
 ### Tiles / sprites (draw / edit)
 
 **Cooper: New Sprite…** to create one, or **right-click an existing `.png` → Edit
-Tiles / Sprites** (or **Cooper: Edit Tiles / Sprites**). A zoomable paint grid
+Tiles / Sprites** (or **Cooper: Edit Tiles**). A zoomable paint grid
 over the indexed image:
 
 - Pick a colour from the palette strip and **paint pixels** (click/drag).
@@ -422,7 +432,7 @@ call it once during setup — never inside the game loop.
 
 ### Snippets (collision, and more)
 
-**Command Palette → Cooper: Insert Snippet…** gives you working, SNES-correct
+**Command Palette → Cooper: Add Snippet…** gives you working, SNES-correct
 code for common needs. Pick one and Cooper wires the `LIB_MODULES` it needs into
 your Makefile and drops the code where your cursor is (adding any missing
 `#include`s), or hands it back on the clipboard when no C file is open.
@@ -452,7 +462,7 @@ The generated C opens in a new editor, ready to paste (or `#include`).
 
 ### Tilemaps
 
-**Right-click a `.map` → View Tilemap (assembled)** to see the background the way
+**Right-click a `.map` → Show Tilemap** to see the background the way
 the SNES draws it — Cooper reads the `.map` + `.pic` tileset + `.pal` and applies
 the real per-cell attributes (**sub-palette**, **H/V flip**). This is a *viewer*:
 for **authoring** tilemaps, use **Tiled** (`.tmj`) — the SDK converts it with
