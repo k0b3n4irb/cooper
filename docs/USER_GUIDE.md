@@ -359,10 +359,19 @@ Cooper reads a sensible default straight from your code's `setMode(...)` /
 > Tip: at a debug stop, open **PPU VIEWERS → Palette** to see the **live CGRAM** on
 > real hardware and compare it with what you designed.
 
-### Tiles / sprites
+### Create a sprite (from scratch)
 
-**Right-click a `.png` → Edit Tiles / Sprites** (or **Cooper: Edit Tiles /
-Sprites**). A zoomable paint grid over the indexed image:
+Starting with nothing? **Cooper: New Sprite (create + draw one)…** makes a fresh
+blank canvas at a SNES sprite size (8/16/32/64, defaulting to your mode's size)
+with a ready 16-colour palette, and opens it in the paint editor below. Draw it,
+adjust colours with **Edit Palette**, then **Add Sprite** to put it in the game.
+(Running **Edit Tiles** in an empty project offers this too — no more dead-end.)
+
+### Tiles / sprites (draw / edit)
+
+**Cooper: New Sprite…** to create one, or **right-click an existing `.png` → Edit
+Tiles / Sprites** (or **Cooper: Edit Tiles / Sprites**). A zoomable paint grid
+over the indexed image:
 
 - Pick a colour from the palette strip and **paint pixels** (click/drag).
 - Grey lines mark the **8×8 tiles**; blue lines mark the **sprite cell** (choose

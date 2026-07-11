@@ -21,7 +21,7 @@ import { listExamples, scaffoldProject, validateProjectName } from './newProject
 import { renderVramViewHtml, VramViewOpts, DEFAULT_VRAM_OPTS, VRAM_WINDOW } from './vramView';
 import { decodeCgram, renderPaletteHtml, decodeOam, renderOamHtml } from './ppu';
 import { decodeTileSheet, tilesToRgba, encodePng, renderVramHtml, bytesPerTile } from './tiles';
-import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8 } from './pngPalette';
+import { readIndexedPng, readIndexedPixels, writePalette, writeIndexedPixels, bgr555ToRgb8, createIndexedPng } from './pngPalette';
 import { renderPaletteEditorHtml } from './paletteEditor';
 import { renderTileEditorHtml } from './tileEditor';
 import { gridMetasprite, emitMetasprite, emitAnimClip } from './metasprite';
@@ -107,6 +107,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.editPalette', (uri?: vscode.Uri) => editPalette(uri)),
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
+        vscode.commands.registerCommand('cooper.newSprite', () => newSprite()),
         vscode.commands.registerCommand('cooper.addSprite', (uri?: vscode.Uri) => addSprite(uri)),
         vscode.commands.registerCommand('cooper.addSoundEffect', (uri?: vscode.Uri) => addSoundEffect(uri)),
         vscode.commands.registerCommand('cooper.exportMetasprite', (uri?: vscode.Uri) => exportMetasprite(uri)),
@@ -432,7 +433,23 @@ async function editPalette(uri?: vscode.Uri): Promise<void> {
 /** Edit the pixels of an indexed PNG (tiles/sprites) — a paint grid with an 8×8
  *  tile overlay + sprite-cell guide; writes the PNG's pixels back on Save. */
 async function editTiles(uri?: vscode.Uri): Promise<void> {
-    const file = await resolveProjectFile(uri, '.png', 'edit its tiles/sprites');
+    // Explicit target (right-click) → use it. Otherwise, if the project has no
+    // sprite PNG yet, don't dead-end — offer to CREATE one (the F5 gap).
+    let file: string | undefined;
+    if (uri?.fsPath?.endsWith('.png')) {
+        file = uri.fsPath;
+    } else {
+        const dir = await resolveProjectDir();
+        const pngs = dir ? await vscode.workspace.findFiles(new vscode.RelativePattern(dir, '**/*.png'), '**/node_modules/**', 1) : [];
+        if (pngs.length === 0) {
+            const go = await vscode.window.showInformationMessage('No sprite to edit yet. Create a new one to draw?', 'New Sprite…');
+            if (go) {
+                await newSprite();
+            }
+            return;
+        }
+        file = await resolveProjectFile(uri, '.png', 'edit its tiles/sprites');
+    }
     if (!file) {
         return;
     }
@@ -560,6 +577,59 @@ async function addSprite(uri?: vscode.Uri): Promise<void> {
     await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
     void vscode.window.showInformationMessage(
         `Cooper: wired ${pngRel} as a ${what} — Makefile rule + data.asm bridge done. The C is on your clipboard (and shown here). Build to see it.`);
+}
+
+/** A ready-to-paint 16-colour starter palette (index 0 = transparent). Edit it
+ *  later with "Edit Palette". Values snap cleanly to BGR555. */
+const DEFAULT_SPRITE_PALETTE = [
+    { r: 0, g: 0, b: 0 }, { r: 0, g: 0, b: 0 }, { r: 248, g: 248, b: 248 }, { r: 136, g: 136, b: 136 },
+    { r: 200, g: 40, b: 40 }, { r: 40, g: 176, b: 40 }, { r: 48, g: 96, b: 240 }, { r: 240, g: 224, b: 64 },
+    { r: 240, g: 144, b: 48 }, { r: 160, g: 64, b: 200 }, { r: 64, g: 200, b: 216 }, { r: 240, g: 144, b: 176 },
+    { r: 120, g: 80, b: 40 }, { r: 200, g: 200, b: 160 }, { r: 56, g: 56, b: 88 }, { r: 224, g: 224, b: 224 },
+];
+
+/**
+ * New Sprite (kills dogfood #1 friction F5 — no way to CREATE graphics, only edit
+ * existing PNGs): make a blank indexed PNG at a chosen SNES sprite size with a
+ * starter 16-colour palette, then open it in the paint editor. Draw → "Add Sprite".
+ */
+async function newSprite(): Promise<void> {
+    const projectDir = await resolveProjectDir();
+    if (!projectDir) {
+        failWithDownload('sdk', 'open an OpenSNES project first, then create a sprite in it.');
+        return;
+    }
+    const pair = objSizePair(resolveProjectGraphics(projectDir).config.objSize);
+    const sizePick = await vscode.window.showQuickPick(
+        [8, 16, 32, 64].map((s) => ({ label: `${s}×${s}`, description: s === pair.small || s === pair.large ? "your mode's size" : '', s })),
+        { placeHolder: `New sprite size — your graphics mode uses ${pair.small}px / ${pair.large}px sprites` });
+    if (!sizePick) {
+        return;
+    }
+    const name = await vscode.window.showInputBox({
+        prompt: 'Sprite name', value: 'sprite',
+        validateInput: (v) => (/^[\w-]+$/.test(v.trim()) ? undefined : 'letters, digits, _ - only'),
+    });
+    if (!name) {
+        return;
+    }
+    const resDir = path.join(projectDir, 'res');
+    const pngPath = path.join(resDir, `${name.trim()}.png`);
+    if (fs.existsSync(pngPath)) {
+        fail(`res/${name.trim()}.png already exists — pick another name (or Edit Tiles on it).`);
+        return;
+    }
+    try {
+        fs.mkdirSync(resDir, { recursive: true });
+        fs.writeFileSync(pngPath, createIndexedPng(sizePick.s, sizePick.s, DEFAULT_SPRITE_PALETTE));
+    } catch (e) {
+        fail(`could not create the sprite: ${(e as Error).message}`);
+        return;
+    }
+    log(`new sprite: res/${name.trim()}.png (${sizePick.s}×${sizePick.s}, blank 16-colour canvas)`);
+    await editTiles(vscode.Uri.file(pngPath));
+    void vscode.window.showInformationMessage(
+        `Cooper: created res/${name.trim()}.png (${sizePick.s}×${sizePick.s}). Draw it here, tweak colours with "Edit Palette", then "Add Sprite" to put it in the game.`);
 }
 
 /**

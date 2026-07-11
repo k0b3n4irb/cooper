@@ -4,6 +4,22 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.57.0] — 2026-07-11
+
+### Added — New Sprite: actually *create* graphics (not just view/edit existing)
+
+- **Cooper: New Sprite (create + draw one)…** makes a **blank indexed PNG** at a
+  chosen SNES sprite size (8/16/32/64, defaulting to your mode's size) with a
+  ready 16-colour starter palette (index 0 transparent), drops it in `res/`, and
+  opens it in the paint editor to draw. Then **Add Sprite** wires it into the
+  game. This closes the long-standing gap (dogfood #1 F5): the tile/palette
+  editors could only *rewrite an existing* PNG — there was **no way to create one
+  from scratch**, so "edit graphics" felt like a viewer.
+- **Edit Tiles no longer dead-ends.** Running it with no sprite in the project now
+  offers to create one, instead of a "no PNG found" cul-de-sac.
+- New pure primitive `createIndexedPng` (a from-scratch indexed-PNG encoder),
+  verified to round-trip through the readers and be converted by `gfx4snes`.
+
 ## [0.56.0] — 2026-07-11
 
 ### Added — C support v2: the `int`=2 hover (what clangd can't tell you)

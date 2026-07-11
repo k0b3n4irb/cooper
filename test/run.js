@@ -1228,6 +1228,25 @@ const PP = require(tmpPP);
 check('rgb8ToBgr555 packs (b<<10)|(g<<5)|r, 5-bit', PP.rgb8ToBgr555({ r: 255, g: 0, b: 255 }) === 0x7C1F);
 check('bgr555->rgb8->bgr555 round-trips', PP.rgb8ToBgr555(PP.bgr555ToRgb8(0x7C1F)) === 0x7C1F && PP.rgb8ToBgr555(PP.bgr555ToRgb8(0x0421)) === 0x0421);
 check('snapToBgr555 quantises to the SNES 5-bit grid', PP.rgb8ToBgr555(PP.snapToBgr555({ r: 250, g: 3, b: 131 })) === PP.rgb8ToBgr555({ r: 250, g: 3, b: 131 }));
+// createIndexedPng: the "create graphics" primitive (F5) — a blank canvas from scratch
+const blank = PP.createIndexedPng(16, 16, [{ r: 0, g: 0, b: 0 }, { r: 248, g: 0, b: 0 }, { r: 0, g: 248, b: 0 }]);
+const blankRead = PP.readIndexedPng(blank);
+const blankPx = PP.readIndexedPixels(blank);
+check('createIndexedPng: valid indexed PNG (16×16, palette, all-transparent index 0)',
+    blankRead.colorType === 3 && blankRead.palette.length === 3 && blankPx.width === 16 && blankPx.height === 16
+    && blankPx.indices.length === 256 && Array.from(blankPx.indices).every((i) => i === 0));
+check('createIndexedPng: writeIndexedPixels can then paint it', (() => {
+    const painted = PP.writeIndexedPixels(blank, Array.from({ length: 256 }, (_, i) => (i < 8 ? 1 : 0)));
+    const px = PP.readIndexedPixels(painted); return px.indices[0] === 1 && px.indices[8] === 0;
+})());
+if (fs.existsSync(path.join(OPENSNES, 'bin', 'gfx4snes'))) {
+    const bdir = fs.mkdtempSync(path.join(os.tmpdir(), 'cooper_blank_'));
+    try {
+        fs.writeFileSync(path.join(bdir, 'blank.png'), PP.createIndexedPng(32, 32, [{ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 }]));
+        const r = cp.spawnSync(path.join(OPENSNES, 'bin', 'gfx4snes'), ['-s', '16', '-p', '-i', path.join(bdir, 'blank.png')], { encoding: 'utf8' });
+        check('createIndexedPng: gfx4snes converts a created-from-scratch canvas', r.status === 0 && fs.existsSync(path.join(bdir, 'blank.pic')));
+    } finally { try { fs.rmSync(bdir, { recursive: true, force: true }); } catch {} }
+}
 const pngPath = path.join(OPENSNES, 'examples', 'maps', 'slopemario', 'res', 'mario_sprite.png');
 if (fs.existsSync(pngPath)) {
     const pbuf = fs.readFileSync(pngPath);

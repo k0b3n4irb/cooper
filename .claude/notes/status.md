@@ -37,6 +37,10 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
 - **0.56.0 (D-077):** **C2 v2** — hover a plain `int`/`long` in project C → Cooper
   warns it's 2/4 bytes on SNES (clangd's host target says 4/8) + suggests u16/s16.
   Hover-only (can't misfire); pure `intSizeHint`, verified.
+- **0.57.0 (D-078):** **New Sprite** — *create* graphics from scratch (user
+  feedback: "editors are viewers, can't create"). `createIndexedPng` primitive +
+  `Cooper: New Sprite…` (blank canvas at mode size → paint editor); Edit Tiles
+  offers it instead of dead-ending. Kills dogfood #1 F5.
 - **0.51.2 (D-072):** consumed **opensnes v0.29.1** — the two bugs Cooper filed
   (#99 cc65816 RMW; #100 gfx4snes -T char-names). Verified both real in the
   delivered binaries first, bumped CI pin, cross-checked `sheetFrameTiles` vs the

@@ -1159,6 +1159,25 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-078 — New Sprite: create graphics from scratch (dogfood #1 F5, 2026-07-11)
+- **Context:** user feedback after dogfooding — "I see editors but it's a viewer,
+  I can't see how to CREATE graphics." Grounded it: the tile/palette editors are
+  real editors but only ever **rewrote an existing** indexed PNG
+  (`writeIndexedPixels`/`writePalette` need an IHDR); `pngPalette` had **no
+  create-from-scratch** primitive, and no command made a blank canvas. So a fresh
+  project had nothing to edit → the editors felt like viewers (also dogfood #1 F5).
+- **Decision:** add **`createIndexedPng(w,h,palette,indices?)`** to `pngPalette` (a
+  minimal from-scratch indexed-PNG encoder — IHDR/PLTE/tRNS(index0)/IDAT via the
+  module's existing zlib+CRC) and a **`Cooper: New Sprite…`** command: pick a size
+  (8/16/32/64, default = the mode's OBJ small size), write a blank 16-colour canvas
+  to `res/<name>.png`, open it in the paint editor. Draw → Edit Palette → Add
+  Sprite. Also made **Edit Tiles offer New Sprite** instead of dead-ending when the
+  project has no PNG.
+- **Verified:** `createIndexedPng` round-trips through `readIndexedPng`/
+  `readIndexedPixels` (16×16, palette, all-index-0), is paintable via
+  `writeIndexedPixels`, and **`gfx4snes` converts a from-scratch canvas** — 461
+  Node + 10 integration.
+
 ### D-077 — C2 v2: the int=2 hover (surface clangd's host-target lie, 2026-07-11)
 - **Context:** the one documented C-support gap (`docs/clangd.md`): clangd runs
   the HOST clang (`int`=4, `long`=8) and there's no 65816 target, so it silently

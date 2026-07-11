@@ -281,3 +281,38 @@ export function writeIndexedPixels(buf: Buffer, indices: ArrayLike<number>): Buf
     }
     return Buffer.concat(parts);
 }
+
+/**
+ * Build a fresh indexed PNG from scratch — the "create graphics" primitive
+ * (the editors only ever *rewrote* an existing PNG). 8-bit indexed, colour type
+ * 3; `palette` is the PLTE (index 0 is made transparent via tRNS, the SNES sprite
+ * convention); `indices` are the pixels row-major (default all 0 = a blank,
+ * transparent canvas). The result is exactly what `readIndexedPng`, the tile
+ * editor, and `gfx4snes -i` consume.
+ */
+export function createIndexedPng(width: number, height: number, palette: Rgb[], indices?: ArrayLike<number>): Buffer {
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(width, 0);
+    ihdr.writeUInt32BE(height, 4);
+    ihdr[8] = 8; // bit depth
+    ihdr[9] = 3; // colour type 3 = indexed (palette)
+    const plte = Buffer.alloc(Math.max(1, palette.length) * 3);
+    palette.forEach((c, i) => { plte[i * 3] = c.r & 255; plte[i * 3 + 1] = c.g & 255; plte[i * 3 + 2] = c.b & 255; });
+    const trns = Buffer.from([0]); // palette index 0 fully transparent
+    const raw = Buffer.alloc(height * (width + 1));
+    let o = 0;
+    for (let y = 0; y < height; y++) {
+        raw[o++] = 0; // filter: None
+        for (let x = 0; x < width; x++) {
+            raw[o++] = indices ? (indices[y * width + x] & 255) : 0;
+        }
+    }
+    return Buffer.concat([
+        Buffer.from(SIG),
+        makeChunk('IHDR', ihdr),
+        makeChunk('PLTE', plte),
+        makeChunk('tRNS', trns),
+        makeChunk('IDAT', zlib.deflateSync(raw)),
+        makeChunk('IEND', Buffer.alloc(0)),
+    ]);
+}
