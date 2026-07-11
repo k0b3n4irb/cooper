@@ -4,6 +4,22 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.58.0] — 2026-07-11
+
+### Fixed — Create New Game is now visible everywhere (it really wasn't)
+
+User report: *"j'ai tout essayé et je ne trouve nulle part Create New Game."*
+True — once a project was open, **no surface showed it at all** (dashboard turned
+into Build/Run/Play, the sidebar had nothing, the walkthrough hides in Help →
+Welcome; only the command palette knew). Now it's reachable from every place you'd
+look:
+
+- **File → New File… → "SNES Game (guided)…"** — the OS-conventional spot.
+- **A `+` button on the Cooper panel's title bar** — always there.
+- **The dashboard keeps a 🎮 New Game… button even with a project open.**
+- **The Cooper panel with no project** now shows clickable **🎮 Create New Game** /
+  **✨ New Project** entries instead of a dead-end "open a folder" message.
+
 ## [0.57.1] — 2026-07-11
 
 ### Changed — the guided path is now discoverable (walkthrough + tutorials)

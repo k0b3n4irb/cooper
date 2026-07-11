@@ -88,10 +88,15 @@ export function userFunctions(cTexts: string[], sym: SymTable): { name: string; 
 /** Build the top-level Cooper tree from resolved project info. */
 export function buildTreeModel(p: ProjectInfo): TreeNode[] {
     if (!p.projectDir) {
-        return [{
-            id: 'none', kind: 'info', icon: 'info',
-            label: 'Open an OpenSNES project (a folder with a Makefile).',
-        }];
+        // No dead-end: the guided ways in, clickable right here.
+        return [
+            { id: 'newgame', kind: 'action', icon: 'game', label: '🎮 Create New Game (guided)…', commandId: 'cooper.createNewGame' },
+            { id: 'newproject', kind: 'action', icon: 'new-folder', label: '✨ New Project (from an SDK example)…', commandId: 'cooper.newProject' },
+            {
+                id: 'none', kind: 'info', icon: 'info',
+                label: '…or open an OpenSNES project (a folder with a Makefile).',
+            },
+        ];
     }
     const cat = (id: string, label: string, children: TreeNode[]): TreeNode =>
         ({ id, label, kind: 'category', children });

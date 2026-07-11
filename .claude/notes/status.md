@@ -45,6 +45,10 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   now leads with **Create New Game** + a "Make it yours" step (New Sprite / Add
   Sound / Insert Snippet); tutorials refreshed (tut 1 = wizard, tut 2 = New
   Sprite, new tut 3 = sound + collision, tut 9 = build_and_run).
+- **0.58.0:** user STILL couldn't find it ("je ne trouve nulle part") — grounded:
+  with a project open NO surface showed it. Now: **File → New File…**, a `+` on
+  the Cooper panel title bar, a dashboard button even with a project, and the
+  empty panel shows clickable New Game / New Project instead of a dead-end.
 - **0.51.2 (D-072):** consumed **opensnes v0.29.1** — the two bugs Cooper filed
   (#99 cc65816 RMW; #100 gfx4snes -T char-names). Verified both real in the
   delivered binaries first, bumped CI pin, cross-checked `sheetFrameTiles` vs the

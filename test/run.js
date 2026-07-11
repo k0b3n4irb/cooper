@@ -341,7 +341,11 @@ check('PROJECT shows the built ROM', model[0].children.find((c) => c.id === 'rom
 check('Build action runs cooper.build', model[1].children.find((c) => c.id === 'build').commandId === 'cooper.build');
 check('Palette action runs cooper.showPalette', model[2].children.find((c) => c.id === 'palette').commandId === 'cooper.showPalette');
 check('symbol click sets a breakpoint', model[3].children[0].commandId === 'cooper.breakOnSymbol' && model[3].children[0].args[0] === 'foo');
-check('no project -> single info node', SB.buildTreeModel({ projectDir: null, romName: null, romBuilt: false, sdkName: null, functions: [] }).length === 1);
+check('no project -> CLICKABLE ways in (Create New Game first), not a dead-end', (() => {
+    const empty = SB.buildTreeModel({ projectDir: null, romName: null, romBuilt: false, sdkName: null, functions: [] });
+    return empty[0].kind === 'action' && empty[0].commandId === 'cooper.createNewGame'
+        && empty[1].commandId === 'cooper.newProject' && empty.some((n) => n.kind === 'info');
+})());
 try { fs.unlinkSync(tmpSB); } catch {}
 
 // --- walkthrough manifest + media (catches blank-box / unpackaged media) ---
@@ -362,7 +366,8 @@ const tmpD2 = path.join(os.tmpdir(), `cooper_dash_${process.pid}.cjs`);
 esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'dashboard.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpD2 });
 const D2 = require(tmpD2);
 const dash = D2.renderDashboardHtml({ hasProject: true, projectName: 'shmup_1942', romBuilt: true, sdkName: 'opensnes', lunaFound: true }, 'vscode-csp', 'NONCE0');
-check('dashboard has Build/Run/Play/Debug + viewer cards + refresh (9 actions)', (dash.match(/data-cmd=/g) || []).length === 9);
+check('dashboard has Build/Run/Play/Debug + viewer cards + refresh + New Game (10 actions)', (dash.match(/data-cmd=/g) || []).length === 10);
+check('dashboard offers New Game even WITH a project open', dash.includes('data-cmd="newgame"'));
 check('dashboard has the Play button (luna-gui)', dash.includes('data-cmd="play"'));
 check('dashboard has a real status refresh (not the preview button)', dash.includes('data-cmd="refresh"'));
 check('dashboard announces ready (extension re-posts the cached preview)', dash.includes("{ command: 'ready' }"));

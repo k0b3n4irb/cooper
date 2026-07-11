@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.57.1",
+  "version": "0.58.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -263,7 +263,9 @@
       {
         "command": "cooper.createNewGame",
         "title": "Create New Game (guided)…",
-        "category": "Cooper"
+        "category": "Cooper",
+        "shortTitle": "SNES Game (guided)…",
+        "icon": "$(add)"
       },
       {
         "command": "cooper.insertSnippet",
@@ -321,7 +323,18 @@
           "group": "cooper@5"
         }
       ],
+      "file/newFile": [
+        {
+          "command": "cooper.createNewGame",
+          "group": "file"
+        }
+      ],
       "view/title": [
+        {
+          "command": "cooper.createNewGame",
+          "when": "view == cooperTree",
+          "group": "navigation@0"
+        },
         {
           "command": "cooper.home",
           "when": "view == cooperTree",

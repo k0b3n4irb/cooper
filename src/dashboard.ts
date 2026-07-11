@@ -94,7 +94,8 @@ pick a game type and Cooper sets up the project for you:<br><br>
     </div>
   </div>
   <div class="status">SDK ${dot(!!s.sdkName, s.sdkName ?? 'not set')} · luna ${dot(s.lunaFound, s.lunaFound ? 'ready' : 'not found')} · ROM ${dot(s.romBuilt, s.romBuilt ? 'built' : 'not built')}
-    <button class="btn alt" data-cmd="refresh" style="margin-left:10px;padding:3px 10px;font-size:11px">↻ Refresh status</button></div>`;
+    <button class="btn alt" data-cmd="refresh" style="margin-left:10px;padding:3px 10px;font-size:11px">↻ Refresh status</button>
+    <button class="btn alt" data-cmd="newgame" style="margin-left:6px;padding:3px 10px;font-size:11px">🎮 New Game…</button></div>`;
 
     const script = `<script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
