@@ -4,6 +4,23 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.61.0] — 2026-07-11
+
+### Added — SFX Synth: create your own sounds from scratch
+
+- **Cooper: New Sound Effect (synth)…** — the "New Sprite" of sound. Pick a
+  classic game-feel preset (**coin, jump, laser, hit, explosion, powerup,
+  blip**), shape it with sliders (waveform, frequency, slide, envelope, vibrato,
+  duty…), **▶ Preview** it instantly (waveform drawn, played at the SNES's
+  native 32 kHz), then **➕ Add to game**: Cooper writes `sfx/<name>.wav` (your
+  editable source of truth) and runs it through the proven Add Sound pipeline —
+  soundbank wired, C snippet handed over. No external audio tool needed to give
+  your game feedback.
+- The synthesizer is pure and deterministic (same parameters → same bytes), and
+  the whole road is verified in CI: a synthesized preset → `.it` → the SDK's
+  `smconv` emits `SFX_COIN`. Faithful-to-BRR preview ("hear it exactly as the
+  SNES plays it") comes with the per-effect audition slice.
+
 ## [0.60.0] — 2026-07-11
 
 ### Changed — UX-2: the studio feel (status bar, calm, Mission Control)

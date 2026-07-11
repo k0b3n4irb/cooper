@@ -5,8 +5,7 @@
 
 export const SNES_SAMPLE_RATE = 32000;
 
-export function encodeWav(samples: number[], sampleRate = SNES_SAMPLE_RATE): Buffer {
-    const channels = 2;
+export function encodeWav(samples: number[], sampleRate = SNES_SAMPLE_RATE, channels: 1 | 2 = 2): Buffer {
     const bytesPerSample = 2;
     const dataSize = samples.length * bytesPerSample;
     const buf = Buffer.alloc(44 + dataSize);

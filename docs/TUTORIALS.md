@@ -83,8 +83,10 @@ library consumes — no hand-counting tile numbers.
 
 **Goal:** a chime when something happens, and things that actually touch.
 
-1. **Author a sound** in any editor (Audacity, sfxr, your DAW…) and export a
-   **WAV** — or grab any short WAV you have the rights to.
+1. **Make the sound in Cooper** — **`Cooper: New Sound Effect (synth)…`**: pick
+   a preset (*coin, jump, laser, hit, explosion…*), shape it with the sliders,
+   **▶ Preview**, then **➕ Add to game** — done, skip to step 3. (Prefer an
+   external editor? Author a WAV in Audacity/your DAW and continue below.)
 2. **`Cooper: Add Sound Effect…`** (or right-click the `.wav`). Cooper converts
    it to the soundbank the SNES sound chip needs (resampling to 32 kHz and
    trimming to fit its RAM if needed), wires `USE_SNESMOD` + the soundbank into

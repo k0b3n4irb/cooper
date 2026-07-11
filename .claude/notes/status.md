@@ -54,6 +54,12 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   palette-only commands; DEBUG collapsed = pro bench), 39 titles renamed to a
   6-verb taxonomy (IDs unchanged), icons everywhere, `.c`/`.sfc` context menus,
   settings descriptions.
+- **0.61.0 (D-081):** **SFX Synth** — `New Sound Effect (synth)…`: sfxr-style
+  presets (coin/jump/laser/hit/explosion/powerup/blip) + sliders + WebAudio
+  preview → `sfx/<name>.wav` → the proven Add Sound pipeline. Pure deterministic
+  `sfxSynth.ts`; whole road CI-verified (synth→.it→smconv→SFX_COIN). Audio plan:
+  next = Export SPC (luna spc-dump), then per-effect audition (G10 v3); NO
+  sample editor (garde-fou).
 - **0.60.0 (D-080):** **UX-2** — permanent status-bar heartbeat, toast diet
   (23→8 info toasts, −65%), dashboard → **Mission Control** (ambient NEXT STEP:
   build → art → sound → tests → AI → ship), SNES-studio flair on theme vars.

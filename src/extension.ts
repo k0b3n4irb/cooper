@@ -34,6 +34,8 @@ import { parseStarters, starterFor } from './starters';
 import { symbolBase, loadSnippet, ensureAsmSrc, appendGfxRule, upsertDataAsm, sheetFrameTiles, sheetSnippet } from './spriteScaffold';
 import { decodeWav } from './wav';
 import { buildIt, sfxSymbol, sfxSnippet, ensureSoundbank } from './soundScaffold';
+import { synthesize, clampParams, SfxParams } from './sfxSynth';
+import { renderSfxSynthHtml } from './sfxSynthView';
 import { parseTilemapEntries, assembleTilemapRgba } from './tilemap';
 import { renderAgentsMd, renderCopilotInstructions } from './aiContext';
 import { intSizeHint } from './intSizeHint';
@@ -123,6 +125,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('cooper.editTiles', (uri?: vscode.Uri) => editTiles(uri)),
         vscode.commands.registerCommand('cooper.viewTilemap', (uri?: vscode.Uri) => viewTilemap(uri)),
         vscode.commands.registerCommand('cooper.newSprite', () => newSprite()),
+        vscode.commands.registerCommand('cooper.newSoundEffect', () => newSoundEffect()),
         vscode.commands.registerCommand('cooper.addSprite', (uri?: vscode.Uri) => addSprite(uri)),
         vscode.commands.registerCommand('cooper.addSoundEffect', (uri?: vscode.Uri) => addSoundEffect(uri)),
         vscode.commands.registerCommand('cooper.exportMetasprite', (uri?: vscode.Uri) => exportMetasprite(uri)),
@@ -661,6 +664,48 @@ async function newSprite(): Promise<void> {
     await editTiles(vscode.Uri.file(pngPath));
     flash(
         `created res/${name.trim()}.png (${sizePick.s}×${sizePick.s}). Draw it here, tweak colours with "Edit Palette", then "Add Sprite" to put it in the game.`);
+}
+
+/**
+ * New Sound Effect (D-081 — the "New Sprite of sound"): an sfxr-style synth in a
+ * webview. Presets + sliders → the PURE synth renders 32 kHz PCM in the
+ * extension (single source of truth); the webview previews it via WebAudio and
+ * draws the waveform. "Add to game" writes sfx/<name>.wav (the source of truth)
+ * and hands it to the existing Add Sound pipeline (WAV → .it → soundbank).
+ */
+async function newSoundEffect(): Promise<void> {
+    const projectDir = await resolveProjectDir();
+    if (!projectDir) {
+        failWithDownload('sdk', 'open an OpenSNES project first, then create a sound in it.');
+        return;
+    }
+    const panel = vscode.window.createWebviewPanel('cooperSfxSynth', 'SFX Synth', vscode.ViewColumn.Active, { enableScripts: true });
+    panel.webview.html = renderSfxSynthHtml(panel.webview.cspSource, nonce());
+    panel.webview.onDidReceiveMessage(async (m: { type?: string; params?: SfxParams; name?: string }) => {
+        if (m.type === 'synth' && m.params) {
+            const pcm = synthesize(clampParams(m.params));
+            const buf = Buffer.alloc(pcm.length * 2);
+            pcm.forEach((v, i) => buf.writeInt16LE(v, i * 2));
+            void panel.webview.postMessage({ type: 'pcm', rate: 32000, b64: buf.toString('base64') });
+            return;
+        }
+        if (m.type === 'add' && m.params) {
+            const name = (m.name ?? 'sfx').trim();
+            if (!/^[\w-]+$/.test(name)) {
+                fail('sound name: letters, digits, _ - only.');
+                return;
+            }
+            try {
+                const sfxDir = path.join(projectDir, 'sfx');
+                fs.mkdirSync(sfxDir, { recursive: true });
+                const wav = path.join(sfxDir, `${name}.wav`);
+                fs.writeFileSync(wav, encodeWav(synthesize(clampParams(m.params)), 32000, 1));
+                await addSoundEffect(vscode.Uri.file(wav));   // the proven pipeline
+            } catch (e) {
+                fail(`could not add the sound: ${(e as Error).message}`);
+            }
+        }
+    });
 }
 
 /**

@@ -377,6 +377,16 @@ with a ready 16-colour palette, and opens it in the paint editor below. Draw it,
 adjust colours with **Edit Palette**, then **Add Sprite** to put it in the game.
 (Running **Edit Tiles** in an empty project offers this too — no more dead-end.)
 
+### Create a sound (from scratch)
+
+No audio tool? **Cooper: New Sound Effect (synth)…** opens a small synthesizer:
+pick a classic preset (**coin, jump, laser, hit, explosion, powerup, blip**),
+shape it with sliders (waveform, frequency, slide, envelope, vibrato…),
+**▶ Preview** — the waveform draws and plays at the SNES's native 32 kHz — then
+**➕ Add to game**. Cooper saves `sfx/<name>.wav` (your editable source) and wires
+the soundbank + hands you the C, exactly like Add Sound Effect. Prefer authoring
+in Audacity/sfxr/your DAW? Export a WAV and use **Add Sound Effect** directly.
+
 ### Tiles / sprites (draw / edit)
 
 **Cooper: New Sprite…** to create one, or **right-click an existing `.png` → Edit

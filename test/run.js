@@ -937,6 +937,55 @@ check('ensureSoundbank extends an existing SOUNDBANK_SRC', SND.ensureSoundbank('
 check('sfxSnippet: init + load + process + play, with the symbol and soundbank.h',
     (() => { const s = SND.sfxSnippet('SFX_COIN'); return s.includes('#include "soundbank.h"') && s.includes('snesmodInit();') && s.includes('snesmodLoadEffect(SFX_COIN)') && s.includes('snesmodProcess();') && s.includes('snesmodPlayEffect(') && s.includes('SNESMOD_PITCH_NORMAL'); })());
 
+// --- D-081: the SFX synthesizer (pure) — the "New Sprite of sound" ---
+const tmpSyn = path.join(os.tmpdir(), `cooper_sfxsynth_${process.pid}.cjs`);
+const tmpSynV = path.join(os.tmpdir(), `cooper_sfxsynthview_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'sfxSynth.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpSyn });
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'sfxSynthView.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpSynV });
+const SYN = require(tmpSyn);
+const SYNV = require(tmpSynV);
+check('synth is deterministic (same params → same bytes, incl. noise)', (() => {
+    const a = SYN.synthesize(SYN.SFX_PRESETS.explosion), b = SYN.synthesize(SYN.SFX_PRESETS.explosion);
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+})());
+check('duration → sample count at 32 kHz', SYN.synthesize({ ...SYN.SFX_PRESETS.blip, duration: 0.5 }).length === 16000);
+check('every preset is audibly non-silent and s16-ranged', Object.values(SYN.SFX_PRESETS).every((p) => {
+    const s = SYN.synthesize(p);
+    return s.some((v) => Math.abs(v) > 3000) && s.every((v) => v >= -32768 && v <= 32767);
+}));
+check('waveforms differ (square ≠ sine ≠ noise on same params)', (() => {
+    const base = { ...SYN.SFX_PRESETS.blip, duration: 0.1 };
+    const sq = SYN.synthesize({ ...base, wave: 'square' }), si = SYN.synthesize({ ...base, wave: 'sine' }), no = SYN.synthesize({ ...base, wave: 'noise' });
+    const diff = (x, y) => x.reduce((a, v, i) => a + Math.abs(v - y[i]), 0) / x.length;
+    return diff(sq, si) > 1000 && diff(si, no) > 1000;
+})());
+check('envelope decays: the last 10% is much quieter than the first 10%', (() => {
+    const s = SYN.synthesize(SYN.SFX_PRESETS.coin);
+    const rms = (arr) => Math.sqrt(arr.reduce((a, v) => a + v * v, 0) / arr.length);
+    const n = s.length;
+    return rms(s.slice(n - Math.floor(n / 10))) < rms(s.slice(0, Math.floor(n / 10))) / 4;
+})());
+check('clampParams boxes hostile input into SPC-safe ranges', (() => {
+    const c = SYN.clampParams({ wave: 'laser?', baseFreq: 99999, freqSlide: 50, duty: 3, attack: -1, decay: 0, duration: 60, vibratoDepth: 99, vibratoSpeed: -5, volume: 7 });
+    return c.wave === 'square' && c.baseFreq === 4000 && c.duration === 1.5 && c.volume === 1 && c.decay === 0.01;
+})());
+check('synth view: presets + nonce CSP + no external sources', (() => {
+    const h = SYNV.renderSfxSynthHtml('csp-src', 'N0');
+    return h.includes('data-preset="coin"') && h.includes("script-src 'nonce-N0'") && !/src="http/.test(h) && h.includes('Add to game');
+})());
+// close the loop: a synthesized preset goes through the REAL pipeline (buildIt → smconv)
+if (fs.existsSync(path.join(OPENSNES, 'bin', 'smconv'))) {
+    const sdir = fs.mkdtempSync(path.join(os.tmpdir(), 'cooper_synth_'));
+    try {
+        const built = SND.buildIt('coin.wav', SYN.synthesize(SYN.SFX_PRESETS.coin), 32000);
+        fs.writeFileSync(path.join(sdir, 'coin.it'), built.it);
+        const r = cp.spawnSync(path.join(OPENSNES, 'bin', 'smconv'), ['-s', '-o', 'soundbank', '-b', '1', '-n', '-p', 'soundbank', 'coin.it'], { cwd: sdir, encoding: 'utf8' });
+        check('synthesized preset → .it → smconv emits SFX_COIN (the whole road)',
+            r.status === 0 && fs.readFileSync(path.join(sdir, 'soundbank.h'), 'utf8').includes('#define SFX_COIN'));
+    } finally { try { fs.rmSync(sdir, { recursive: true, force: true }); } catch {} }
+}
+try { fs.unlinkSync(tmpSyn); fs.unlinkSync(tmpSynV); } catch {}
+
 // REAL build: generate a project, author a sound into it end-to-end, build, and
 // confirm smconv emitted SFX_COIN and the snesmod snippet compiled+linked. (The
 // effect actually playing was verified live in dogfood #2 via luna's DSP state.)

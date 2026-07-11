@@ -1159,6 +1159,32 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-081 — SFX Synth: create sound from scratch (audio reflection, 2026-07-11)
+- **Context:** user reflection on sound tooling ("on réfléchit avant de faire").
+  Grounded inventory: Cooper could *listen* (Audition = whole-game mix) and
+  *integrate* (Add Sound Effect = WAV→`.it`→soundbank) but not **create** — the
+  same create-gap the user found for graphics (D-078). Agreed split: (1) this
+  synth, (2) Export SPC (cheap, luna `spc-dump`), (3) per-effect soundbank
+  audition (G10 v3, to scope), (4) **NO sample editor** (would clone Audacity —
+  the audio garde-fou: own the bridge + audition, tracker/wave-editing external).
+- **Decision:** `Cooper: New Sound Effect (synth)…` — an sfxr-style synthesizer.
+  Pure `sfxSynth.ts`: 7 presets + params (wave/freq/slide/duty/attack/decay/
+  duration/vibrato/arp/volume) → mono s16 PCM @32 kHz; **deterministic** (noise =
+  fixed-seed xorshift stepped per cycle — pitched retro noise, and testable).
+  Webview (`sfxSynthView.ts`): sliders + waveform canvas + WebAudio preview —
+  the PCM is synthesized **in the extension** (single source of truth, no JS
+  duplicate) and posted to the view. "Add to game" writes `sfx/<name>.wav` (the
+  editable source) and delegates to the existing `addSoundEffect` pipeline.
+- **WAV vs `.it` (the user's question):** WAV is the SFX source of truth
+  (versionable, editable anywhere); `.it` stays a build artifact. Music remains
+  tracker-authored `.it`, external (unchanged rule).
+- **Deferred honestly:** BRR-faithful preview ("hear it as the SNES plays it")
+  needs the per-effect audition harness — slice 3.
+- **Verified:** determinism, duration→samples, all presets non-silent + ranged,
+  waveforms distinct, envelope decays, hostile-input clamping, view CSP; and the
+  whole road closed in CI: synthesized coin → `buildIt` → real `smconv` →
+  `SFX_COIN`. 480 Node + 10 integration.
+
 ### D-080 — UX-2: ambient state + calm + Mission Control (2026-07-11)
 - **Context:** phase 2 of the UX audit, sharpened by the user's stated vision:
   *"que l'utilisateur oublie qu'il est sur VS Code et se sente immergé dans un
