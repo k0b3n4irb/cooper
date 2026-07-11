@@ -4,6 +4,23 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.57.1] — 2026-07-11
+
+### Changed — the guided path is now discoverable (walkthrough + tutorials)
+
+- The **Get Started walkthrough** (Help → Welcome) now leads with **🎮 Create New
+  Game (guided)** — the genre survey + hardware checkboxes — instead of only the
+  copy-an-example path, and gains a **"Make it yours"** step with one-click
+  buttons for **New Sprite**, **Add Sound Effect** and **Insert Snippet**. The
+  wizard was only reachable via the command palette / empty dashboard before —
+  effectively invisible.
+- **Tutorials refreshed to the current flow**: tutorial 1 now walks the wizard
+  (survey → checkboxes → *you already move a character*), tutorial 2 starts from
+  **New Sprite** (create from scratch, then draw → Add Sprite with tile numbers
+  computed), and a **new tutorial 3 — "Give it sound and collision"** covers Add
+  Sound Effect + the collision snippets (the exact chain that built Star
+  Catcher). The AI tutorial now shows the `build_and_run` verify loop.
+
 ## [0.57.0] — 2026-07-11
 
 ### Added — New Sprite: actually *create* graphics (not just view/edit existing)

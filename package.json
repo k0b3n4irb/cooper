@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.57.0",
+  "version": "0.57.1",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -359,13 +359,14 @@
           },
           {
             "id": "project",
-            "title": "Create your first project",
-            "description": "No project yet? Start from a **real SDK example** — Cooper copies it out of the SDK tree, wires its Makefile to your setup, and runs the first build for you.\n\n[New Project…](command:cooper.newProject)\n\n(Already have a project folder? Just open it — Cooper detects the Makefile.)",
+            "title": "Create your first game (guided)",
+            "description": "Answer a short survey — **what kind of game?** (platformer, RPG, shmup, racing…) — tick the hardware you want (sound, SRAM save, SA-1, SuperFX…), and Cooper generates the whole project: Makefile, libraries, graphics mode, and a starter where **you already move a character with the D-pad**.\n\n[🎮 Create New Game…](command:cooper.createNewGame)\n\nPrefer starting from a real SDK example (breakout, hello_world…)? [New Project…](command:cooper.newProject) — or just open an existing project folder.",
             "media": {
               "image": "media/cooper-preview.png",
-              "altText": "A freshly built example frame"
+              "altText": "A freshly built game frame"
             },
             "completionEvents": [
+              "onCommand:cooper.createNewGame",
               "onCommand:cooper.newProject"
             ]
           },
@@ -403,6 +404,20 @@
             },
             "completionEvents": [
               "onCommand:cooper.preview"
+            ]
+          },
+          {
+            "id": "create",
+            "title": "Make it yours — art, sound, code",
+            "description": "Everything you need to turn the starter into *your* game, no external tools required:\n\n[✏️ New Sprite (create + draw one)…](command:cooper.newSprite) — a blank canvas at your mode's sprite size, opened in the paint editor. Then **Add Sprite** wires it into the game with the tile numbers computed.\n\n[🔊 Add Sound Effect (from a WAV)…](command:cooper.addSoundEffect) — Cooper builds the soundbank and hands you the C to play it.\n\n[🧩 Insert Snippet (collision, …)…](command:cooper.insertSnippet) — working, SDK-correct code (AABB collision, tile collision…), with the Makefile wired for you.",
+            "media": {
+              "image": "media/cooper-dashboard.png",
+              "altText": "The Cooper dashboard"
+            },
+            "completionEvents": [
+              "onCommand:cooper.newSprite",
+              "onCommand:cooper.addSoundEffect",
+              "onCommand:cooper.insertSnippet"
             ]
           },
           {

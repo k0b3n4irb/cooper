@@ -41,6 +41,10 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   feedback: "editors are viewers, can't create"). `createIndexedPng` primitive +
   `Cooper: New Sprite…` (blank canvas at mode size → paint editor); Edit Tiles
   offers it instead of dead-ending. Kills dogfood #1 F5.
+- **0.57.1:** discoverability (user: "c'est un peu à l'aveugle") — the walkthrough
+  now leads with **Create New Game** + a "Make it yours" step (New Sprite / Add
+  Sound / Insert Snippet); tutorials refreshed (tut 1 = wizard, tut 2 = New
+  Sprite, new tut 3 = sound + collision, tut 9 = build_and_run).
 - **0.51.2 (D-072):** consumed **opensnes v0.29.1** — the two bugs Cooper filed
   (#99 cc65816 RMW; #100 gfx4snes -T char-names). Verified both real in the
   delivered binaries first, bumped CI pin, cross-checked `sheetFrameTiles` vs the

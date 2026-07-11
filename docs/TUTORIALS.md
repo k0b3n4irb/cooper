@@ -6,66 +6,106 @@ pointed at your OpenSNES SDK + luna (one-time setup: [User Guide §1–2](USER_G
 
 | # | You want to… | Uses |
 |---|---|---|
-| [1](#1-from-zero-to-a-game-on-screen) | get a game running from nothing | New Project · Build · Run · Play |
-| [2](#2-draw-a-sprite-and-make-it-walk) | draw a sprite and animate it | Palette/Tile editors · Metasprite export |
-| [3](#3-find-and-fix-a-crash) | find why the game crashes | Breakpoints · Locals · Stepping |
-| [4](#4-why-did-this-variable-change) | catch what corrupts a variable | Data breakpoint · Memory trace |
-| [5](#5-my-game-drops-frames) | find the slow code | Frame profiler |
-| [6](#6-turn-a-bug-into-a-test-that-never-comes-back) | lock a fixed bug with a test | Record · Gameplay tests |
-| [7](#7-ship-your-game-to-a-real-snes) | run it on hardware | Validate · Deploy |
-| [8](#8-let-your-ai-pair-on-opensnes) | make your AI OpenSNES-fluent | Configure AI |
+| [1](#1-from-zero-to-a-game-on-screen) | get a game running from nothing | **Create New Game (guided)** · Build · Run · Play |
+| [2](#2-create-a-sprite-and-make-it-walk) | create a sprite and animate it | New Sprite · Palette/Tile editors · Add Sprite |
+| [3](#3-give-it-sound-and-collision) | add a sound effect and collision | Add Sound Effect · Insert Snippet |
+| [4](#4-find-and-fix-a-crash) | find why the game crashes | Breakpoints · Locals · Stepping |
+| [5](#5-why-did-this-variable-change) | catch what corrupts a variable | Data breakpoint · Memory trace |
+| [6](#6-my-game-drops-frames) | find the slow code | Frame profiler |
+| [7](#7-turn-a-bug-into-a-test-that-never-comes-back) | lock a fixed bug with a test | Record · Gameplay tests |
+| [8](#8-ship-your-game-to-a-real-snes) | run it on hardware | Validate · Deploy |
+| [9](#9-let-your-ai-pair-on-opensnes) | make your AI OpenSNES-fluent | Configure AI |
 
 ---
 
 ## 1. From zero to a game on screen
 
-**Goal:** go from an empty folder to your game running in a window.
+**Goal:** go from an empty folder to a game you can already steer.
 
-1. **Command Palette → `Cooper: New Project…`** (or click **✨ New Project** on
-   the dashboard). Pick a starting point — `text/hello_world` for the minimal
-   one, or a full game like `games/breakout` — then a name and a folder.
-2. Cooper copies that SDK example out of the SDK tree, wires its Makefile to
-   your setup, sets up C IntelliSense, and **runs the first build**. Click
-   **Open Project**.
-3. Click **▶ Run** (sidebar or dashboard) — a rendered frame appears inline.
-4. Click **🎮 Play** — the game opens in a **native window** at 60 fps with
-   sound; grab your keyboard/gamepad and play.
+1. **Command Palette → `Cooper: Create New Game…`** (or click **🎮 Create New
+   Game** on the dashboard — it's also the first step of the *Get Started with
+   Cooper* walkthrough, Help → Welcome).
+2. **Answer the survey:** what kind of game? (platformer, RPG, shmup, fighting,
+   racing, puzzle, adventure — or *custom* if you want to pick everything
+   yourself). Cooper prefills the right SNES profile: graphics mode, sprite
+   sizes, library modules.
+3. **Tick the hardware you want** — sound (on by default), battery save (SRAM),
+   FastROM, HiROM, SA-1, SuperFX. This decides the Makefile flags for you.
+4. Pick a name + folder. Cooper **generates the project** (Makefile, starter
+   `main.c`, `.cooper/graphics.json`, C IntelliSense) and **runs the first
+   build**. Click **Open Project**.
+5. Click **▶ Run** — and *you're already playing*: the starter shows a character
+   on a genre-coloured backdrop that **moves with the D-pad** (4-way for
+   top-down games, left-right for side-scrollers). No black screen.
+6. Click **🎮 Play** — the game opens in a **native window** at 60 fps with
+   sound; grab your keyboard/gamepad.
 
-**You now have:** a buildable, runnable, playable project that lives in its own
-folder. Edit `main.c` and press Run again — or turn on **`Cooper: Toggle Watch`**
-so every save rebuilds and refreshes the preview automatically.
+**You now have:** a buildable, runnable, steerable game. Edit `main.c` and press
+Run again — or turn on **`Cooper: Toggle Watch`** so every save rebuilds and
+refreshes the preview automatically.
 
----
-
-## 2. Draw a sprite and make it walk
-
-**Goal:** author a sprite's colours and pixels, then get correct C data for it.
-
-1. **Palette** — right-click your sprite's indexed `.png` → **Edit Palette
-   (SNES BGR555)**. Each R/G/B channel is 0–31 (real hardware gamut); rows of 16
-   are the sub-palettes; entry 0 is transparent. Drag the sliders — the image
-   recolours live — then **Save to PNG**.
-2. **Pixels** — right-click the same `.png` → **Edit Tiles / Sprites**. Paint on
-   the zoomable grid (grey lines = 8×8 tiles, blue = the sprite cell). Draw the
-   frames of a walk cycle side by side.
-3. **Preview the animation** — in the tile editor, set *from cell*, *frames* and
-   *fps*, press ▶: the consecutive cells loop **while you keep painting**, so you
-   tune the motion in place.
-4. **Get the C** — right-click the `.png` → **Export Metasprite / Animation
-   (C)…**. Choose the sub-sprite size (e.g. 32) and the grid (e.g. `2x2` for a
-   64×64 character), then optional animation frames. Cooper opens a generated
-   file with a `MetaspriteItem[]` table — with the **correct 8×8 OAM tile names
-   computed from your sheet** — and a `DECLARE_ANIM_CLIP`.
-5. Use it in your loop: `oamDrawMeta(0, x, y, hero_frame0, baseTile, 0,
-   OBJ_LARGE);` and `animPlay(&p, &hero_anim); tile = animTick(&p);`. **Build**;
-   your PNG edits regenerate the `.pic`/`.pal` automatically.
-
-**You now have:** hardware-correct art and the exact C data the OpenSNES library
-consumes — no hand-counting tile numbers.
+> Prefer starting from a **real SDK example** (breakout, hello_world…)? Use
+> **`Cooper: New Project…`** (**✨** on the dashboard) — Cooper copies it out of
+> the SDK tree and wires it up the same way.
 
 ---
 
-## 3. Find and fix a crash
+## 2. Create a sprite and make it walk
+
+**Goal:** create art from scratch, draw it, and get it moving in the game.
+
+1. **Create the canvas** — **`Cooper: New Sprite (create + draw one)…`**. Pick a
+   size (8/16/32/64 px — Cooper defaults to your graphics mode's sprite size) and
+   a name. You get a fresh blank canvas in `res/`, with a ready 16-colour
+   palette, opened straight in the paint editor. (Starting from existing art
+   instead? Right-click any indexed `.png` → **Edit Tiles / Sprites**.)
+2. **Draw** — paint on the zoomable grid (grey lines = 8×8 tiles, blue = the
+   sprite cell; index 0 is transparent). For an animation, make the canvas a
+   strip and draw the walk frames side by side.
+3. **Colours** — right-click the `.png` → **Edit Palette (SNES BGR555)**. Each
+   R/G/B channel is 0–31 (the real hardware gamut); the image recolours live.
+4. **Preview the animation** — in the tile editor, set *from cell*, *frames* and
+   *fps*, press ▶: the consecutive cells loop **while you keep painting**.
+5. **Put it in the game** — right-click the `.png` → **Add Sprite…**. Cooper
+   converts it, wires the Makefile + `data.asm`, and hands you the C to load and
+   place it (clipboard + a tab) — **tile numbers computed**, including per-frame
+   tiles for a multi-frame sheet (`hero_tiles[frame]`). Paste, **Build**, done.
+6. **Big characters** (larger than one hardware sprite): right-click the `.png` →
+   **Export Metasprite / Animation (C)…** for a `MetaspriteItem[]` table with the
+   correct 8×8 OAM tile names, plus `DECLARE_ANIM_CLIP` for clips — then
+   `oamDrawMeta(…)` / `animPlay`/`animTick` in your loop.
+
+**You now have:** art you created inside Cooper, on screen, with the exact C the
+library consumes — no hand-counting tile numbers.
+
+---
+
+## 3. Give it sound and collision
+
+**Goal:** a chime when something happens, and things that actually touch.
+
+1. **Author a sound** in any editor (Audacity, sfxr, your DAW…) and export a
+   **WAV** — or grab any short WAV you have the rights to.
+2. **`Cooper: Add Sound Effect…`** (or right-click the `.wav`). Cooper converts
+   it to the soundbank the SNES sound chip needs (resampling to 32 kHz and
+   trimming to fit its RAM if needed), wires `USE_SNESMOD` + the soundbank into
+   the Makefile, and hands you the C: initialise once (`snesmodInit` — before the
+   game loop, it costs a few frames), `snesmodProcess()` each frame, and
+   `snesmodPlayEffect(...)` on the event. Paste, **Build**, and you hear it.
+3. **Collision** — **`Cooper: Insert Snippet…`** → pick from the **Collision**
+   category: *AABB overlap* (catching/hitting), *AABB with push-out* (walls and
+   platforms), or *tile collision* (a box vs the map). Cooper wires the
+   `collision` library module into the Makefile and inserts working, SDK-correct
+   code at your cursor (with the `#include`s added).
+4. Combine them: when `collideRect(&player, &pickup)` hits, play the chime and
+   score. **Build → Run.**
+
+**You now have:** feedback and physics — the two things that make a demo feel
+like a game. (This exact chain built Star Catcher, our dogfood game.)
+
+---
+
+## 4. Find and fix a crash
 
 **Goal:** stop at your code, see the state, step through the bug.
 
@@ -89,7 +129,7 @@ not `printf` archaeology.
 
 ---
 
-## 4. Why did this variable change?
+## 5. Why did this variable change?
 
 **Goal:** catch the code that writes a variable it shouldn't.
 
@@ -112,7 +152,7 @@ assignment by hand.
 
 ---
 
-## 5. My game drops frames
+## 6. My game drops frames
 
 **Goal:** find where the CPU time goes and whether you fit the frame budget.
 
@@ -129,7 +169,7 @@ data instead of guesses about what's slow.
 
 ---
 
-## 6. Turn a bug into a test that never comes back
+## 7. Turn a bug into a test that never comes back
 
 **Goal:** reproduce a gameplay bug deterministically and keep it fixed forever.
 
@@ -153,7 +193,7 @@ the same `make test` runs in the editor and on your build server.
 
 ---
 
-## 7. Ship your game to a real SNES
+## 8. Ship your game to a real SNES
 
 **Goal:** put your ROM on a flashcart and boot it on hardware.
 
@@ -171,7 +211,7 @@ the same `make test` runs in the editor and on your build server.
 
 ---
 
-## 8. Let your AI pair on OpenSNES
+## 9. Let your AI pair on OpenSNES
 
 **Goal:** make Copilot / Claude Code / Cursor actually good at OpenSNES.
 
@@ -181,9 +221,14 @@ the same `make test` runs in the editor and on your build server.
    OpenSNES SDK as MCP servers**.
 2. Reload the window (or start your assistant's agent mode).
 3. Now your AI can **look up the real API** from your installed SDK (exact
-   signatures, symbol search, hardware constraints) instead of guessing, and
-   **drive luna** to peek VRAM/memory, read state and screenshot — so it can
-   **verify its own code on cycle-accurate hardware**, not just claim it works.
+   signatures, symbol search, hardware constraints) instead of guessing, and —
+   the key one — call **`build_and_run`**: one tool that builds your project
+   **and** runs it on luna, handing back the compile errors **or a screenshot of
+   what it renders plus PPU/CPU state**. Your assistant *sees* the frame and
+   self-corrects. For deeper digs it can drive luna directly (peek VRAM/memory,
+   breakpoints, traces).
+4. Try it: ask your assistant *"make the background blue and verify it"* — watch
+   it edit, build, run, look at the frame, and fix itself if it got it wrong.
 
 **You now have:** an assistant that writes correct OpenSNES C and checks itself
 in the emulator — the payoff of owning the whole vertical.
