@@ -121,6 +121,7 @@ export function buildTreeModel(p: ProjectInfo): TreeNode[] {
         cat('create', 'CREATE', [
             action('newsprite', 'New Sprite (draw one)…', 'edit', 'cooper.newSprite'),
             action('newsound', 'New Sound Effect (synth)…', 'music', 'cooper.newSoundEffect'),
+            action('newmap', 'New Tilemap (Tiled)…', 'map', 'cooper.newTilemap'),
             action('addsprite', 'Add Sprite (from a PNG)…', 'file-media', 'cooper.addSprite'),
             action('addsound', 'Add Sound Effect (from a WAV)…', 'unmute', 'cooper.addSoundEffect'),
             action('editpalette', 'Edit Palette', 'symbol-color', 'cooper.editPalette'),

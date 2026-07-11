@@ -1065,6 +1065,85 @@ if (cp.spawnSync('clang', ['--version']).status !== 0 || !fs.existsSync(path.joi
 }
 try { fs.unlinkSync(tmpSnip); } catch {}
 
+// --- D-082: New Tilemap scaffolder — tmj tmx2snes ACCEPTS + full build ---
+console.log('\n=== tilemapScaffold: tmj + rules + bridge, and the map builds ===');
+const tmpTms = path.join(os.tmpdir(), `cooper_tmscaffold_${process.pid}.cjs`);
+esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'tilemapScaffold.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpTms });
+const TMS = require(tmpTms);
+const tmjTxt = TMS.renderTmj({ widthTiles: 64, heightTiles: 32, tilesetImage: 'tileset.png', imageWidth: 128, imageHeight: 16 });
+const tmj = JSON.parse(tmjTxt);
+check('renderTmj: valid Tiled JSON — BG1 tilelayer + Entities objectgroup + embedded tileset',
+    tmj.layers[0].name === 'BG1' && tmj.layers[0].data.length === 64 * 32
+    && tmj.layers[1].type === 'objectgroup' && tmj.tilesets[0].tilecount === 32
+    && tmj.tilesets[0].tiles.length === 32 && tmj.tilesets[0].tiles[0].properties.some((p) => p.name === 'attribute'));
+check('renderTmj: cute_tiled-safe serialization (no ": " after keys, data inline)',
+    !tmjTxt.includes('": ') && /"data":\[1, 1/.test(tmjTxt));
+check('mapSymbolBase sanitizes', TMS.mapSymbolBase('level 1!') === 'level_1_' && TMS.mapSymbolBase('9lives') === '_9lives');
+check('appendMapRules: TMX2SNES var + gfx -m rule + tmx rule + combined dep, idempotent', (() => {
+    let mk = 'include $(OPENSNES)/make/common.mk\n';
+    mk = TMS.appendMapRules(mk, 'res/level1.tmj', 'res/tileset.png');
+    const once = mk;
+    mk = TMS.appendMapRules(mk, 'res/level1.tmj', 'res/tileset.png');
+    return once === mk && once.includes('TMX2SNES := $(OPENSNES)/bin/tmx2snes')
+        && once.includes('-s 8 -o 48 -u 16 -p -m') && once.includes('res/BG1.m16 res/level1.t16 res/level1.b16:')
+        && once.includes('combined.asm: res/tileset.pic res/BG1.m16');
+})());
+check('mapDataAsmSection: tileset superfree + map data out of bank $00 + 5 labels', (() => {
+    const a = TMS.mapDataAsmSection('level1', 'res/level1.tmj', 'res/tileset.png');
+    return a.includes('superfree') && a.includes('semifree bank 2')
+        && ['level1_tiles:', 'level1_pal:', 'level1_map:', 'level1_att:', 'level1_def:'].every((l) => a.includes(l))
+        && a.includes('.incbin "res/BG1.m16"') && a.includes('.incbin "res/level1.b16"');
+})());
+check('mapSnippet: bg init + mapLoad + camera loop + collision/objects pointers', (() => {
+    const s = TMS.mapSnippet('level1', 64);
+    return s.includes('bgInitTileSet(0, level1_tiles') && s.includes('mapLoad(level1_map, level1_def, level1_att)')
+        && s.includes('mapUpdateCamera') && s.includes('mapVblank()') && s.includes('mapGetMetaTilesProp') && s.includes('objLoadObjects');
+})());
+// REAL: scaffold a whole map project — tmx2snes must accept OUR tmj, and it must build.
+if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !fs.existsSync(path.join(OPENSNES, 'bin', 'tmx2snes'))) {
+    skipped('SDK make / tmx2snes not available');
+} else {
+    const tmpPgTm = path.join(os.tmpdir(), `cooper_pg_fortm_${process.pid}.cjs`);
+    const tmpPngTm = path.join(os.tmpdir(), `cooper_png_fortm_${process.pid}.cjs`);
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'projectGen.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPgTm });
+    esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'src', 'pngPalette.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: tmpPngTm });
+    const PGtm = require(tmpPgTm);
+    const PNGtm = require(tmpPngTm);
+    const dir = path.join(os.tmpdir(), `cooper_maptest_${process.pid}`);
+    try {
+        fs.mkdirSync(path.join(dir, 'res'), { recursive: true });
+        const pal = Array.from({ length: 16 }, (_, i) => ({ r: (i * 16) % 256, g: (i * 37) % 256, b: (i * 73) % 256 }));
+        const idx = new Uint8Array(128 * 16);
+        for (let y = 0; y < 16; y++) { for (let x = 0; x < 128; x++) { idx[y * 128 + x] = 1 + ((Math.floor(x / 8) + Math.floor(y / 8)) % 15); } }
+        fs.writeFileSync(path.join(dir, 'res', 'tileset.png'), PNGtm.createIndexedPng(128, 16, pal, idx));
+        const spec = { name: 'maptest', graphics: { mode: 1, objSize: 0 }, build: { sound: false }, modules: ['console', 'background', 'sprite', 'dma', 'input', 'map'] };
+        let mk = PGtm.renderMakefile(spec, OPENSNES);
+        mk = SS.ensureAsmSrc(mk, 'data.asm');
+        mk = TMS.appendMapRules(mk, 'res/level1.tmj', 'res/tileset.png');
+        fs.writeFileSync(path.join(dir, 'Makefile'), mk);
+        fs.writeFileSync(path.join(dir, 'res', 'level1.tmj'), TMS.renderTmj({ widthTiles: 64, heightTiles: 32, tilesetImage: 'tileset.png', imageWidth: 128, imageHeight: 16 }));
+        fs.writeFileSync(path.join(dir, 'data.asm'), '; data.asm\n' + TMS.mapDataAsmSection('level1', 'res/level1.tmj', 'res/tileset.png'));
+        fs.writeFileSync(path.join(dir, 'main.c'),
+            '#include <snes.h>\n#include <snes/map.h>\n'
+            + 'extern u8 level1_tiles[], level1_tiles_end[];\nextern u8 level1_pal[], level1_pal_end[];\n'
+            + 'extern u8 level1_map[], level1_def[], level1_att[];\ns16 camx = 128;\n'
+            + 'int main(void){ u16 pad; consoleInit();\n'
+            + '  bgInitTileSet(0, level1_tiles, level1_pal, 0, level1_tiles_end-level1_tiles, level1_pal_end-level1_pal, BG_16COLORS, 0x2000);\n'
+            + '  bgSetMapPtr(0, 0x6800, SC_64x32); setMode(BG_MODE1,0); setMainScreen(LAYER_BG1); WaitForVBlank();\n'
+            + '  mapLoad(level1_map, level1_def, level1_att); setScreenOn();\n'
+            + '  while(1){ mapUpdate(); pad=padHeld(0); if(pad&KEY_RIGHT)camx++; mapUpdateCamera(camx,0); WaitForVBlank(); mapVblank(); } return 0; }\n');
+        const r = cp.spawnSync('make', [], { cwd: dir, encoding: 'utf8', timeout: 180000 });
+        check('scaffolded tilemap: tmx2snes accepts OUR tmj (.m16/.b16/.t16 emitted) and it builds a .sfc',
+            r.status === 0 && fs.existsSync(path.join(dir, 'maptest.sfc'))
+            && fs.existsSync(path.join(dir, 'res', 'BG1.m16')) && fs.existsSync(path.join(dir, 'res', 'level1.b16')) && fs.existsSync(path.join(dir, 'res', 'level1.t16')));
+        if (r.status !== 0) { console.log((r.stdout || '').split('\n').slice(-8).join('\n')); }
+    } finally {
+        try { fs.unlinkSync(tmpPgTm); fs.unlinkSync(tmpPngTm); } catch {}
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+}
+try { fs.unlinkSync(tmpTms); } catch {}
+
 // --- C6 spine: hybrid graphics-config resolution (pure, real example .c) ---
 console.log('\n=== graphicsConfig: parse code + override precedence ===');
 const tmpGc = path.join(os.tmpdir(), `cooper_graphicscfg_${process.pid}.cjs`);

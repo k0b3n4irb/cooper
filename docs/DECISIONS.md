@@ -1159,6 +1159,35 @@ rationale and the docs that grounded it. Newest last.
   example: 2 s drained (>60k samples), **>10 % non-silent**, encodes to a
   playable wav.
 
+### D-082 — New Tilemap: the Tiled bridge, not a Tiled clone (2026-07-11)
+- **Context:** user asked for Tiled-like map tooling (paint tiles, collision,
+  spawns, a code-usable array). Grounded: the SDK's map pipeline IS Tiled —
+  `tmx2snes` converts a `.tmj` into `.m16` (map) + `.b16` (per-tile `attribute`
+  = collision) + `.o16` (Entities object layer = spawns) + `.t16`, consumed by
+  `mapLoad`/`mapGetMetaTilesProp`/`objLoadObjects` (examples `maps/tiled`,
+  `games/mapandobjects`). The cliff is the WIRING, not the editor. This resolves
+  the D-042-vs-plan-B2 tension: **bridge Tiled** (per the memory/garde-fou),
+  don't build a lesser in-editor clone; a light complement painter can come
+  later if the dogfood demands it.
+- **Decision:** `Cooper: New Tilemap (Tiled)…` — pure `tilemapScaffold.ts`:
+  `renderTmj` (a valid Tiled map: BG1 tilelayer, Entities objectgroup, embedded
+  tileset with `attribute`/`palette`/`priority` pre-declared on every tile),
+  `appendMapRules` (TMX2SNES var + the example's exact gfx flags `-s 8 -o 48
+  -u 16 -p -m` + tmx rule + combined.asm dep, idempotent), `mapDataAsmSection`
+  (tileset superfree; map data `semifree bank 2` — the example's layout),
+  `mapSnippet` (bgInitTileSet/mapLoad/camera loop + collision/objects pointers).
+  Glue picks the tileset PNG, offers **Open in Tiled** (spawn `tiled`, fallback
+  mapeditor.org).
+- **Load-bearing finding:** `tmx2snes` (cute_tiled) REJECTS normal JSON
+  pretty-printing — `": "` after keys and numeric arrays split one-per-line both
+  fail with "Invalid integer". Bisected by reserializing the WORKING example
+  until it broke. The generator emits Tiled's exact form (`":"`, data inline),
+  proven by converting the SDK example to **byte-identical** `.m16`/`.b16`/`.t16`.
+- **Verified:** pure tests (tmj shape, safe serialization, rules idempotence,
+  bridge labels, snippet) + CI e2e: a scaffolded map project **builds a `.sfc`**
+  with `.m16`/`.b16`/`.t16` emitted from OUR tmj; the rendered map (checker of
+  all 32 tiles) verified on screen in luna. 487 Node + 10 integration.
+
 ### D-081 — SFX Synth: create sound from scratch (audio reflection, 2026-07-11)
 - **Context:** user reflection on sound tooling ("on réfléchit avant de faire").
   Grounded inventory: Cooper could *listen* (Audition = whole-game mix) and

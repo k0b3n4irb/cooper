@@ -54,6 +54,12 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   palette-only commands; DEBUG collapsed = pro bench), 39 titles renamed to a
   6-verb taxonomy (IDs unchanged), icons everywhere, `.c`/`.sfc` context menus,
   settings descriptions.
+- **0.62.0 (D-082):** **New Tilemap (Tiled)…** — the maps bridge: generated
+  ready-to-paint `.tmj` + Makefile rules + data.asm + mapLoad C; collision via
+  `attribute`, spawns via Entities layer; Open in Tiled. Finding: tmx2snes's
+  cute_tiled rejects `": "` + per-line arrays (serializer proven byte-identical
+  vs the SDK example). Map rendering verified in luna. Resolves D-042/B2:
+  bridge Tiled, no clone.
 - **0.61.0 (D-081):** **SFX Synth** — `New Sound Effect (synth)…`: sfxr-style
   presets (coin/jump/laser/hit/explosion/powerup/blip) + sliders + WebAudio
   preview → `sfx/<name>.wav` → the proven Add Sound pipeline. Pure deterministic

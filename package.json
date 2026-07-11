@@ -2,7 +2,7 @@
   "name": "cooper",
   "displayName": "Cooper — OpenSNES IDE",
   "description": "All-in-one SNES game development for the OpenSNES SDK + luna emulator: WLA-DX 65816 highlighting, C support via clangd, and project tooling.",
-  "version": "0.61.0",
+  "version": "0.62.0",
   "publisher": "opensnes",
   "license": "MIT",
   "repository": {
@@ -275,6 +275,12 @@
         "title": "New Sound Effect (synth)…",
         "category": "Cooper",
         "icon": "$(music)"
+      },
+      {
+        "command": "cooper.newTilemap",
+        "title": "New Tilemap (Tiled)…",
+        "category": "Cooper",
+        "icon": "$(map)"
       },
       {
         "command": "cooper.addSprite",

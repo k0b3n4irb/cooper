@@ -4,6 +4,28 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.62.0] — 2026-07-11
+
+### Added — New Tilemap: levels with collision and spawns, Tiled-powered
+
+- **Cooper: New Tilemap (Tiled)…** — the maps counterpart of Add Sprite. Pick
+  your tileset PNG and a map size; Cooper generates a **ready-to-paint Tiled
+  map** (`.tmj`) and wires everything: the Makefile rules (tileset `gfx4snes -m`
+  + `tmx2snes`), the `data.asm` bridge (map data placed out of bank $00), and
+  the C to load and scroll it (`mapLoad`/`mapUpdate`/camera). Paint tiles in
+  Tiled, mark **collision** per tile (`attribute` → `T_SOLID`/`T_LADDER`/…, read
+  back with `mapGetMetaTilesProp`), drop **spawns** on the Entities layer —
+  **Build** converts it all. *Open in Tiled* launches the editor (or points you
+  at mapeditor.org). Cooper deliberately doesn't clone Tiled — it's the SDK's
+  native map format; Cooper owns the wiring + the hardware-faithful Show Tilemap
+  check.
+- Grounded the hard way: `tmx2snes`'s JSON parser rejects standard
+  pretty-printing (`": "` after keys, one-number-per-line arrays) — Cooper's
+  generated `.tmj` uses the exact Tiled serialization, verified by converting
+  the SDK example to **byte-identical** binaries, and in CI by building a
+  scaffolded map project to a `.sfc` (the map was also verified rendering in
+  luna).
+
 ## [0.61.0] — 2026-07-11
 
 ### Added — SFX Synth: create your own sounds from scratch

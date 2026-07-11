@@ -470,13 +470,30 @@ your sheet** — the thing the library asks the editor to get right (gfx4snes
 Cooper also emits a `DECLARE_ANIM_CLIP` you drive with `animPlay`/`animTick`.
 The generated C opens in a new editor, ready to paste (or `#include`).
 
-### Tilemaps
+### Tilemaps (levels: tiles, collision, spawns)
+
+**Cooper: New Tilemap (Tiled)…** sets a whole level up for you: pick your
+tileset PNG and a map size, and Cooper generates a **ready-to-paint Tiled map**
+(`res/<name>.tmj`) wired end to end — the Makefile rules (`gfx4snes -m` +
+`tmx2snes`), the `data.asm` bridge, and the C to load and scroll it
+(`mapLoad`/`mapUpdate`/camera) on your clipboard. Then paint in **Tiled**
+(free — the *Open in Tiled* button launches it or takes you to mapeditor.org):
+
+- **tiles** — paint the `BG1` layer with your tileset;
+- **collision** — set each tile's **`attribute`** property (`T_SOLID`,
+  `T_LADDER`, `T_SPIKE`… — `mapGetMetaTilesProp(x,y)` reads it back in C);
+- **spawns** — drop objects on the **Entities** layer (`objLoadObjects()` + the
+  object engine consume them — see the SDK's `games/mapandobjects`).
+
+**Build** converts everything automatically (`.m16` map, `.b16` collision,
+`.o16` objects). Cooper deliberately does **not** clone Tiled — it's the
+industry-standard editor and the SDK's native format; Cooper owns the wiring
+and the hardware-faithful check below.
 
 **Right-click a `.map` → Show Tilemap** to see the background the way
 the SNES draws it — Cooper reads the `.map` + `.pic` tileset + `.pal` and applies
-the real per-cell attributes (**sub-palette**, **H/V flip**). This is a *viewer*:
-for **authoring** tilemaps, use **Tiled** (`.tmj`) — the SDK converts it with
-`tmx2snes` in the build.
+the real per-cell attributes (**sub-palette**, **H/V flip**) — which Tiled does
+not show.
 
 ## 12. Make your AI OpenSNES-aware
 
