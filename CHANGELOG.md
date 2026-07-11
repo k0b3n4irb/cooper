@@ -4,6 +4,21 @@ All notable changes to Cooper are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.62.1] — 2026-07-11
+
+### Fixed — New Tilemap ships WORKING collision (dogfood #4 findings)
+
+- The generated snippet's collision no longer relies on the SDK's
+  `mapGetMetaTilesProp` — **it returns garbage when called from C** (it reads
+  its WRAM table with the caller's data bank; found live in dogfood #4, filed
+  as opensnes#103). The snippet now ships a small `<map>_prop(x, y)` read-back
+  over the converted data (same lookup, pure C), and the `data.asm` bridge
+  places map data in **bank 0** so C's near pointers can actually read it (the
+  second live finding). Verified in luna on a real level: the hero stops dead
+  at a `T_SOLID` wall and a `T_SPIKE` strip respawns him; the Entities spawn
+  round-trips byte-exact into `.o16`. Also documented that
+  `mapUpdateCamera(x,y)` takes the *player* position (the view follows it).
+
 ## [0.62.0] — 2026-07-11
 
 ### Added — New Tilemap: levels with collision and spawns, Tiled-powered

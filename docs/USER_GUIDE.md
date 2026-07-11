@@ -481,7 +481,9 @@ tileset PNG and a map size, and Cooper generates a **ready-to-paint Tiled map**
 
 - **tiles** — paint the `BG1` layer with your tileset;
 - **collision** — set each tile's **`attribute`** property (`T_SOLID`,
-  `T_LADDER`, `T_SPIKE`… — `mapGetMetaTilesProp(x,y)` reads it back in C);
+  `T_LADDER`, `T_SPIKE`…) — the generated snippet includes a `<map>_prop(x,y)`
+  helper that reads it back in C (the SDK's `mapGetMetaTilesProp` currently
+  returns garbage from C — opensnes#103; Cooper's helper does the same lookup);
 - **spawns** — drop objects on the **Entities** layer (`objLoadObjects()` + the
   object engine consume them — see the SDK's `games/mapandobjects`).
 

@@ -1088,16 +1088,17 @@ check('appendMapRules: TMX2SNES var + gfx -m rule + tmx rule + combined dep, ide
         && once.includes('-s 8 -o 48 -u 16 -p -m') && once.includes('res/BG1.m16 res/level1.t16 res/level1.b16:')
         && once.includes('combined.asm: res/tileset.pic res/BG1.m16');
 })());
-check('mapDataAsmSection: tileset superfree + map data out of bank $00 + 5 labels', (() => {
+check('mapDataAsmSection: tileset superfree + map data bank 0 (C-readable) + 5 labels', (() => {
     const a = TMS.mapDataAsmSection('level1', 'res/level1.tmj', 'res/tileset.png');
-    return a.includes('superfree') && a.includes('semifree bank 2')
+    return a.includes('superfree') && a.includes('semifree bank 0')
         && ['level1_tiles:', 'level1_pal:', 'level1_map:', 'level1_att:', 'level1_def:'].every((l) => a.includes(l))
         && a.includes('.incbin "res/BG1.m16"') && a.includes('.incbin "res/level1.b16"');
 })());
-check('mapSnippet: bg init + mapLoad + camera loop + collision/objects pointers', (() => {
+check('mapSnippet: bg init + mapLoad + WORKING collision read-back + camera + objects', (() => {
     const s = TMS.mapSnippet('level1', 64);
     return s.includes('bgInitTileSet(0, level1_tiles') && s.includes('mapLoad(level1_map, level1_def, level1_att)')
-        && s.includes('mapUpdateCamera') && s.includes('mapVblank()') && s.includes('mapGetMetaTilesProp') && s.includes('objLoadObjects');
+        && s.includes('mapUpdateCamera') && s.includes('mapVblank()') && s.includes('level1_prop(') && s.includes('T_SOLID')
+        && !s.includes('mapGetMetaTilesProp(') && s.includes('objLoadObjects');
 })());
 // REAL: scaffold a whole map project — tmx2snes must accept OUR tmj, and it must build.
 if (!fs.existsSync(path.join(OPENSNES, 'make', 'common.mk')) || !fs.existsSync(path.join(OPENSNES, 'bin', 'tmx2snes'))) {

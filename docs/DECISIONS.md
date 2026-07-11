@@ -1187,6 +1187,15 @@ rationale and the docs that grounded it. Newest last.
   bridge labels, snippet) + CI e2e: a scaffolded map project **builds a `.sfc`**
   with `.m16`/`.b16`/`.t16` emitted from OUR tmj; the rendered map (checker of
   all 32 tiles) verified on screen in luna. 487 Node + 10 integration.
+- **0.62.1 addendum (dogfood #4, Crystal Cavern):** two live findings — (F14)
+  `mapGetMetaTilesProp` returns garbage from C (reads `$7E:3000` with caller's
+  DB=$00; **opensnes#103** filed with the asm analysis) and (F15) bank-2 map
+  data is unreadable by cc65816's near pointers. Fix shipped: the bridge places
+  map data in **bank 0** and the snippet ships a working `<map>_prop(x,y)` C
+  read-back (swap back to the API when #103 lands). Also (F16)
+  `mapUpdateCamera` takes the *player* position. Collision proven in luna:
+  T_SOLID wall stops the hero (OAM pinned at 208), T_SPIKE respawns him; the
+  Entities spawn round-trips byte-exact into `.o16`. See dogfood-04.md.
 
 ### D-081 — SFX Synth: create sound from scratch (audio reflection, 2026-07-11)
 - **Context:** user reflection on sound tooling ("on réfléchit avant de faire").

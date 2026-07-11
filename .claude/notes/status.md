@@ -54,6 +54,9 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
   palette-only commands; DEBUG collapsed = pro bench), 39 titles renamed to a
   6-verb taxonomy (IDs unchanged), icons everywhere, `.c`/`.sfc` context menus,
   settings descriptions.
+- **0.62.1:** dogfood #4 (Crystal Cavern) — collision+spawns proven in luna;
+  found & fixed: mapGetMetaTilesProp broken from C (opensnes#103), bank-2 data
+  unreadable from C → snippet ships a working C read-back, map data in bank 0.
 - **0.62.0 (D-082):** **New Tilemap (Tiled)…** — the maps bridge: generated
   ready-to-paint `.tmj` + Makefile rules + data.asm + mapLoad C; collision via
   `attribute`, spawns via Entities layer; Open in Tiled. Finding: tmx2snes's
