@@ -57,6 +57,15 @@ Executing the vision plan (`.claude/plans/wiggly-bouncing-moon.md`): Cooper =
 - **0.62.1:** dogfood #4 (Crystal Cavern) — collision+spawns proven in luna;
   found & fixed: mapGetMetaTilesProp broken from C (opensnes#103), bank-2 data
   unreadable from C → snippet ships a working C read-back, map data in bank 0.
+- **F14/F15/F16 delivered on opensnes develop (2026-07-12), VERIFIED Cooper-side**:
+  f4f3d6d0 (map getters read $7E tables long — 7 reads fixed, libtest 20/20,
+  #103 closed), c665c61a (mapLoad placement doc + focusx/point-to-follow),
+  3e13a8be. Proof: the exact dogfood-#4 repro rebuilt with the ORIGINAL pattern
+  (mapGetMetaTilesProp + bank-2 data) now passes in luna (wall 208/208, spikes
+  ≥64 — was 26/74/8). Cooper 487 Node + 10 integration green vs develop.
+  **TODO at next opensnes release: flip the New Tilemap scaffold back**
+  (snippet → mapGetMetaTilesProp, data.asm → bank 2) + bump the CI pin.
+  Class lock tracked upstream as #104.
 - **0.62.0 (D-082):** **New Tilemap (Tiled)…** — the maps bridge: generated
   ready-to-paint `.tmj` + Makefile rules + data.asm + mapLoad C; collision via
   `attribute`, spawns via Entities layer; Open in Tiled. Finding: tmx2snes's
